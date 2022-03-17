@@ -1,0 +1,28 @@
+defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaAuthIdentitiesTable do
+  use Ecto.Migration
+
+  def change do
+    create table(:identities, primary_key: false<%= if not is_nil(db_prefix), do: ", prefix: \"#{db_prefix}\"" %>) do
+      add(:id, :uuid, primary_key: true)
+      add(:identity_provider, :integer, null: false)
+      add(:uid, :string, null: true)
+      add(:token, :string, null: true)
+
+      add(:user_id, references(:users, on_delete: :nothing, type: :uuid))
+      timestamps()
+    end
+    create(
+      index(:identities, [:uid, :identity_provider],
+        name: :uniq_index_on_identities_uid_and_identity_provider,
+        unique: true
+      )
+    )
+
+    create(
+      index(:identities, [:user_id, :identity_provider],
+        name: :uniq_index_on_identities_user_id_and_identity_provider,
+        unique: true
+      )
+    )
+  end
+end

@@ -1,0 +1,35 @@
+defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaAuthUsersTable do
+  use Ecto.Migration
+
+  def change do
+    create table(:users, primary_key: false<%= if not is_nil(db_prefix), do: ", prefix: \"#{db_prefix}\"" %>) do
+      add(:id, :uuid, primary_key: true)
+      add(:name, :string, size: 20, null: false)
+      add(:lastname, :string, size: 20, null: true)
+      add(:username, :string, size: 20, null: false, unique: true)
+      add(:email, :string, null: false, unique: true)
+      add(:password_hash, :string, null: true)
+      add(:status, :integer, null: false)
+      add(:unconfirmed_email, :string, size: 120, null: true, unique: true)
+      timestamps()
+    end
+    create(
+      index(:users, [:email],
+        name: :index_on_users_email,
+        unique: true
+      )
+    )
+    create(
+      index(:users, [:unconfirmed_email],
+        name: :index_on_users_verified_email,
+        unique: true
+      )
+    )
+    create(
+      index(:users, [:username],
+        name: :index_on_users_username,
+        unique: true
+      )
+    )
+  end
+end
