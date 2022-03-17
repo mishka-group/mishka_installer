@@ -9,8 +9,8 @@ defmodule MishkaInstaller.Database.PluginSchema do
     field :name, :string, null: false
     field :event, :string, null: false
     field :priority, :integer, null: false
-    field :status, MishkaInistaller.PluginStatusEnum, null: false, default: :started
-    field :depend_type, MishkaInistaller.PluginDependTypeEnum, null: false, default: :soft
+    field :status, MishkaInstaller.PluginStatusEnum, null: false, default: :started
+    field :depend_type, MishkaInstaller.PluginDependTypeEnum, null: false, default: :soft
     field :depends, {:array, :string}, null: true
     field :extra, {:array, :map}, null: false
 
