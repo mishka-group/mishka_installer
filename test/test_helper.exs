@@ -30,5 +30,4 @@ Code.require_file("test_activity_table.exs", __DIR__)
 Code.require_file("test_plugin_table.exs", __DIR__)
 :ok = Ecto.Migrator.up(TestRepo, 1, MishkaInstaller.Repo.Migrations.TestPluginTable, log: false)
 
-# Ecto.Adapters.SQL.Sandbox.mode(TestRepo, :manual)
 Process.flag(:trap_exit, true)
