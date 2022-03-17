@@ -8,7 +8,7 @@ defmodule MsihkaSendingEmailPlugin.SendingEmail do
       initial: []
 
   def initial(args) do
-    Logger.info("SendingEmail plugin was started")
+    Logger.warn("SendingEmail plugin was started")
     event = %PluginState{name: "MsihkaSendingEmailPlugin.SendingEmail", event: Atom.to_string(@ref), priority: 100}
     Hook.register(event: event)
     {:ok, @ref, args}

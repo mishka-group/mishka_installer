@@ -8,7 +8,7 @@ defmodule MsihkaSendingEmailPlugin.SendingSMS do
       initial: []
 
   def initial(args) do
-    Logger.info("SendingSMS plugin was started")
+    Logger.warn("SendingSMS plugin was started")
     event = %PluginState{name: "MsihkaSendingEmailPlugin.SendingSMS", event: Atom.to_string(@ref), priority: 1}
     Hook.register(event: event)
     {:ok, @ref, args}

@@ -8,7 +8,7 @@ defmodule MsihkaSendingEmailPlugin.SendingHalt do
       initial: []
 
   def initial(args) do
-    Logger.info("SendingHalt plugin was started")
+    Logger.warn("SendingHalt plugin was started")
     event = %PluginState{name: "MsihkaSendingEmailPlugin.SendingHalt", event: Atom.to_string(@ref), priority: 2}
     Hook.register(event: event)
     {:ok, @ref, args}

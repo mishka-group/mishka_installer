@@ -37,6 +37,7 @@ defmodule MishkaInstaller.Database.Helper do
     end
   end
 
+  # Ref: https://elixirforum.com/t/how-to-send-sandbox-allow-for-each-dynamic-supervisor-testing/46422/4
   def allow_if_sandbox(parent_pid, orphan_msg \\ :stop) do
     if sandbox_pool?() do
       monitor_parent(parent_pid, orphan_msg)
@@ -66,7 +67,6 @@ defmodule MishkaInstaller.Database.Helper do
   def get_parent_pid(state) when is_nil(state.parent_pid), do: :ok
 
   def get_parent_pid(state) do
-    IO.inspect(state)
     if Mix.env() == :test do
       allow_if_sandbox(state.parent_pid)
     else

@@ -2,8 +2,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
   use ExUnit.Case, async: true
   doctest MishkaInstaller
   alias MishkaInstaller.Hook
+  alias MsihkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
 
   setup_all _tags do
+    start_supervised(SendingEmail)
+    start_supervised(SendingSMS)
+    start_supervised(SendingHalt)
+
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
     # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
     on_exit fn ->
@@ -156,6 +161,15 @@ defmodule MishkaInstallerTest.Event.HookTest do
       ip: "127.0.1.1",
       endpoint: :admin
     }
+
+    [
+      %MishkaInstaller.PluginState{name: "MsihkaSendingEmailPlugin.SendingEmail", event: :on_test_event, priority: 100},
+      %MishkaInstaller.PluginState{name: "MsihkaSendingEmailPlugin.SendingHalt", event: :on_test_event, priority: 2},
+      %MishkaInstaller.PluginState{name: "MsihkaSendingEmailPlugin.SendingSMS", event: :on_test_event, priority: 1},
+    ]
+    |> Enum.map(&Hook.register(event: &1))
+
+    :timer.sleep(3000)
     assert Hook.call(event: "on_test_event", state: sample_of_login_state) == Map.merge(sample_of_login_state, %{ip: "129.0.1.1"})
     assert Hook.call(event: "return_first_state", state: sample_of_login_state) == sample_of_login_state
   end

@@ -288,16 +288,19 @@ defmodule MishkaInstaller.Hook do
       end
 
       def init(state) do
-        {:ok, state, 300}
+        if Mix.env != :test, do: {:ok, state, 300}, else: {:ok, state, 3000}
       end
 
       # This part helps us to wait for database and completing PubSub either
       def handle_info(:timeout, state) do
-        if is_nil(Process.whereis(MishkaHtml.PubSub)) do
-          {:noreply, state, 100}
-        else
-          unquote(module_selected).initial(unquote(initial_entry))
-          {:noreply, state}
+        cond do
+          !is_nil(MishkaInstaller.get_config(:pubsub)) && is_nil(Process.whereis(MishkaHtml.PubSub)) -> {:noreply, state, 100}
+          !is_nil(MishkaInstaller.get_config(:pubsub)) ->
+            unquote(module_selected).initial(unquote(initial_entry))
+            {:noreply, state}
+          true ->
+            unquote(module_selected).initial(unquote(initial_entry))
+            {:noreply, state}
         end
       end
     end
