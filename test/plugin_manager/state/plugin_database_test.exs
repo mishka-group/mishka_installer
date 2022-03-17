@@ -60,7 +60,7 @@ defmodule MishkaInstallerTest.State.PluginDatabaseTest do
     end)
 
     Enum.map(@depends, fn item ->
-      Map.merge(@new_soft_plugin, %{name: item, depend_type: :hard, depends: List.delete(@depends, item)})
+      Map.merge(@new_soft_plugin, %{name: item, depend_type: :hard, depends: List.delete(@depends, item), parent_pid: self()})
       |> MishkaInstaller.PluginState.push_call()
     end)
 

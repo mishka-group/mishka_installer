@@ -5,7 +5,7 @@ defmodule MishkaInstaller.PluginState do
   alias MishkaInstaller.Plugin
   alias __MODULE__
 
-  defstruct [:name, :event, priority: 1, status: :started, depend_type: :soft, depends: [], extra: []]
+  defstruct [:name, :event, priority: 1, status: :started, depend_type: :soft, parent_pid: nil, depends: [], extra: []]
 
   @type params() :: map()
   @type id() :: String.t()
@@ -17,6 +17,7 @@ defmodule MishkaInstaller.PluginState do
     priority: integer(),
     status: :started | :stopped | :restarted,
     depend_type: :soft | :hard,
+    parent_pid: pid() | nil,
     depends: list(String.t()),
     extra: list(map())
   }
@@ -115,6 +116,7 @@ defmodule MishkaInstaller.PluginState do
   # Callbacks
   @impl true
   def init(%PluginState{} = state) do
+    MishkaInstaller.Database.Helper.get_parent_id(state)
     Logger.info("#{Map.get(state, :name)} from #{Map.get(state, :event)} event of Plugins manager system was started")
     {:ok, state, {:continue, {:sync_with_database, :take}}}
   end

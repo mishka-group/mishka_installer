@@ -1,5 +1,6 @@
 defmodule MishkaInstaller.Database.Helper do
   import Ecto.Changeset
+  require Logger
 
   @spec translate_errors(Ecto.Changeset.t()) :: %{optional(atom) => [binary | map]}
   def translate_errors(changeset) do
@@ -33,6 +34,41 @@ defmodule MishkaInstaller.Database.Helper do
     case Ecto.UUID.cast(id) do
       {:ok, record_id} -> {:ok, :uuid, record_id}
       _ -> {:error, :uuid}
+    end
+  end
+
+  def allow_if_sandbox(parent_pid, orphan_msg \\ :stop) do
+    if sandbox_pool?() do
+      monitor_parent(parent_pid, orphan_msg)
+      # this addresses #1
+      Ecto.Adapters.SQL.Sandbox.allow(MishkaInstaller.repo, parent_pid, self())
+    end
+  end
+
+  def sandbox_pool?() do
+    config = Application.fetch_env!(:core, __MODULE__)
+    Keyword.get(config, :pool) == Ecto.Adapters.SQL.Sandbox
+  end
+
+  defp monitor_parent(parent_pid, orphan_msg) do
+    # this is part of addressing #2
+    Process.monitor(parent_pid)
+
+    if Process.alive?(parent_pid) do
+      :ok
+    else
+      Logger.error("#{inspect(parent_pid)} down when booting #{inspect(self())}")
+      # this addresses #3
+      # the "throw" will work like an early "return"; see the GenServer docs
+      throw(orphan_msg)
+    end
+  end
+
+  def get_parent_id(state) do
+    if Mix.env() == :test do
+      allow_if_sandbox(state.parent_pid)
+    else
+      :ok
     end
   end
 end
