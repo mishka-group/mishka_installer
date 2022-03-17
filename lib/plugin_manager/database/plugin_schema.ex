@@ -6,12 +6,11 @@ defmodule MishkaInstaller.Database.PluginSchema do
   @foreign_key_type :binary_id
 
   schema "plugins" do
-
     field :name, :string, null: false
     field :event, :string, null: false
     field :priority, :integer, null: false
-    field :status, PluginStatusEnum, null: false, default: :started
-    field :depend_type, PluginDependTypeEnum, null: false, default: :soft
+    field :status, MishkaInistaller.PluginStatusEnum, null: false, default: :started
+    field :depend_type, MishkaInistaller.PluginDependTypeEnum, null: false, default: :soft
     field :depends, {:array, :string}, null: true
     field :extra, {:array, :map}, null: false
 

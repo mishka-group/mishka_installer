@@ -6,13 +6,12 @@ defmodule MishkaInstaller.Database.ActivitySchema do
   @foreign_key_type :binary_id
 
   schema "activities" do
-
-    field(:type, ActivitiesTypeEnum, null: false)
-    field(:section, ActivitiesSection, null: false)
+    field(:type, MishkaInistaller.ActivitiesTypeEnum, null: false)
+    field(:section, MishkaInistaller.ActivitiesSectionEnum, null: false)
     field(:section_id, :binary_id, primary_key: false, null: true)
-    field(:priority, ContentPriorityEnum, null: false)
-    field(:status, ActivitiesStatusEnum, null: false)
-    field(:action, ActivitiesAction, null: false)
+    field(:priority, MishkaInistaller.ContentPriorityEnum, null: false)
+    field(:status, MishkaInistaller.ActivitiesStatusEnum, null: false)
+    field(:action, MishkaInistaller.ActivitiesActionEnum, null: false)
     field(:extra, :map, null: true)
 
     timestamps(type: :utc_datetime)

@@ -1,28 +1,18 @@
-defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaAuthIdentitiesTable do
+defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaInistrallerActivityTable do
   use Ecto.Migration
 
   def change do
-    create table(:identities, primary_key: false<%= if not is_nil(db_prefix), do: ", prefix: \"#{db_prefix}\"" %>) do
+    create table(:activities, primary_key: false<%= if not is_nil(db_prefix), do: ", prefix: \"#{db_prefix}\"" %>) do
       add(:id, :uuid, primary_key: true)
-      add(:identity_provider, :integer, null: false)
-      add(:uid, :string, null: true)
-      add(:token, :string, null: true)
+      add(:type, :integer, null: false)
+      add(:action, :integer, null: false)
+      add(:section, :integer, null: false, null: false)
+      add(:section_id, :uuid, primary_key: false, null: true)
+      add(:priority, :integer, null: false)
+      add(:status, :integer, null: false)
+      add(:extra, :map, null: true)
 
-      add(:user_id, references(:users, on_delete: :nothing, type: :uuid))
       timestamps()
     end
-    create(
-      index(:identities, [:uid, :identity_provider],
-        name: :uniq_index_on_identities_uid_and_identity_provider,
-        unique: true
-      )
-    )
-
-    create(
-      index(:identities, [:user_id, :identity_provider],
-        name: :uniq_index_on_identities_user_id_and_identity_provider,
-        unique: true
-      )
-    )
   end
 end
