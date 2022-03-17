@@ -16,4 +16,18 @@ defmodule MishkaInstaller do
   end
 
   def ip(user_ip), do: is_bitstring(user_ip) && user_ip || Enum.join(Tuple.to_list(user_ip), ".")
+
+  def get_config(item, section \\ :basic) do
+    case Application.fetch_env(:mishka_installer, section) do
+      :error -> {:error, :get_config, "We cannot find #{section} part of mishka_installer"} # or load a default config
+      {:ok, list} -> Keyword.fetch!(list, item)
+    end
+  end
+
+  def repo() do
+    case MishkaInstaller.get_config(:repo) do
+      {:error, :get_config, _msg} -> MishkaInstaller.Repo
+      value -> value
+    end
+  end
 end

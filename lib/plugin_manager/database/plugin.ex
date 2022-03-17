@@ -1,12 +1,12 @@
 defmodule MishkaInstaller.Plugin do
 
-  alias MishkaDatabase.Schema.MishkaInstaller.Plugin, as: PluginSchema
+  alias MishkaInstaller.Database.PluginSchema
   alias MishkaInstaller.PluginState
   import Ecto.Query
   use MishkaDeveloperTools.DB.CRUD,
           module: PluginSchema,
           error_atom: :plugin,
-          repo: MishkaDatabase.Repo
+          repo: MishkaInstaller.repo
 
   @type data_uuid() :: Ecto.UUID.t
   @type record_input() :: map()
@@ -61,14 +61,14 @@ defmodule MishkaInstaller.Plugin do
   def plugins(event: event) do
     from(plg in PluginSchema, where: plg.event == ^event)
     |> fields()
-    |> MishkaDatabase.Repo.all()
+    |> MishkaInstaller.repo.all()
     |> Enum.map(&struct(PluginState, &1))
   end
 
   def plugins() do
     from(plg in PluginSchema)
     |> fields()
-    |> MishkaDatabase.Repo.all()
+    |> MishkaInstaller.repo.all()
     |> Enum.map(&struct(PluginState, &1))
   end
 
@@ -86,8 +86,8 @@ defmodule MishkaInstaller.Plugin do
   end
 
   def delete_plugins(event) do
-    stream = MishkaDatabase.Repo.stream(from(plg in PluginSchema))
-    MishkaDatabase.Repo.transaction(fn() ->
+    stream = MishkaInstaller.repo.stream(from(plg in PluginSchema))
+    MishkaInstaller.repo.transaction(fn() ->
       stream
       |> Stream.filter(&(event in &1.depends))
       |> Enum.to_list()

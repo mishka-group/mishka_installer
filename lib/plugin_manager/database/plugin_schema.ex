@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.Database.Plugin do
+defmodule MishkaInstaller.Database.PluginSchema do
   use Ecto.Schema
 
   import Ecto.Changeset
