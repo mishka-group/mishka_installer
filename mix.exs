@@ -1,33 +1,49 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
+  @version "0.0.1"
 
   def project do
     [
       app: :mishka_installer,
-      version: "0.0.1",
-      build_path: "../../_build",
-      config_path: "../../config/config.exs",
-      deps_path: "../../deps",
-      lockfile: "../../mix.lock",
+      version: @version,
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      name: "Mishka Installer",
+      elixirc_paths: elixirc_paths(Mix.env()),
+      description: description(),
+      package: package(),
+      homepage_url: "https://github.com/mishka-group",
+      source_url: "https://github.com/mishka-group/mishka_installer",
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger, :mishka_database],
+      extra_applications: [:logger],
       mod: {MishkaInstaller.Application, []}
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:mishka_database, in_umbrella: true},
       {:mishka_developer_tools, "~> 0.0.5"}
+    ]
+  end
+
+  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(_), do: ["lib"]
+
+  defp description() do
+    "Mishka Installer is a system plugin manager for elixir."
+  end
+
+  defp package() do
+    [
+      files: ~w(lib .formatter.exs mix.exs LICENSE README*),
+      licenses: ["Apache License 2.0"],
+      maintainers: ["Shahryar Tavakkoli"],
+      links: %{"GitHub" => "https://github.com/mishka-group/mishka_installer"}
     ]
   end
 end
