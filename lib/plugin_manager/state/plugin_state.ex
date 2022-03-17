@@ -5,7 +5,7 @@ defmodule MishkaInstaller.PluginState do
   alias MishkaInstaller.Plugin
   alias __MODULE__
 
-  defstruct [:name, :event, priority: 1, status: :started, depend_type: :soft, parent_pid: nil, depends: [], extra: []]
+  defstruct [:name, :event, priority: 1, status: :started, depend_type: :soft, depends: [], extra: [], parent_pid: nil]
 
   @type params() :: map()
   @type id() :: String.t()
@@ -17,15 +17,15 @@ defmodule MishkaInstaller.PluginState do
     priority: integer(),
     status: :started | :stopped | :restarted,
     depend_type: :soft | :hard,
-    parent_pid: pid() | nil,
+    parent_pid: any(),
     depends: list(String.t()),
     extra: list(map())
   }
   @type t :: plugin()
 
   def start_link(args) do
-    {id, type} = {Map.get(args, :id), Map.get(args, :type)}
-    GenServer.start_link(__MODULE__, default(id, type), name: via(id, type))
+    {id, type, parent_pid} = {Map.get(args, :id), Map.get(args, :type), Map.get(args, :parent_pid)}
+    GenServer.start_link(__MODULE__, default(id, type, parent_pid), name: via(id, type))
   end
 
   def child_spec(process_name) do
@@ -37,13 +37,13 @@ defmodule MishkaInstaller.PluginState do
     }
   end
 
-  defp default(plugin_name, event) do
-    %PluginState{name: plugin_name, event: event}
+  defp default(plugin_name, event, parent_pid) do
+    %PluginState{name: plugin_name, event: event, parent_pid: parent_pid}
   end
 
   @spec push(MishkaInstaller.PluginState.t()) :: :ok | {:error, :push, any}
   def push(%PluginState{} = element) do
-    case PSupervisor.start_job(%{id: element.name, type: element.event}) do
+    case PSupervisor.start_job(%{id: element.name, type: element.event, parent_pid: element.parent_pid}) do
       {:ok, status, pid} -> GenServer.cast(pid, {:push, status, element})
       {:error, result} ->  {:error, :push, result}
     end
@@ -51,7 +51,7 @@ defmodule MishkaInstaller.PluginState do
 
   @spec push_call(MishkaInstaller.PluginState.t()) :: :ok | {:error, :push, any}
   def push_call(%PluginState{} = element) do
-    case PSupervisor.start_job(%{id: element.name, type: element.event}) do
+    case PSupervisor.start_job(%{id: element.name, type: element.event, parent_pid: element.parent_pid}) do
       {:ok, status, pid} ->
         if Mix.env() == :test, do: Logger.warn("Plugin State of #{element.name} is being pushed")
         GenServer.call(pid, {:push, status, element})
@@ -116,7 +116,7 @@ defmodule MishkaInstaller.PluginState do
   # Callbacks
   @impl true
   def init(%PluginState{} = state) do
-    MishkaInstaller.Database.Helper.get_parent_id(state)
+    MishkaInstaller.Database.Helper.get_parent_pid(state)
     Logger.info("#{Map.get(state, :name)} from #{Map.get(state, :event)} event of Plugins manager system was started")
     {:ok, state, {:continue, {:sync_with_database, :take}}}
   end
@@ -170,6 +170,12 @@ defmodule MishkaInstaller.PluginState do
         {:error, _result, _error_atom} -> state
       end
     {:noreply, state}
+  end
+
+  @impl true
+  def handle_info({:DOWN, _ref, :process, _pid, _reason}, _state) do
+    # log that this happened, etc. Don't use Repo!
+    :stop
   end
 
   @impl true

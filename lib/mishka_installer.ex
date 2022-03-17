@@ -12,7 +12,10 @@ defmodule MishkaInstaller do
       priority: priority,
       status: status,
       user_id: nil
-    }, Map.from_struct(plugin))
+    },
+      Map.from_struct(plugin)
+      |> Map.drop([:parent_pid])
+    )
   end
 
   def ip(user_ip), do: is_bitstring(user_ip) && user_ip || Enum.join(Tuple.to_list(user_ip), ".")

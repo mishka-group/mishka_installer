@@ -1,6 +1,6 @@
 defmodule MishkaInstaller.PluginStateDynamicSupervisor do
 
-  @spec start_job(%{id: String.t(), type: String.t()}) :: :ignore | {:error, any} | {:ok, :add | :edit, pid}
+  @spec start_job(%{id: String.t(), type: String.t(), parent_pid: any()}) :: :ignore | {:error, any} | {:ok, :add | :edit, pid}
   def start_job(args) do
     DynamicSupervisor.start_child(PluginStateOtpRunner, {MishkaInstaller.PluginState, args})
     |> case do

@@ -46,8 +46,7 @@ defmodule MishkaInstaller.Database.Helper do
   end
 
   def sandbox_pool?() do
-    config = Application.fetch_env!(:core, __MODULE__)
-    Keyword.get(config, :pool) == Ecto.Adapters.SQL.Sandbox
+    MishkaInstaller.repo == Ecto.Integration.TestRepo
   end
 
   defp monitor_parent(parent_pid, orphan_msg) do
@@ -64,11 +63,15 @@ defmodule MishkaInstaller.Database.Helper do
     end
   end
 
-  def get_parent_id(state) do
+  def get_parent_pid(state) when is_nil(state.parent_pid), do: :ok
+
+  def get_parent_pid(state) do
+    IO.inspect(state)
     if Mix.env() == :test do
       allow_if_sandbox(state.parent_pid)
     else
       :ok
     end
   end
+
 end

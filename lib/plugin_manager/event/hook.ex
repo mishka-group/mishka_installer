@@ -2,6 +2,7 @@ defmodule MishkaInstaller.Hook do
   alias MishkaInstaller.PluginState
   alias MishkaInstaller.PluginStateDynamicSupervisor, as: PSupervisor
   alias MishkaInstaller.Plugin
+  @allowed_fields [:name, :event, :priority, :status, :depend_type, :depends, :extra, :id]
 
   @type event() :: String.t()
   @type plugin() :: event()
@@ -13,7 +14,7 @@ defmodule MishkaInstaller.Hook do
     register_status =
       with {:ok, :ensure_event, _msg} <- ensure_event(event, :debug),
            {:error, :get_record_by_field, :plugin} <- Plugin.show_by_name("#{event.name}"),
-           {:ok, :add, :plugin, _record_info} <- Plugin.create(Map.from_struct(event)) do
+           {:ok, :add, :plugin, _record_info} <- Plugin.create(event, @allowed_fields) do
             PluginState.push_call(event)
             {:ok, :register, :activated}
       else
@@ -262,7 +263,8 @@ defmodule MishkaInstaller.Hook do
       status: output.status,
       depend_type: output.depend_type,
       depends: Map.get(output, :depends) || [],
-      extra: Map.get(output, :extra) || []
+      extra: Map.get(output, :extra) || [],
+      parent_pid: Map.get(output, :parent_pid)
     }
   end
 
