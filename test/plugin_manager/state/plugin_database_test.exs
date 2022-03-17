@@ -2,11 +2,11 @@ defmodule MishkaInstallerTest.State.PluginDatabaseTest do
   use ExUnit.Case, async: false
   doctest MishkaInstaller
   setup_all _tags do
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(MishkaDatabase.Repo)
-    # Ecto.Adapters.SQL.Sandbox.mode(MishkaDatabase.Repo, :auto)
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
+    # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
     on_exit fn ->
-      :ok = Ecto.Adapters.SQL.Sandbox.checkout(MishkaDatabase.Repo)
-      # Ecto.Adapters.SQL.Sandbox.mode(MishkaDatabase.Repo, :auto)
+      :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
+      # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
       clean_db()
       :ok
     end

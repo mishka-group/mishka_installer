@@ -26,7 +26,7 @@ defmodule MishkaInstaller do
 
   def repo() do
     case MishkaInstaller.get_config(:repo) do
-      {:error, :get_config, _msg} -> MishkaInstaller.Repo
+      {:error, :get_config, _msg} -> Ecto.Integration.TestRepo
       value -> value
     end
   end

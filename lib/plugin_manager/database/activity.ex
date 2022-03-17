@@ -4,13 +4,9 @@ defmodule MishkaInstaller.Activity do
   use MishkaDeveloperTools.DB.CRUD,
           module: ActivitySchema,
           error_atom: :activity,
-          repo: MishkaDatabase.Repo
+          repo: MishkaInstaller.repo
 
   @behaviour MishkaDeveloperTools.DB.CRUD
-
-  def subscribe do
-    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub), "activity")
-  end
 
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_add, 1}
   def create(attrs) do
@@ -71,8 +67,14 @@ defmodule MishkaInstaller.Activity do
       )
   end
 
-  def notify_subscribers({:ok, _, :activity, repo_data} = params, type_send) do
-    Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub), "activity", {type_send, :ok, repo_data})
-    params
+
+
+  if Mix.env() == :test do
+    def notify_subscribers(params, _type_send), do: params
+  else
+    def notify_subscribers({:ok, _, :activity, repo_data} = params, type_send, _status) do
+      Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub), "activity", {type_send, :ok, repo_data})
+      params
+    end
   end
 end

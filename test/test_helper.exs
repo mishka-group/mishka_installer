@@ -15,6 +15,8 @@ defmodule Ecto.Integration.TestRepo do
     adapter: Ecto.Adapters.Postgres
 end
 
+Application.put_env(:mishka_installer, :basic, repo: TestRepo)
+
 {:ok, _} = Ecto.Adapters.Postgres.ensure_all_started(TestRepo, :temporary)
 
 _ = Ecto.Adapters.Postgres.storage_down(TestRepo.config())
@@ -22,10 +24,11 @@ _ = Ecto.Adapters.Postgres.storage_down(TestRepo.config())
 
 {:ok, _pid} = TestRepo.start_link()
 
-Code.require_file("test_tables.exs", __DIR__)
-
+Code.require_file("test_activity_table.exs", __DIR__)
 :ok = Ecto.Migrator.up(TestRepo, 0, MishkaInstaller.Repo.Migrations.TestActivityTable, log: false)
-:ok = Ecto.Migrator.up(TestRepo, 0, MishkaInstaller.Repo.Migrations.TestCategoryTable, log: false)
-Ecto.Adapters.SQL.Sandbox.mode(TestRepo, :manual)
+
+Code.require_file("test_plugin_table.exs", __DIR__)
+:ok = Ecto.Migrator.up(TestRepo, 1, MishkaInstaller.Repo.Migrations.TestPluginTable, log: false)
+
+# Ecto.Adapters.SQL.Sandbox.mode(TestRepo, :manual)
 Process.flag(:trap_exit, true)
-end
