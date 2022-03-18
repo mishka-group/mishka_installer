@@ -1,9 +1,6 @@
 defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
   @shortdoc "Generates Guardian.DB's migration"
 
-  @moduledoc """
-  Generates the required MishkaInstaller's database migration.
-  """
   use Mix.Task
 
   import Mix.Ecto
@@ -22,7 +19,7 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
       ensure_repo(repo, args)
       path = Ecto.Migrator.migrations_path(repo)
 
-      :mishka_auth
+      :mishka_installer
       |> Application.app_dir()
       |> Path.join("priv/*.eex")
       |> Path.wildcard()
