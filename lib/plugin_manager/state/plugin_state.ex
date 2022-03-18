@@ -116,7 +116,7 @@ defmodule MishkaInstaller.PluginState do
   # Callbacks
   @impl true
   def init(%PluginState{} = state) do
-    MishkaInstaller.Database.Helper.get_parent_pid(state)
+    if Mix.env == :test, do: MishkaInstaller.Database.Helper.get_parent_pid(state)
     Logger.info("#{Map.get(state, :name)} from #{Map.get(state, :event)} event of Plugins manager system was started")
     {:ok, state, {:continue, {:sync_with_database, :take}}}
   end
