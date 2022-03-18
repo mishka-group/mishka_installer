@@ -61,8 +61,8 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
 
 
   defp prefix do
-    :mishka_auth
-    |> Application.fetch_env!(MishkaAuth)
+    :mishka_installer
+    |> Application.fetch_env!(:basic)
     |> Keyword.get(:prefix, nil)
   end
 
