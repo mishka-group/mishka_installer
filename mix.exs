@@ -27,11 +27,9 @@ defmodule MishkaInstaller.MixProject do
 
   defp deps do
     [
-      {:phoenix_pubsub, "~> 2.0"}, # should change it on mishka_developer_tools and remove it from installer mix file
+      {:phoenix_pubsub, "~> 2.0"},
       {:ecto_enum, "~> 1.4"},
-      {:ecto_sql, "~> 3.7"}, # should change it on mishka_developer_tools and remove it from installer mix file
-      {:postgrex, "~> 0.15.13"},
-      {:mishka_developer_tools, "~> 0.0.5"},
+      {:mishka_developer_tools, "~> 0.0.6"},
       {:jason, "~> 1.3"}
     ]
   end
