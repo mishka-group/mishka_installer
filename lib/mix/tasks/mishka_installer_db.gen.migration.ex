@@ -12,24 +12,29 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
   def run(args) do
     no_umbrella!("ecto.gen.migration")
 
-    repos = parse_repo(args)
+    case get_list_of_files() do
+      true ->
+        repos = parse_repo(args)
 
-    Enum.each(repos, fn repo ->
+        Enum.each(repos, fn repo ->
 
-      ensure_repo(repo, args)
-      path = Ecto.Migrator.migrations_path(repo)
+          ensure_repo(repo, args)
+          path = Ecto.Migrator.migrations_path(repo)
 
-      :mishka_installer
-      |> Application.app_dir()
-      |> Path.join("priv/*.eex")
-      |> Path.wildcard()
-      |> Enum.reverse()
-      |> Enum.map(fn file ->
-        generated_file(Path.basename(file), file, path)
-        :timer.sleep(2000);
-      end)
+          :mishka_installer
+          |> Application.app_dir()
+          |> Path.join("priv/*.eex")
+          |> Path.wildcard()
+          |> Enum.reverse()
+          |> Enum.map(fn file ->
+            generated_file(Path.basename(file), file, path)
+            :timer.sleep(2000);
+          end)
 
-    end)
+        end)
+      msg ->
+        Mix.raise(msg)
+    end
   end
 
   @spec generated_file(binary, binary, binary) :: boolean
@@ -69,4 +74,16 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
 
   defp pad(i) when i < 10, do: <<?0, ?0 + i>>
   defp pad(i), do: to_string(i)
+
+  defp get_list_of_files() do
+    with {:ls_file, {:ok, files_list}} <- {:ls_file, File.ls("priv/repo/migrations")},
+         {:activity, false} <- {:activity, Enum.any?(files_list, &String.match?(&1, ~r/_activity_migration.exs/))},
+         {:plugin, false} <- {:plugin, Enum.any?(files_list, &String.match?(&1, ~r/_plugin_migration.exs/))} do
+      true
+    else
+      {:ls_file, _} -> "Please check there is migrations (priv/repo/migrations) folder in your project"
+      {:activity, true} -> "If you run this script before please delete _activity_migration.exs file"
+      {:plugin, true}  -> "If you run this script before please delete _plugin_migration.exs file"
+    end
+  end
 end
