@@ -1,0 +1,11 @@
+<section class="phx-hero">
+  <h1><%= gettext "Welcome to %{name}!", name: "Mishka Installer Developer" %></h1>
+  <p>With this sample, you can create a project without basic dependencies</p>
+  <p>We implemented Mishka Installer as a directory of codes, and you do not need to add it as a dependency when you want to develop something</p>
+  <p>After making a library, you should roll out your plugin as standard elixir hex pkg or an acceptable format</p>
+  <p>This project just helps you to create your own plugin without waiting to compile whole the project</p>
+  <img src={Routes.static_path(@socket, "/images/mishka-gp-trp.png")} alt="Mishka Group" width="200" height="200">
+  <br> <br>
+  <%= live_redirect "Home", to: Routes.live_path(@socket, MishkeInstallerDeveloperWeb.LiveTestPage) %> | 
+  <%= live_redirect "PageOne", to: Routes.live_path(@socket, MishkeInstallerDeveloperWeb.LiveTestPageOne) %>
+</section>

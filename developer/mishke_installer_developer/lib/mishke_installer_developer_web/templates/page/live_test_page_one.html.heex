@@ -1,0 +1,8 @@
+<section class="phx-hero">
+   page one
+   <br> <br>
+   <img src={Routes.static_path(@socket, "/images/mishka-gp-trp.png")} alt="Mishka Group" width="200" height="200">
+   <br> <br>
+   <%= live_redirect "Home", to: Routes.live_path(@socket, MishkeInstallerDeveloperWeb.LiveTestPage) %> | 
+   <%= live_redirect "PageOne", to: Routes.live_path(@socket, MishkeInstallerDeveloperWeb.LiveTestPageOne) %>
+</section>
