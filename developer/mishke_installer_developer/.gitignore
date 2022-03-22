@@ -35,3 +35,4 @@ npm-debug.log
 .DS_Store
 
 mix.lock
+/lib/mishke_installer_developer/plugin_development/

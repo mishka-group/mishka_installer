@@ -294,7 +294,7 @@ defmodule MishkaInstaller.Hook do
       # This part helps us to wait for database and completing PubSub either
       def handle_info(:timeout, state) do
         cond do
-          !is_nil(MishkaInstaller.get_config(:pubsub)) && is_nil(Process.whereis(MishkaHtml.PubSub)) -> {:noreply, state, 100}
+          !is_nil(MishkaInstaller.get_config(:pubsub)) && is_nil(Process.whereis(MishkaInstaller.get_config(:pubsub))) -> {:noreply, state, 100}
           !is_nil(MishkaInstaller.get_config(:pubsub)) ->
             unquote(module_selected).initial(unquote(initial_entry))
             {:noreply, state}
