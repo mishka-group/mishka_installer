@@ -5,7 +5,7 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
 
   import Mix.Ecto
   import Mix.Generator
-
+  @project_config_name :mishke_installer_developer
 
   @spec run([any]) :: :ok
   @doc false
@@ -21,7 +21,7 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
           ensure_repo(repo, args)
           path = Ecto.Migrator.migrations_path(repo)
 
-          :mishka_installer
+          @project_config_name
           |> Application.app_dir()
           |> Path.join("priv/*.eex")
           |> Path.wildcard()
@@ -66,7 +66,7 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
 
 
   defp prefix do
-    :mishka_installer
+    @project_config_name
     |> Application.fetch_env!(:basic)
     |> Keyword.get(:prefix, nil)
   end

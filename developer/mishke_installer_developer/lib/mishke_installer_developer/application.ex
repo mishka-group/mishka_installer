@@ -1,12 +1,13 @@
 defmodule MishkeInstallerDeveloper.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
-  @moduledoc false
-
   use Application
 
   @impl true
   def start(_type, _args) do
+    plugin_runner_config = [
+      strategy: :one_for_one,
+      name: PluginStateOtpRunner
+    ]
+
     children = [
       # Start the Ecto repository
       MishkeInstallerDeveloper.Repo,
@@ -15,19 +16,19 @@ defmodule MishkeInstallerDeveloper.Application do
       # Start the PubSub system
       {Phoenix.PubSub, name: MishkeInstallerDeveloper.PubSub},
       # Start the Endpoint (http/https)
-      MishkeInstallerDeveloperWeb.Endpoint
+      MishkeInstallerDeveloperWeb.Endpoint,
       # Start a worker by calling: MishkeInstallerDeveloper.Worker.start_link(arg)
       # {MishkeInstallerDeveloper.Worker, arg}
+      {Registry, keys: :unique, name: PluginStateRegistry},
+      {DynamicSupervisor, plugin_runner_config},
+      {Task.Supervisor, name: MishkaInstaller.Activity},
+      %{id: MishkaSocial.Auth.Strategy, start: {MishkaSocial.Auth.Strategy, :start_link, [[]]}}
     ]
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
     opts = [strategy: :one_for_one, name: MishkeInstallerDeveloper.Supervisor]
     Supervisor.start_link(children, opts)
   end
 
-  # Tell Phoenix to update the endpoint configuration
-  # whenever the application is updated.
   @impl true
   def config_change(changed, _new, removed) do
     MishkeInstallerDeveloperWeb.Endpoint.config_change(changed, removed)

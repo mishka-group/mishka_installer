@@ -29,6 +29,10 @@ config :mishke_installer_developer, MishkeInstallerDeveloper.Mailer, adapter: Sw
 # Swoosh API client is needed for adapters other than SMTP.
 config :swoosh, :api_client, false
 
+config :mishke_installer_developer, :basic,
+  repo: MishkeInstallerDeveloper.Repo,
+  pubsub: MishkeInstallerDeveloper.PubSub
+
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.14.0",

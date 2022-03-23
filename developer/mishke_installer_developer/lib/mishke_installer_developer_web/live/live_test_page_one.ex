@@ -7,8 +7,9 @@ defmodule MishkeInstallerDeveloperWeb.LiveTestPageOne do
   end
 
   @impl true
-  def mount(_params, _session, socket) do
-    new_socket = assign(socket, page_title: "Live Test Page One", self_pid: self())
+  def mount(params, _session, socket) do
+    user_id = get_connect_info(socket, :peer_data).address
+    new_socket = assign(socket, page_title: "Live Test Page One", self_pid: self(), user_id: user_id, input: params)
     {:ok, new_socket}
   end
 end
