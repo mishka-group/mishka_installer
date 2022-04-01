@@ -50,16 +50,16 @@ defmodule MishkeInstallerDeveloper.MixProject do
       {:jason, "~> 1.2"},
       {:plug_cowboy, "~> 2.5"},
       {:mishka_developer_tools, "~> 0.0.6"},
-      {:ecto_enum, "~> 1.4"}
+      {:ecto_enum, "~> 1.4"},
+
+      # extra deps
+      {:ueberauth, "~> 0.7.0"},
+      # {:ueberauth, path: "/Users/shahryar/Downloads/ueberauth-master", override: true},
+      {:ueberauth_google, "~> 0.10.1"},
+      {:ueberauth_github, "~> 0.8.1"}
     ]
   end
 
-  # Aliases are shortcuts or tasks specific to the current project.
-  # For example, to install project dependencies and perform other setup tasks, run:
-  #
-  #     $ mix setup
-  #
-  # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
       setup: ["deps.get", "ecto.setup"],

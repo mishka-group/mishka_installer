@@ -31,7 +31,8 @@ config :swoosh, :api_client, false
 
 config :mishke_installer_developer, :basic,
   repo: MishkeInstallerDeveloper.Repo,
-  pubsub: MishkeInstallerDeveloper.PubSub
+  pubsub: MishkeInstallerDeveloper.PubSub,
+  html_router: MishkeInstallerDeveloperWeb.Router.Helpers
 
 # Configure esbuild (the version is required)
 config :esbuild,
@@ -50,6 +51,27 @@ config :logger, :console,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+
+# ueberauth config can delete in developer pkg
+config :ueberauth, Ueberauth,
+base_path: "/auth",
+providers: [
+  github: {Ueberauth.Strategy.Github, [default_scope: "read:user", send_redirect_uri: false]},
+  google: {Ueberauth.Strategy.Google, [
+     default_scope:
+     "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile"
+   ]},
+]
+
+config :ueberauth, Ueberauth.Strategy.Github.OAuth,
+   client_id: System.get_env("GITHUB_CLIENT_ID"),
+   client_secret: System.get_env("GITHUB_CLIENT_SECRET")
+
+config :ueberauth, Ueberauth.Strategy.Google.OAuth,
+   client_id: System.get_env("GOOGLE_CLIENT_ID"),
+   client_secret: System.get_env("GOOGLE_CLIENT_SECRET"),
+   redirect_uri: System.get_env("GOOGLE_REDIRECT_URI")
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

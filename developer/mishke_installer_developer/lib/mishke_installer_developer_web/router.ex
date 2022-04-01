@@ -19,6 +19,9 @@ defmodule MishkeInstallerDeveloperWeb.Router do
       pipe_through :browser
       live "/", LiveTestPage
       live "/page-one", LiveTestPageOne
+      post "/auth/login", AuthController, :login
+      get "/auth/:provider/callback", AuthController, :register
+      get "/auth/register", AuthController, :register
     end
   end
 
