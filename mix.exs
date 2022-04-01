@@ -30,7 +30,8 @@ defmodule MishkaInstaller.MixProject do
       {:phoenix_pubsub, "~> 2.0"},
       {:ecto_enum, "~> 1.4"},
       {:mishka_developer_tools, "~> 0.0.6"},
-      {:jason, "~> 1.3"}
+      {:jason, "~> 1.3"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 
