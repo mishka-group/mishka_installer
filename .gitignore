@@ -29,3 +29,5 @@ mishka_social-*.tar
 
 # Misc.
 .DS_Store
+
+mix.lock

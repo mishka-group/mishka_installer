@@ -1,6 +1,6 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
-  @version "0.0.1"
+  @version "0.0.2"
 
   def project do
     [
@@ -44,7 +44,7 @@ defmodule MishkaInstaller.MixProject do
 
   defp package() do
     [
-      files: ~w(lib .formatter.exs mix.exs LICENSE README*),
+      files: ~w(lib priv .formatter.exs mix.exs LICENSE README*),
       licenses: ["Apache License 2.0"],
       maintainers: ["Shahryar Tavakkoli"],
       links: %{"GitHub" => "https://github.com/mishka-group/mishka_installer"}
