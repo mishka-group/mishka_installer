@@ -34,7 +34,7 @@ defmodule MishkaInstaller do
     end
   end
 
-  defp ensure_compiled(module) do
+  def ensure_compiled(module) do
     case Code.ensure_compiled(module) do
       {:module, _} -> module
       {:error, _} ->
