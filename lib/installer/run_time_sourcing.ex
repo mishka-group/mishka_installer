@@ -34,10 +34,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end)
   end
 
-
-  @spec prepend_compiled_apps(any) ::
-          {:ok, :prepend_compiled_apps}
-          | {:error, :prepend_compiled_apps, :bad_directory | :no_directory, list}
+  @spec prepend_compiled_apps(any) :: {:ok, :prepend_compiled_apps} | {:error, do_runtime(), ensure(), list}
   def prepend_compiled_apps([]), do: {:error, :prepend_compiled_apps, :no_directory, []}
   def prepend_compiled_apps(files_list) do
     files_list
@@ -52,7 +49,6 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   defp get_build_path(mode \\ Mix.env()) do
     Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["_build/", "#{mode}/", "lib"])
   end
-
 
   defp application_ensure({:ok, :prepend_compiled_apps}, app) do
     with {:load, :ok} <- {:load, Application.load(app)},
