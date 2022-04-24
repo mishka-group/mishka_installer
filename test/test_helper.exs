@@ -11,12 +11,6 @@ Application.put_env(
   pool_size: 20
 )
 
-defmodule Ecto.Integration.TestRepo do
-  use Ecto.Repo,
-    otp_app: :ecto,
-    adapter: Ecto.Adapters.Postgres
-end
-
 Application.put_env(:mishka_installer, :basic, repo: TestRepo, pubsub: nil)
 
 {:ok, _} = Ecto.Adapters.Postgres.ensure_all_started(TestRepo, :temporary)

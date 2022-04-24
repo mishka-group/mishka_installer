@@ -29,7 +29,7 @@ defmodule MishkaInstaller do
 
   def repo() do
     case MishkaInstaller.get_config(:repo) do
-      nil -> ensure_compiled(Ecto.Integration.TestRepo)
+      nil -> if Mix.env() != :prod, do: Ecto.Integration.TestRepo, else: ensure_compiled(nil)
       value -> value
     end
   end
@@ -37,12 +37,7 @@ defmodule MishkaInstaller do
   def ensure_compiled(module) do
     case Code.ensure_compiled(module) do
       {:module, _} -> module
-      {:error, _} ->
-        if Mix.env() == :test do
-          module
-        else
-          raise "This module does not exist"
-        end
+      {:error, _} -> raise "This module does not exist or is not configured if it is related to Ecto. Please read the documentation at GitHub."
     end
   end
 end

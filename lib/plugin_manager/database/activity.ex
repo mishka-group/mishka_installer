@@ -67,8 +67,6 @@ defmodule MishkaInstaller.Activity do
       )
   end
 
-
-
   if Mix.env() == :test do
     def notify_subscribers(params, _type_send), do: params
   else
