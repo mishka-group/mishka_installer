@@ -172,10 +172,12 @@ defmodule MishkaInstaller.PluginState do
     {:noreply, state}
   end
 
-  @impl true
-  def handle_info({:DOWN, _ref, :process, _pid, _reason}, _state) do
-    # log that this happened, etc. Don't use Repo!
-    :stop
+  if Mix.env() in [:test, :dev] do
+    @impl true
+    def handle_info({:DOWN, _ref, :process, _pid, _reason}, state) do
+      # log that this happened, etc. Don't use Repo!
+      {:stop, :normal, state}
+    end
   end
 
   @impl true
