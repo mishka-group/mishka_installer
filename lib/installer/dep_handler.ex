@@ -27,12 +27,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   #   }
   # ]
 
+  @spec check_or_create_deps_json(binary) :: {:ok, :check_or_create_deps_json, String.t()} | {:error, :check_or_create_deps_json, String.t()}
   def check_or_create_deps_json(project_path \\ MishkaInstaller.get_config(:project_path) || File.cwd!()) do
     with {:deployment_path, true} <- {:deployment_path, File.exists?(Path.join(project_path, ["deployment"]))},
          {:extensions_path, true} <- {:extensions_path, File.exists?(Path.join(project_path, ["deployment/", "extensions"]))},
          {:json_file, true} <- {:json_file, File.exists?(Path.join(project_path, ["deployment/", "extensions/", "extensions.json"]))} do
 
-         {:ok, :check_or_create_deps_json}
+         {:ok, :check_or_create_deps_json, File.read!(Path.join(project_path, ["deployment/", "extensions/", "extensions.json"]))}
     else
       {:deployment_path, false} ->
         create_deps_json_directory(project_path, "deployment")
