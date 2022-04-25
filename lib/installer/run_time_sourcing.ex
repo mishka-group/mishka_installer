@@ -2,8 +2,8 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   @type ensure() :: :bad_directory | :load | :no_directory | :sure_all_started
   @type do_runtime() :: :application_ensure | :prepend_compiled_apps
 
-  @spec do_runtime_install(any) ::{:ok, :application_ensure} | {:error, do_runtime(), ensure(), any}
-  def do_runtime_install(app) do
+  @spec do_runtime(any) ::{:ok, :application_ensure} | {:error, do_runtime(), ensure(), any}
+  def do_runtime(app) do
     get_build_path()
     |> File.ls!()
     |> compare_dependencies()
