@@ -1,6 +1,4 @@
 defmodule MishkaInstaller.Installer.DepHandler do
-  # TODO: Create a sample structuer to make json what fields shoud be existed
-  # TODO: Where path is the place we have to save json
   # TODO: Create a function to read all dependencies from the json file created
   # TODO: Create a function to read information of a dep
   # TODO: Check if this file does not exist, create it with database
@@ -27,13 +25,40 @@ defmodule MishkaInstaller.Installer.DepHandler do
   #   }
   # ]
 
+  defstruct [:app, :version, :type, :url, :tag, :timeout, :dependency_type, :update, dependencies: []]
+
+  @type t() :: %__MODULE__{
+    app: atom(),
+    version: String.t(),
+    type: atom(),
+    url: String.t(),
+    tag: String.t(),
+    timeout: timeout(),
+    dependency_type: atom(),
+    update: String.t(),
+    dependencies: [map()],
+  }
+
+  @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) :: :ok | {:error, atom} | {:error, :add_new_app, String.t()}
+  def add_new_app(%__MODULE__{} = app_info) do
+    case check_or_create_deps_json() do
+      {:ok, :check_or_create_deps_json, exist_json} ->
+        {:ok, file} = File.open(extensions_json_path(), [:write])
+        new_apps =
+          Jason.decode!(exist_json) ++ [Map.from_struct(app_info)]
+          |> Jason.encode!()
+        IO.binwrite(file, new_apps)
+      {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, msg}
+    end
+  end
+
   @spec check_or_create_deps_json(binary) :: {:ok, :check_or_create_deps_json, String.t()} | {:error, :check_or_create_deps_json, String.t()}
   def check_or_create_deps_json(project_path \\ MishkaInstaller.get_config(:project_path) || File.cwd!()) do
     with {:deployment_path, true} <- {:deployment_path, File.exists?(Path.join(project_path, ["deployment"]))},
          {:extensions_path, true} <- {:extensions_path, File.exists?(Path.join(project_path, ["deployment/", "extensions"]))},
-         {:json_file, true} <- {:json_file, File.exists?(Path.join(project_path, ["deployment/", "extensions/", "extensions.json"]))} do
+         {:json_file, true} <- {:json_file, File.exists?(extensions_json_path())} do
 
-         {:ok, :check_or_create_deps_json, File.read!(Path.join(project_path, ["deployment/", "extensions/", "extensions.json"]))}
+         {:ok, :check_or_create_deps_json, File.read!(extensions_json_path())}
     else
       {:deployment_path, false} ->
         create_deps_json_directory(project_path, "deployment")
@@ -55,12 +80,17 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   defp create_deps_json_file(project_path) do
-    case File.open(Path.join(project_path, ["deployment/", "extensions/", "extensions.json"]), [:write]) do
+    case File.open(extensions_json_path(), [:write]) do
       {:ok, file} ->
         IO.binwrite(file, Jason.encode!([]))
         File.close(file)
         check_or_create_deps_json(project_path)
       _error -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this file. Please add it manually."}
     end
+  end
+
+  def extensions_json_path() do
+    MishkaInstaller.get_config(:project_path) || File.cwd!()
+    |> Path.join(["deployment/", "extensions/", "extensions.json"])
   end
 end
