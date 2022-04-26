@@ -82,6 +82,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
+  def read_dep_json() do
+    File.read!(extensions_json_path())
+    |> Jason.decode!()
+  rescue
+    _e -> {:error, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
+  end
+
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
       :ok -> check_or_create_deps_json(project_path)
