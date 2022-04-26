@@ -43,11 +43,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def add_new_app(%__MODULE__{} = app_info) do
     case check_or_create_deps_json() do
       {:ok, :check_or_create_deps_json, exist_json} ->
-        {:ok, file} = File.open(extensions_json_path(), [:write])
-        new_apps =
-          Jason.decode!(exist_json) ++ [Map.from_struct(app_info)]
-          |> Jason.encode!()
-        IO.binwrite(file, new_apps)
+        update_file({:open_file, File.open(extensions_json_path(), [:write])}, app_info, exist_json)
       {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, msg}
     end
   end
@@ -93,4 +89,20 @@ defmodule MishkaInstaller.Installer.DepHandler do
     MishkaInstaller.get_config(:project_path) || File.cwd!()
     |> Path.join(["deployment/", "extensions/", "extensions.json"])
   end
+
+  defp update_file({:open_file, {:ok, file}}, app_info, exist_json) do
+    with {:decode, {:ok, exist_json_data}} <- {:decode, Jason.decode(exist_json)},
+         map_app_info <- [Map.from_struct(app_info)],
+         {:encode, {:ok, new_apps}} <- {:encode, Jason.encode(exist_json_data ++ map_app_info)} do
+          IO.binwrite(file, new_apps)
+    else
+      {:decode, {:error, _error}} ->
+        {:error, :add_new_app, "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it"}
+      {:encode, {:error, _error}} -> {:error, :add_new_app, "We can not encode your new app data, please check your data."}
+    end
+  end
+
+  defp update_file({:open_file, {:error, _posix}}, _app_info, _exist_json), do:
+                  {:error, :add_new_app, "Unfortunately, the JSON concerned file either does not exist or we do not have access to it.
+                  You can delete or create it in your panel, but before that please check you have enough access to edit it."}
 end
