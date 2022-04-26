@@ -65,6 +65,23 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  def get_deps_from_mix(mix_module) do
+    [{:deps, app_info} | _t] = Keyword.filter(mix_module.project, fn {key, _value} -> key == :deps end)
+    Enum.map(app_info, fn app_info ->
+      [app, version] = Tuple.to_list(app_info) |> Enum.take(2)
+      %{app: app, version: version}
+    end)
+  end
+
+  def get_deps_from_mix_lock() do
+    Mix.Dep.Lock.read
+    |> Map.to_list()
+    |> Enum.map(fn {key, list} ->
+      [_h | [_app, version]] = Tuple.to_list(list) |> Enum.take(3)
+      %{app: key, version: version}
+    end)
+  end
+
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
       :ok -> check_or_create_deps_json(project_path)
@@ -85,7 +102,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  def extensions_json_path() do
+  defp extensions_json_path() do
     MishkaInstaller.get_config(:project_path) || File.cwd!()
     |> Path.join(["deployment/", "extensions/", "extensions.json"])
   end
