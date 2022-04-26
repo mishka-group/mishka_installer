@@ -29,7 +29,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   def deps() do
     [{:get, "deps.get"}, {:compile, "deps.compile"}]
     |> Enum.map(fn {operation, command} ->
-      {stream, status} = System.cmd("mix", [command], into: IO.stream())
+      {stream, status} = System.cmd("mix", [command], into: IO.stream(), stderr_to_stdout: true)
       %{operation: operation, output: stream, status: status}
     end)
   end
