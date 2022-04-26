@@ -28,13 +28,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defstruct [:app, :version, :type, :url, :tag, :timeout, :dependency_type, :update, dependencies: []]
 
   @type t() :: %__MODULE__{
-    app: atom(),
+    app: String.t(),
     version: String.t(),
-    type: atom(),
+    type: String.t(),
     url: String.t(),
     tag: String.t(),
     timeout: timeout(),
-    dependency_type: atom(),
+    dependency_type: String.t(),
     update: String.t(),
     dependencies: [map()],
   }
