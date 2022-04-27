@@ -8,12 +8,6 @@ defmodule MishkaInstaller.Plugin do
           error_atom: :plugin,
           repo: MishkaInstaller.repo
 
-  @type data_uuid() :: Ecto.UUID.t
-  @type record_input() :: map()
-  @type error_tag() :: :plugin
-  @type repo_data() :: Ecto.Schema.t()
-  @type repo_error() :: Ecto.Changeset.t()
-
   @behaviour MishkaDeveloperTools.DB.CRUD
 
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_add, 1}

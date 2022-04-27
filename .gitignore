@@ -25,7 +25,8 @@ mishka_social-*.tar
 # Temporary files, for example, from tests.
 /tmp/
 /deployment/
-
+/priv/repo/
+/config/
 *.beam
 
 # Misc.

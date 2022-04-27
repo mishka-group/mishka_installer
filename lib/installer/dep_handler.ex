@@ -1,6 +1,4 @@
 defmodule MishkaInstaller.Installer.DepHandler do
-  # TODO: Create a function to read all dependencies from the json file created
-  # TODO: Create a function to read information of a dep
   # TODO: Check if this file does not exist, create it with database
   # TODO: Read the installed_app information and existed app in json file, what sub-dependencies need to be updated
   # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban
@@ -13,7 +11,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   #     version: "0.0.2",
   #     type: :git, # :hex, if user upload elixir libraries (path), we should keep them in a temporary folder, and Docker should make it valume
   #     url: "https://github.com/mishka-group/mishka_installer", # if it is hex: https://hex.pm/packages/mishka_installer
-  #     tag: "0.0.2", # we consider it when it is a git, and if does not exist we get master,
+  #     git_tag: "0.0.2", # we consider it when it is a git, and if does not exist we get master,
   #     timeout: 3000, # it can be a feature, How long does it take to start?
   #     dependency_type: :none, # :soft_update, When you use this, the RunTime sourcing check what dependencies you use in your program have a higher version
   #     #compared to the old source. it just notice admin there is a update, it does not force the source to be updated
@@ -21,21 +19,21 @@ defmodule MishkaInstaller.Installer.DepHandler do
   #       %{app: :mishka_developer_tools, max: "0.0.2", min: "0.0.1"},
   #       %{app: :mishka_social, max: "0.0.2", min: "0.0.1"}
   #     ],
-  #     update: "https://github.com/mishka-group/mishka_installer/blob/master/update.json", # Check is there a higher version?
+  #     update_server: "https://github.com/mishka-group/mishka_installer/blob/master/update.json", # Check is there a higher version?
   #   }
   # ]
 
-  defstruct [:app, :version, :type, :url, :tag, :timeout, :dependency_type, :update, dependencies: []]
+  defstruct [:app, :version, :type, :url, :git_tag, :timeout, :dependency_type, :update_server, dependencies: []]
 
   @type t() :: %__MODULE__{
     app: String.t(),
     version: String.t(),
     type: String.t(),
     url: String.t(),
-    tag: String.t(),
+    git_tag: String.t(),
     timeout: timeout(),
     dependency_type: String.t(),
-    update: String.t(),
+    update_server: String.t(),
     dependencies: [map()],
   }
 
