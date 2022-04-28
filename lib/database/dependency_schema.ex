@@ -8,8 +8,8 @@ defmodule MishkaInstaller.Database.DependencySchema do
   schema "dependencies" do
     field :app, :string, null: false
     field :version, :string, null: false
-    field :type, :integer, null: false
-    field :dependency_type, :integer, null: false
+    field :type, MishkaInstaller.DependencyEnum, null: false
+    field :dependency_type, MishkaInstaller.DependencyTypeEnum, null: false
 
     field :url, :string, null: true
     field :git_tag, :string, null: true
@@ -20,7 +20,7 @@ defmodule MishkaInstaller.Database.DependencySchema do
     timestamps(type: :utc_datetime)
   end
 
-  @all_fields ~w(app version type url dependency_type git_tag timeout update_server)a
+  @all_fields ~w(app version type url dependency_type git_tag timeout update_server dependencies)a
   @required_fields ~w(app version type dependency_type)a
 
   @spec changeset(struct(), map()) :: Ecto.Changeset.t()

@@ -1,9 +1,15 @@
 defmodule MishkaInstaller.Dependency do
+  @moduledoc """
+
+  This module can hold your dependencies' information in database
+
+  > Do not use these functions directly, because we do not update JSON file in this module, some functions were prepared in DepHandler module for you.
+  """
   alias MishkaInstaller.Database.DependencySchema
   import Ecto.Query
   use MishkaDeveloperTools.DB.CRUD,
           module: DependencySchema,
-          error_atom: :plugin,
+          error_atom: :dependency,
           repo: MishkaInstaller.repo
 
   @behaviour MishkaDeveloperTools.DB.CRUD

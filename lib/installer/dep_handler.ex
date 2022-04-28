@@ -1,27 +1,63 @@
 defmodule MishkaInstaller.Installer.DepHandler do
-  # TODO: Check if this file does not exist, create it with database
+  @moduledoc """
+
+  A module that holds new dependencies' information, and add them into database or validating to implement in runtime
+
+  ### Responsibilities of this module
+
+  * Create `Json` - it helps developer to implement theire plugin/commponent into the project.
+  * Add dependencies into database - for validating, stroing and keeping backup of runtime dependencies
+  * Get dependencies information in several different ways
+
+
+  ### For example, these are output from `Json` file
+  [
+    %{
+      app: :mishka_installer,
+      version: "0.0.2",
+      type: :git, # :hex, if user upload elixir libraries (path), we should keep them in a temporary folder, and Docker should make it valume
+      url: "https://github.com/mishka-group/mishka_installer", # if it is hex: https://hex.pm/packages/mishka_installer
+      git_tag: "0.0.2", # we consider it when it is a git, and if does not exist we get master,
+      timeout: 3000, # it can be a feature, How long does it take to start?
+      dependency_type: :none, # :soft_update, When you use this, the RunTime sourcing check what dependencies you use in your program have a higher version
+      #compared to the old source. it just notice admin there is a update, it does not force the source to be updated
+      dependencies: [ # this part let mishka_installer to know can update or not dependencies of a app, we should consider a backup file
+        %{app: :mishka_developer_tools, max: "0.0.2", min: "0.0.1"},
+        %{app: :mishka_social, max: "0.0.2", min: "0.0.1"}
+      ],
+      update_server: "https://github.com/mishka-group/mishka_installer/blob/master/update.json", # Check is there a higher version?
+    }
+  ]
+
+  OR
+
+  ```elixir
+  %MishkaInstaller.Installer.DepHandler{
+    app: "mishka_social",
+    version: "0.0.2 ",
+    type: "hex",
+    url: "https://hex.pm/packages/mishka_social",
+    git_tag: nil,
+    timeout: nil,
+    dependency_type: "soft_update",
+    update_server: nil,
+    dependencies: [
+      %{app: :phoenix, min: "1.6"},
+      %{app: :phoenix_live_view, max: "0.17.7", min: "0.17.7"},
+      %{app: :ueberauth, max: "0.17.7", min: "0.17.7"},
+      %{app: :ueberauth_github, min: "0.8.1"},
+      %{app: :ueberauth_google, min: "0.10.1"},
+    ]
+  }
+  ```
+  """
+
   # TODO: Read the installed_app information and existed app in json file, what sub-dependencies need to be updated
   # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban
   # TODO: Add version of app in extra
-  # TODO: Check is there update from a developer json url, and get it from plugin/componnet mix file, Consider queue
   # TODO: Check Conflict with max and mix dependencies, before update with installed or will be installed apps
-  # [
-  #   %{
-  #     app: :mishka_installer,
-  #     version: "0.0.2",
-  #     type: :git, # :hex, if user upload elixir libraries (path), we should keep them in a temporary folder, and Docker should make it valume
-  #     url: "https://github.com/mishka-group/mishka_installer", # if it is hex: https://hex.pm/packages/mishka_installer
-  #     git_tag: "0.0.2", # we consider it when it is a git, and if does not exist we get master,
-  #     timeout: 3000, # it can be a feature, How long does it take to start?
-  #     dependency_type: :none, # :soft_update, When you use this, the RunTime sourcing check what dependencies you use in your program have a higher version
-  #     #compared to the old source. it just notice admin there is a update, it does not force the source to be updated
-  #     dependencies: [ # this part let mishka_installer to know can update or not dependencies of a app, we should consider a backup file
-  #       %{app: :mishka_developer_tools, max: "0.0.2", min: "0.0.1"},
-  #       %{app: :mishka_social, max: "0.0.2", min: "0.0.1"}
-  #     ],
-  #     update_server: "https://github.com/mishka-group/mishka_installer/blob/master/update.json", # Check is there a higher version?
-  #   }
-  # ]
+  # TODO: if the application we want to added has migration what we should to do?
+  # TODO: check after application is added, if it has genserver under aplication is started or not?
 
   defstruct [:app, :version, :type, :url, :git_tag, :timeout, :dependency_type, :update_server, dependencies: []]
 
@@ -41,7 +77,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def add_new_app(%__MODULE__{} = app_info) do
     case check_or_create_deps_json() do
       {:ok, :check_or_create_deps_json, exist_json} ->
-        update_file({:open_file, File.open(extensions_json_path(), [:write])}, app_info, exist_json)
+        insert_new_ap({:open_file, File.open(extensions_json_path(), [:read, :write])}, app_info, exist_json)
       {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, msg}
     end
   end
@@ -112,19 +148,25 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> Path.join(["deployment/", "extensions/", "extensions.json"])
   end
 
-  defp update_file({:open_file, {:ok, file}}, app_info, exist_json) do
+  defp insert_new_ap({:open_file, {:ok, file}}, app_info, exist_json) do
     with {:decode, {:ok, exist_json_data}} <- {:decode, Jason.decode(exist_json)},
+         {:duplicate_app, false} <- {:duplicate_app, Enum.any?(exist_json_data, &(&1["app"] == Map.get(app_info, :app) || Map.get(app_info, "app")))},
          map_app_info <- [Map.from_struct(app_info)],
-         {:encode, {:ok, new_apps}} <- {:encode, Jason.encode(exist_json_data ++ map_app_info)} do
+         {:encode, {:ok, new_apps}} <- {:encode, Jason.encode(exist_json_data ++ map_app_info)},
+         {:ok, :add, :dependency, repo_data} <- MishkaInstaller.Dependency.create(Map.from_struct(app_info)) do
           IO.binwrite(file, new_apps)
+          {:ok, :add_new_app, repo_data}
     else
       {:decode, {:error, _error}} ->
-        {:error, :add_new_app, "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it"}
-      {:encode, {:error, _error}} -> {:error, :add_new_app, "We can not encode your new app data, please check your data."}
+        {:error, :add_new_app, :file, "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it"}
+      {:duplicate_app, true} ->
+        {:error, :add_new_app, :file, "You can not insert new app which is duplicate, if you want to update it please user another function."}
+      {:encode, {:error, _error}} -> {:error, :add_new_app, :file, "We can not encode your new app data, please check your data."}
+      {:error, :add, :dependency, repo_error} -> {:error, :add_new_app, :changeset, repo_error}
     end
   end
 
-  defp update_file({:open_file, {:error, _posix}}, _app_info, _exist_json), do:
-                  {:error, :add_new_app, "Unfortunately, the JSON concerned file either does not exist or we do not have access to it.
+  defp insert_new_ap({:open_file, {:error, _posix}}, _app_info, _exist_json), do:
+                  {:error, :add_new_app, :file, "Unfortunately, the JSON concerned file either does not exist or we do not have access to it.
                   You can delete or create it in your panel, but before that please check you have enough access to edit it."}
 end

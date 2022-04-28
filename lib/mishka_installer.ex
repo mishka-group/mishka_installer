@@ -25,6 +25,8 @@ defmodule MishkaInstaller do
       :error -> nil
       {:ok, list} -> Keyword.fetch!(list, item)
     end
+  rescue
+    _e -> nil
   end
 
   def repo() do

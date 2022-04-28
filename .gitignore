@@ -24,12 +24,15 @@ mishka_social-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
-/deployment/
-/priv/repo/
-/config/
 *.beam
 
 # Misc.
 .DS_Store
 
 mix.lock
+
+# Developer config
+/lib/repo.ex
+/deployment/
+/priv/repo/
+/config/

@@ -1,4 +1,4 @@
-defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaInistrallerPluginTable do
+defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaInistrallerDependencyTable do
   use Ecto.Migration
 
   def change do
@@ -7,6 +7,7 @@ defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaInistrallerPluginTabl
       add(:app, :string, size: 200, null: false)
       add(:version, :string, size: 200, null: false)
       add(:type, :integer, null: false)
+      add(:dependency_type, :integer, null: false)
 
       add(:url, :text, null: true)
       add(:git_tag, :string, size: 200, null: true)
