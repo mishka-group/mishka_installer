@@ -11,6 +11,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
 
   ### For example, these are output from `Json` file
+  ```elixir
   [
     %{
       app: :mishka_installer,
@@ -28,7 +29,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       update_server: "https://github.com/mishka-group/mishka_installer/blob/master/update.json", # Check is there a higher version?
     }
   ]
-
+  ```
   OR
 
   ```elixir
@@ -54,7 +55,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # TODO: Read the installed_app information and existed app in json file, what sub-dependencies need to be updated
   # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban
-  # TODO: Add version of app in extra
   # TODO: Check Conflict with max and mix dependencies, before update with installed or will be installed apps
   # TODO: if the application we want to added has migration what we should to do?
   # TODO: check after application is added, if it has genserver under aplication is started or not?
@@ -72,6 +72,30 @@ defmodule MishkaInstaller.Installer.DepHandler do
     update_server: String.t(),
     dependencies: [map()],
   }
+
+  def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
+    with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
+         {:ok, json_data} <- Jason.decode(exist_json)do
+
+        installed_apps = Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
+        Enum.map(json_data, fn app ->
+          case Map.fetch(installed_apps, app["app"]) do
+            :error -> nil
+            {:ok, {installed_app, _des, installed_version}} ->
+              %{
+                app: installed_app,
+                json_version: app["version"],
+                installed_version: installed_version,
+                status: Version.compare(String.trim(app["version"]), "#{installed_version}")
+              }
+          end
+        end)
+        |> Enum.reject(& is_nil(&1))
+    else
+      {:error, :check_or_create_deps_json, msg} -> {:error, :compare_dependencies_with_json, msg}
+      {:error, %Jason.DecodeError{}} -> {:error, :compare_dependencies_with_json, "invalid Json file"}
+    end
+  end
 
   @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) :: :ok | {:error, atom} | {:error, :add_new_app, String.t()}
   def add_new_app(%__MODULE__{} = app_info) do
@@ -117,10 +141,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   def read_dep_json() do
-    File.read!(extensions_json_path())
-    |> Jason.decode!()
+    {:ok, :read_dep_json, File.read!(extensions_json_path()) |> Jason.decode!()}
   rescue
-    _e -> {:error, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
+    _e -> {:error, :read_dep_json, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
   end
 
   defp create_deps_json_directory(project_path, folder_path) do

@@ -1,14 +1,25 @@
 defmodule MishkaInstaller.Installer.RunTimeSourcing do
+  @moduledoc """
+  This module is created just for compiling and sourcing, hence if you want to work with Json file and the other compiling dependencies
+  please see the `MishkaInstaller.Installer.DepHandler` module.
+  """
+
   @type ensure() :: :bad_directory | :load | :no_directory | :sure_all_started
   @type do_runtime() :: :application_ensure | :prepend_compiled_apps
 
-  @spec do_runtime(any) ::{:ok, :application_ensure} | {:error, do_runtime(), ensure(), any}
-  def do_runtime(app) do
+  @spec do_runtime(atom(), atom()) ::{:ok, :application_ensure} | {:error, do_runtime(), ensure(), any}
+  def do_runtime(app, :add) do
     get_build_path()
     |> File.ls!()
     |> compare_dependencies()
     |> prepend_compiled_apps()
     |> application_ensure(app)
+  end
+
+  def do_runtime(_app, :soft_update) do
+    # TODO: update an installed app
+    get_build_path()
+    |> File.ls!()
   end
 
   @spec compare_dependencies([tuple()], [String.t()]) :: [String.t()]
@@ -20,7 +31,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
           app_name
         _ ->
           nil
-        end
+      end
     end)
     |> Enum.reject(& is_nil(&1))
   end
