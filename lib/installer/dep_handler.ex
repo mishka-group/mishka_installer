@@ -53,7 +53,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   ```
   """
 
-  # TODO: Read the installed_app information and existed app in json file, what sub-dependencies need to be updated
+  # TODO: what sub-dependencies need to be updated
   # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban
   # TODO: Check Conflict with max and mix dependencies, before update with installed or will be installed apps
   # TODO: if the application we want to added has migration what we should to do?
@@ -73,6 +73,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
     dependencies: [map()],
   }
 
+  @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
+
+  @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
   def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
     with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
          {:ok, json_data} <- Jason.decode(exist_json)do
@@ -94,6 +97,33 @@ defmodule MishkaInstaller.Installer.DepHandler do
     else
       {:error, :check_or_create_deps_json, msg} -> {:error, :compare_dependencies_with_json, msg}
       {:error, %Jason.DecodeError{}} -> {:error, :compare_dependencies_with_json, "invalid Json file"}
+    end
+  end
+
+
+  def compare_sub_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
+    with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
+         {:ok, json_data} <- Jason.decode(exist_json)do
+
+      installed_apps = Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
+      Enum.map(merge_json_by_min_version(json_data), fn app ->
+        case Map.fetch(installed_apps, app["app"]) do
+          :error -> nil
+          {:ok, {installed_app, _des, installed_version}} ->
+            %{
+              app: installed_app,
+              json_min_version: app["min"],
+              json_max_version: app["max"],
+              installed_version: installed_version,
+              min_status: Version.compare(String.trim(app["min"]), "#{installed_version}"),
+              max_status: Version.compare(String.trim(app["max"]), "#{installed_version}")
+            }
+        end
+      end)
+      |> Enum.reject(& is_nil(&1))
+    else
+      {:error, :check_or_create_deps_json, msg} -> {:error, :compare_sub_dependencies_with_json, msg}
+      {:error, %Jason.DecodeError{}} -> {:error, :compare_sub_dependencies_with_json, "invalid Json file"}
     end
   end
 
@@ -169,6 +199,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp extensions_json_path() do
     MishkaInstaller.get_config(:project_path) || File.cwd!()
     |> Path.join(["deployment/", "extensions/", "extensions.json"])
+  end
+
+  # Ref: https://elixirforum.com/t/how-to-improve-sort-of-maps-in-a-list-which-have-duplicate-key/47486
+  defp merge_json_by_min_version(json_data) do
+    Enum.flat_map(json_data, &(&1["dependencies"]))
+      |> Enum.group_by(&(&1["app"]))
+      |> Enum.map(fn {_key, list} ->
+        Enum.max_by(list, &(&1["min"]), Version)
+      end)
   end
 
   defp insert_new_ap({:open_file, {:ok, file}}, app_info, exist_json) do
