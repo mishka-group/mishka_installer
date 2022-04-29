@@ -22,6 +22,23 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> application_ensure(app, :soft_update)
   end
 
+  def do_runtime(app, :uninstall) when is_atom(app) do
+    Application.stop(app)
+    Application.unload(app)
+    if(Atom.to_string(app) in File.ls!(get_build_path()), do: "#{app}", else: false)
+    |> delete_app_dir()
+  end
+
+  defp delete_app_dir(false), do: {:error, :prepend_compiled_apps, :no_directory, []}
+  defp delete_app_dir(dir) do
+    Path.join(get_build_path(), ["#{dir}"])
+    |> File.rm_rf()
+    |> case do
+      {:ok, files_and_directories} -> {:ok, :delete_app_dir, files_and_directories}
+      {:error, reason, file} -> {:error, :delete_app_dir, reason, file}
+    end
+  end
+
   @spec compare_dependencies([tuple()], [String.t()]) :: [String.t()]
   def compare_dependencies(installed_apps \\ Application.loaded_applications, files_list) do
     installed_apps = Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)

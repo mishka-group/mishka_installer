@@ -1,4 +1,5 @@
 defmodule MishkaInstaller.Installer.DepProtector do
+  # TODO: what we should do to save state when an app is updated?
   # TODO: Check if this file does not exist, create it with database
   # TODO: Check is there update from a developer json url, and get it from plugin/componnet mix file, Consider queue
   # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban

@@ -52,8 +52,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
   }
   ```
   """
-
-  # TODO: Check Conflict with max and mix dependencies, before update with installed or will be installed apps
   # TODO: if the application we want to added has migration what we should to do?
 
   defstruct [:app, :version, :type, :url, :git_tag, :timeout, :dependency_type, :update_server, dependencies: []]

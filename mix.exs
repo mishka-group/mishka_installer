@@ -31,9 +31,7 @@ defmodule MishkaInstaller.MixProject do
       {:ecto_enum, "~> 1.4"},
       {:mishka_developer_tools, "~> 0.0.6"},
       {:jason, "~> 1.3"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      # {:timex, "~> 3.6.4"} # old version first
-      {:timex, "~> 3.7"} # Update to new ver
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 
