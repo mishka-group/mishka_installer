@@ -8,18 +8,18 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   @type do_runtime() :: :application_ensure | :prepend_compiled_apps
 
   @spec do_runtime(atom(), atom()) ::{:ok, :application_ensure} | {:error, do_runtime(), ensure(), any}
-  def do_runtime(app, :add) do
+  def do_runtime(app, :add) when is_atom(app) do
     get_build_path()
     |> File.ls!()
     |> compare_dependencies()
     |> prepend_compiled_apps()
-    |> application_ensure(app)
+    |> application_ensure(app, :add)
   end
 
-  def do_runtime(_app, :soft_update) do
-    # TODO: update an installed app
-    get_build_path()
-    |> File.ls!()
+  def do_runtime(app, :soft_update) when is_atom(app) do
+    if(Atom.to_string(app) in File.ls!(get_build_path()), do: ["#{app}"], else: false)
+    |> prepend_compiled_apps()
+    |> application_ensure(app, :soft_update)
   end
 
   @spec compare_dependencies([tuple()], [String.t()]) :: [String.t()]
@@ -46,6 +46,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @spec prepend_compiled_apps(any) :: {:ok, :prepend_compiled_apps} | {:error, do_runtime(), ensure(), list}
+  def prepend_compiled_apps(false), do: {:error, :prepend_compiled_apps, :no_directory, []}
   def prepend_compiled_apps([]), do: {:error, :prepend_compiled_apps, :no_directory, []}
   def prepend_compiled_apps(files_list) do
     files_list
@@ -61,7 +62,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["_build/", "#{mode}/", "lib"])
   end
 
-  defp application_ensure({:ok, :prepend_compiled_apps}, app) do
+  defp application_ensure({:ok, :prepend_compiled_apps}, app, :add) do
     with {:load, :ok} <- {:load, Application.load(app)},
          {:sure_all_started, {:ok, _apps}} <- {:sure_all_started, Application.ensure_all_started(app)} do
 
@@ -72,5 +73,19 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
-  defp application_ensure(error, _app), do: error
+  defp application_ensure({:ok, :prepend_compiled_apps}, app, :soft_update) do
+    Application.stop(app)
+    with {:unload, :ok} <- {:unload, Application.unload(app)},
+         {:load, :ok} <- {:load, Application.load(app)},
+         {:sure_all_started, {:ok, _apps}} <- {:sure_all_started, Application.ensure_all_started(app)} do
+
+        {:ok, :application_ensure}
+    else
+      {:unload, {:error, term}} -> {:error, :application_ensure, :unload, term}
+      {:load, {:error, term}} -> {:error, :application_ensure, :load, term}
+      {:sure_all_started, {:error, {app, term}}} -> {:error, :application_ensure, :sure_all_started, {app, term}}
+    end
+  end
+
+  defp application_ensure(error, _app, _status), do: error
 end

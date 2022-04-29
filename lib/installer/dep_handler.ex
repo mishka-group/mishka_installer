@@ -53,11 +53,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
   ```
   """
 
-  # TODO: what sub-dependencies need to be updated
-  # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban
   # TODO: Check Conflict with max and mix dependencies, before update with installed or will be installed apps
   # TODO: if the application we want to added has migration what we should to do?
-  # TODO: check after application is added, if it has genserver under aplication is started or not?
 
   defstruct [:app, :version, :type, :url, :git_tag, :timeout, :dependency_type, :update_server, dependencies: []]
 

@@ -10,7 +10,7 @@
 - [ ] Accept developer `hex` for installing an extension
 - [ ] Compatible MishkaCms with this version
 - [ ] Document improved and Wiki added
-- [ ] Some types added and some behaviors added
+- [ ] Some types and behaviors added
 - [ ] Compatible Docker shell with this version
 - [ ] Disable and make behavior optional in plugin hook
 
