@@ -39,7 +39,7 @@ defmodule MishkaInstaller.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp description() do
-    "Mishka Installer is a system plugin manager for elixir."
+    "Mishka Installer is a system plugin manager and run time installer for elixir."
   end
 
   defp package() do

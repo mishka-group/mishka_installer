@@ -1,4 +1,7 @@
 defmodule MishkaInstaller.Installer.DepHandler do
+  alias MishkaInstaller.Reference.OnChangeDependency
+  @event "on_change_dependency"
+  defstruct [:app, :version, :type, :url, :git_tag, :timeout, :dependency_type, :update_server, dependencies: []]
   @moduledoc """
 
   A module that holds new dependencies' information, and add them into database or validating to implement in runtime
@@ -54,8 +57,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
   """
   # TODO: if the application we want to added has migration what we should to do?
 
-  defstruct [:app, :version, :type, :url, :git_tag, :timeout, :dependency_type, :update_server, dependencies: []]
-
   @type t() :: %__MODULE__{
     app: String.t(),
     version: String.t(),
@@ -69,6 +70,27 @@ defmodule MishkaInstaller.Installer.DepHandler do
   }
 
   @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
+
+  # This function helps developer to decide what they should do when an app is going to be updated.
+  # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
+  @spec dependency_changes_notifier(atom(), atom()) :: any
+  def dependency_changes_notifier(app, status \\ :soft_update) do
+    case MishkaInstaller.PluginState.get_all(event: @event) do
+      [] ->
+        {:ok, :dependency_changes_notifier, :no_state, "We could not find any registered-app that has important state, hence you can update safely."}
+      _value ->
+        MishkaInstaller.Hook.call(event: @event, state: %OnChangeDependency{app: app, status: status}, operation: :no_return)
+        # TODO: store {app, status, time} in `MishkaInstaller.Installer.DepChangesProtector`
+        # TODO: MishkaInstaller.Installer.DepChangesProtector.push(app, status)
+        {:ok, :dependency_changes_notifier, :registered_app,
+        "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
+         After their response, we will change the #{app} dependency and let you know about its latest news."}
+    end
+  end
+
+  def mix_read_from_json() do
+    # TODO: Convert mix deps from json file
+  end
 
   @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
   def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
