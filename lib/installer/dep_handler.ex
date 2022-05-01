@@ -80,8 +80,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         {:ok, :dependency_changes_notifier, :no_state, "We could not find any registered-app that has important state, hence you can update safely."}
       _value ->
         MishkaInstaller.Hook.call(event: @event, state: %OnChangeDependency{app: app, status: status}, operation: :no_return)
-        # TODO: store {app, status, time} in `MishkaInstaller.Installer.DepChangesProtector`
-        # TODO: MishkaInstaller.Installer.DepChangesProtector.push(app, status)
+        MishkaInstaller.Installer.DepChangesProtector.push(app, status)
         {:ok, :dependency_changes_notifier, :registered_app,
         "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
          After their response, we will change the #{app} dependency and let you know about its latest news."}
