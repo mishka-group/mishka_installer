@@ -30,7 +30,28 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def init(stack) do
     Logger.info("OTP Dependencies changes protector Cache server was started")
-    {:ok, stack}
+    {:ok, stack, {:continue, :check_json}}
+  end
+
+  @impl true
+  def handle_continue(:check_json, state) do
+    Process.send_after(self(), :check_json, 10_000)
+    {:noreply,state}
+  end
+
+  @impl true
+  def handle_info(:check_json, _state) do
+    Logger.info("OTP Dependencies changes protector Cache server was valued by JSON.")
+    new_state =
+      with {:ok, :check_or_create_deps_json, _json} <- MishkaInstaller.Installer.DepHandler.check_or_create_deps_json(),
+           {:ok, :read_dep_json, data} <- MishkaInstaller.Installer.DepHandler.read_dep_json() do
+            data
+            |> Enum.filter(&(&1["dependency_type"] == "soft_update"))
+            |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
+      else
+        _ -> []
+      end
+    {:noreply, new_state}
   end
 
   @impl true

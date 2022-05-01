@@ -73,8 +73,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
-  @spec dependency_changes_notifier(atom(), atom()) :: any
-  def dependency_changes_notifier(app, status \\ :soft_update) do
+  @spec dependency_changes_notifier(String.t(), String.t()) :: any
+  def dependency_changes_notifier(app, status \\ "soft_update") do
     case MishkaInstaller.PluginState.get_all(event: @event) do
       [] ->
         {:ok, :dependency_changes_notifier, :no_state, "We could not find any registered-app that has important state, hence you can update safely."}
@@ -205,6 +205,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp create_deps_json_file(project_path) do
     case File.open(extensions_json_path(), [:write]) do
       {:ok, file} ->
+        # TODO: get data from database
         IO.binwrite(file, Jason.encode!([]))
         File.close(file)
         check_or_create_deps_json(project_path)
