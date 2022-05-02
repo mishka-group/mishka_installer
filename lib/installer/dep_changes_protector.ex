@@ -38,6 +38,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_continue(:check_json, state) do
     Process.send_after(self(), :check_json, @re_check_json_time)
+    MishkaInstaller.Dependency.subscribe()
     {:noreply,state}
   end
 

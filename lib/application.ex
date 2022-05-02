@@ -19,10 +19,11 @@ defmodule MishkaInstaller.Application do
     end
 
     children = [
-      MishkaInstaller.Installer.DepChangesProtector,
       {Registry, keys: :unique, name: PluginStateRegistry},
       {DynamicSupervisor, plugin_runner_config},
-      {Task.Supervisor, name: MishkaInstaller.Activity}
+      {Task.Supervisor, name: MishkaInstaller.Activity},
+      {Phoenix.PubSub, name: MishkaInstaller.PubSub},
+      MishkaInstaller.Installer.DepChangesProtector
     ] ++ test_plugin
 
     opts = [strategy: :one_for_one, name: MishkaInstaller.Supervisor]

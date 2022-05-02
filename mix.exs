@@ -27,7 +27,7 @@ defmodule MishkaInstaller.MixProject do
 
   defp deps do
     [
-      {:phoenix_pubsub, "~> 2.0"},
+      {:phoenix_pubsub, "~> 2.1"},
       {:ecto_enum, "~> 1.4"},
       {:mishka_developer_tools, "~> 0.0.6"},
       {:jason, "~> 1.3"},

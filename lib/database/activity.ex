@@ -8,6 +8,10 @@ defmodule MishkaInstaller.Activity do
 
   @behaviour MishkaDeveloperTools.DB.CRUD
 
+  def subscribe do
+    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, "activity")
+  end
+
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_add, 1}
   def create(attrs) do
     crud_add(attrs)
@@ -71,8 +75,10 @@ defmodule MishkaInstaller.Activity do
     def notify_subscribers(params, _type_send), do: params
   else
     def notify_subscribers({:ok, _, :activity, repo_data} = params, type_send) do
-      Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub), "activity", {type_send, :ok, repo_data})
+      Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, "activity", {type_send, :ok, repo_data})
       params
     end
+
+    def notify_subscribers(params, _), do: params
   end
 end

@@ -17,26 +17,31 @@ defmodule MishkaInstaller.Dependency do
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_add, 1}
   def create(attrs) do
     crud_add(attrs)
+    |> notify_subscribers(:dependency)
   end
 
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_add, 1}
   def create(attrs, allowed_fields) do
     crud_add(attrs, allowed_fields)
+    |> notify_subscribers(:dependency)
   end
 
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_edit, 1}
   def edit(attrs) do
     crud_edit(attrs)
+    |> notify_subscribers(:dependency)
   end
 
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_edit, 1}
   def edit(attrs, allowed_fields) do
     crud_edit(attrs, allowed_fields)
+    |> notify_subscribers(:dependency)
   end
 
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_delete, 1}
   def delete(id) do
     crud_delete(id)
+    |> notify_subscribers(:dependency)
   end
 
   @doc delegate_to: {MishkaDeveloperTools.DB.CRUD, :crud_get_record, 1}
@@ -76,4 +81,18 @@ defmodule MishkaInstaller.Dependency do
     }
   end
 
+  def subscribe do
+    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, "dependency")
+  end
+
+  if Mix.env() == :test do
+    def notify_subscribers(params, _type_send), do: params
+  else
+    def notify_subscribers({:ok, _, :dependency, repo_data} = params, type_send) do
+      Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, "activity", {type_send, :ok, repo_data})
+      params
+    end
+
+    def notify_subscribers(params, _), do: params
+  end
 end
