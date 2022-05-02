@@ -53,6 +53,10 @@ defmodule MishkaInstaller.Dependency do
     from(dep in DependencySchema)
     |> fields()
     |> MishkaInstaller.repo.all()
+  end
+
+  def dependencies(:struct) do
+    dependencies()
     |> Enum.map(&struct(MishkaInstaller.Installer.DepHandler, &1))
   end
 

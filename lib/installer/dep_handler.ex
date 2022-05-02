@@ -156,15 +156,23 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def check_or_create_deps_json(project_path \\ MishkaInstaller.get_config(:project_path) || File.cwd!()) do
     with {:deployment_path, true} <- {:deployment_path, File.exists?(Path.join(project_path, ["deployment"]))},
          {:extensions_path, true} <- {:extensions_path, File.exists?(Path.join(project_path, ["deployment/", "extensions"]))},
-         {:json_file, true} <- {:json_file, File.exists?(extensions_json_path())} do
+         {:json_file, true} <- {:json_file, File.exists?(extensions_json_path())},
+         {:empty_json, true, json_data} <- {:empty_json, File.read!(extensions_json_path()) != "", File.read!(extensions_json_path())},
+         {:ok, :read_dep_json, _converted_json} <- read_dep_json() do
 
-         {:ok, :check_or_create_deps_json, File.read!(extensions_json_path())}
+         {:ok, :check_or_create_deps_json, json_data}
     else
       {:deployment_path, false} ->
         create_deps_json_directory(project_path, "deployment")
       {:extensions_path, false} ->
         create_deps_json_directory(project_path, "deployment/extensions")
       {:json_file, false} ->
+        create_deps_json_file(project_path)
+      {:empty_json, false, _data} ->
+        File.rm_rf(extensions_json_path())
+        create_deps_json_file(project_path)
+      {:error, :read_dep_json, _msg} ->
+        File.rm_rf(extensions_json_path())
         create_deps_json_file(project_path)
     end
   end
@@ -205,8 +213,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp create_deps_json_file(project_path) do
     case File.open(extensions_json_path(), [:write]) do
       {:ok, file} ->
-        # TODO: get data from database
-        IO.binwrite(file, Jason.encode!([]))
+        IO.binwrite(file, Jason.encode!(MishkaInstaller.Dependency.dependencies()))
         File.close(file)
         check_or_create_deps_json(project_path)
       _error -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this file. Please add it manually."}
