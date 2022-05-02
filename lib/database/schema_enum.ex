@@ -7,4 +7,4 @@ defenum MishkaInstaller.ActivitiesSectionEnum, blog_post: 0, blog_category: 1, c
 defenum MishkaInstaller.ActivitiesStatusEnum, error: 0, info: 1, warning: 2, report: 3, throw: 4, exit: 5
 defenum MishkaInstaller.ActivitiesActionEnum, add: 0, edit: 1, delete: 2, destroy: 3, read: 4, send_request: 5, receive_request: 6, other: 7, auth: 8
 defenum MishkaInstaller.DependencyEnum, git: 0, hex: 1, upload: 2
-defenum MishkaInstaller.DependencyTypeEnum, none: 0, soft_update: 1
+defenum MishkaInstaller.DependencyTypeEnum, none: 0, force_update: 1

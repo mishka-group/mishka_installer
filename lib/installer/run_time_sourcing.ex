@@ -16,10 +16,10 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> application_ensure(app, :add)
   end
 
-  def do_runtime(app, :soft_update) when is_atom(app) do
+  def do_runtime(app, :force_update) when is_atom(app) do
     if(Atom.to_string(app) in File.ls!(get_build_path()), do: ["#{app}"], else: false)
     |> prepend_compiled_apps()
-    |> application_ensure(app, :soft_update)
+    |> application_ensure(app, :force_update)
   end
 
   def do_runtime(app, :uninstall) when is_atom(app) do
@@ -90,7 +90,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
-  defp application_ensure({:ok, :prepend_compiled_apps}, app, :soft_update) do
+  defp application_ensure({:ok, :prepend_compiled_apps}, app, :force_update) do
     Application.stop(app)
     with {:unload, :ok} <- {:unload, Application.unload(app)},
          {:load, :ok} <- {:load, Application.load(app)},

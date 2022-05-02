@@ -23,7 +23,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       url: "https://github.com/mishka-group/mishka_installer", # if it is hex: https://hex.pm/packages/mishka_installer
       git_tag: "0.0.2", # we consider it when it is a git, and if does not exist we get master,
       timeout: 3000, # it can be a feature, How long does it take to start?
-      dependency_type: :none, # :soft_update, When you use this, the RunTime sourcing check what dependencies you use in your program have a higher version
+      dependency_type: :none, # :force_update, When you use this, the RunTime sourcing check what dependencies you use in your program have a higher version
       #compared to the old source. it just notice admin there is a update, it does not force the source to be updated
       dependencies: [ # this part let mishka_installer to know can update or not dependencies of a app, we should consider a backup file
         %{app: :mishka_developer_tools, max: "0.0.2", min: "0.0.1"},
@@ -43,7 +43,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     url: "https://hex.pm/packages/mishka_social",
     git_tag: nil,
     timeout: nil,
-    dependency_type: "soft_update",
+    dependency_type: "force_update",
     update_server: nil,
     dependencies: [
       %{app: :phoenix, min: "1.6"},
@@ -74,7 +74,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
   @spec dependency_changes_notifier(String.t(), String.t()) :: any
-  def dependency_changes_notifier(app, status \\ "soft_update") do
+  def dependency_changes_notifier(app, status \\ "force_update") do
     case MishkaInstaller.PluginState.get_all(event: @event) do
       [] ->
         {:ok, :dependency_changes_notifier, :no_state, "We could not find any registered-app that has important state, hence you can update safely."}

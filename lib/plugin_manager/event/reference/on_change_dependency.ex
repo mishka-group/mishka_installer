@@ -2,7 +2,7 @@ defmodule MishkaInstaller.Reference.OnChangeDependency do
   defstruct [:app, :status]
 
   @type app() :: atom()
-  @type status() :: :add | :soft_update
+  @type status() :: :add | :force_update
   @type ref() :: :on_change_dependency # Name of this event
   @type reason() :: map() | String.t() # output of state for this event
   @type registerd_info() :: MishkaInstaller.PluginState.t() # information about this plugin on state which was saved
