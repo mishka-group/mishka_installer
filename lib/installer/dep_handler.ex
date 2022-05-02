@@ -94,7 +94,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
   def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
     with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
-         {:ok, json_data} <- Jason.decode(exist_json)do
+         {:ok, :read_dep_json, json_data} <- read_dep_json(exist_json) do
 
         installed_apps = Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
         Enum.map(json_data, fn app ->
@@ -112,14 +112,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
         |> Enum.reject(& is_nil(&1))
     else
       {:error, :check_or_create_deps_json, msg} -> {:error, :compare_dependencies_with_json, msg}
-      {:error, %Jason.DecodeError{}} -> {:error, :compare_dependencies_with_json, "invalid Json file"}
+      _ -> {:error, :compare_dependencies_with_json, "invalid Json file"}
     end
   end
 
 
   def compare_sub_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
     with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
-         {:ok, json_data} <- Jason.decode(exist_json)do
+         {:ok, :read_dep_json, json_data} <- read_dep_json(exist_json) do
 
       installed_apps = Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
       Enum.map(merge_json_by_min_version(json_data), fn app ->
@@ -139,7 +139,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       |> Enum.reject(& is_nil(&1))
     else
       {:error, :check_or_create_deps_json, msg} -> {:error, :compare_sub_dependencies_with_json, msg}
-      {:error, %Jason.DecodeError{}} -> {:error, :compare_sub_dependencies_with_json, "invalid Json file"}
+      _ -> {:error, :compare_sub_dependencies_with_json, "invalid Json file"}
     end
   end
 
@@ -158,7 +158,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
          {:extensions_path, true} <- {:extensions_path, File.exists?(Path.join(project_path, ["deployment/", "extensions"]))},
          {:json_file, true} <- {:json_file, File.exists?(extensions_json_path())},
          {:empty_json, true, json_data} <- {:empty_json, File.read!(extensions_json_path()) != "", File.read!(extensions_json_path())},
-         {:ok, :read_dep_json, _converted_json} <- read_dep_json() do
+         {:ok, :read_dep_json, _converted_json} <- read_dep_json(json_data) do
 
          {:ok, :check_or_create_deps_json, json_data}
     else
@@ -194,8 +194,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
-  def read_dep_json() do
-    {:ok, :read_dep_json, File.read!(extensions_json_path()) |> Jason.decode!()}
+  def read_dep_json(json \\ File.read!(extensions_json_path())) do
+    {:ok, :read_dep_json, json |> Jason.decode!()}
   rescue
     _e -> {:error, :read_dep_json, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
   end

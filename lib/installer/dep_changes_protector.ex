@@ -2,6 +2,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   use GenServer
   require Logger
   @re_check_json_time 10_000
+  alias MishkaInstaller.Installer.DepHandler
 
   @spec start_link(list()) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(args \\ []) do
@@ -91,8 +92,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   defp json_check_and_create() do
-    with {:ok, :check_or_create_deps_json, _json} <- MishkaInstaller.Installer.DepHandler.check_or_create_deps_json(),
-           {:ok, :read_dep_json, data} <- MishkaInstaller.Installer.DepHandler.read_dep_json() do
+    with {:ok, :check_or_create_deps_json, json} <- DepHandler.check_or_create_deps_json(),
+           {:ok, :read_dep_json, data} <- DepHandler.read_dep_json(json) do
             data
             |> Enum.filter(&(&1["dependency_type"] == "soft_update"))
             |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
