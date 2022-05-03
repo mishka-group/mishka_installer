@@ -2,6 +2,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   use GenServer
   require Logger
   @re_check_json_time 10_000
+
   alias MishkaInstaller.Installer.DepHandler
 
   @spec start_link(list()) :: :ignore | {:error, any} | {:ok, pid}
@@ -39,7 +40,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   def handle_continue(:check_json, state) do
     Process.send_after(self(), :check_json, @re_check_json_time)
     MishkaInstaller.Dependency.subscribe()
-    {:noreply,state}
+    {:noreply, state}
   end
 
   @impl true
@@ -50,11 +51,10 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_info({:ok, :dependency, _action, _repo_data}, state) do
-    MishkaInstaller.Installer.DepHandler.extensions_json_path()
+  def handle_info({:ok, :dependency, _action, _repo_data}, _state) do
+    DepHandler.extensions_json_path()
     |> File.rm_rf()
-    json_check_and_create()
-    {:noreply, state}
+    {:noreply, json_check_and_create()}
   end
 
   @impl true
