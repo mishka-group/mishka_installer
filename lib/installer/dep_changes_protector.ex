@@ -100,15 +100,17 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban
   end
 
+  # For now, we decided to remove and re-create JSON file to prevent user not to delete or wrong edit manually
   defp json_check_and_create() do
+    DepHandler.extensions_json_path()
+    |> File.rm_rf()
     with {:ok, :check_or_create_deps_json, json} <- DepHandler.check_or_create_deps_json(),
-           {:ok, :read_dep_json, data} <- DepHandler.read_dep_json(json) do
-            data
-            |> Enum.filter(&(&1["dependency_type"] == "force_update"))
-            |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
+         {:ok, :read_dep_json, data} <- DepHandler.read_dep_json(json) do
+          data
+          |> Enum.filter(&(&1["dependency_type"] == "force_update"))
+          |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
       else
         _ ->
-          # TODO: send an activity as error log
           []
       end
   end
