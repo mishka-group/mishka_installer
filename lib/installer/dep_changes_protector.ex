@@ -44,9 +44,17 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info(:check_json, _state) do
-    Logger.info("OTP Dependencies changes protector Cache server was valued by JSON.")
+    if Mix.env() not in [:dev, :test], do: Logger.info("OTP Dependencies changes protector Cache server was valued by JSON.")
     Process.send_after(self(), :check_json, @re_check_json_time)
     {:noreply, json_check_and_create()}
+  end
+
+  @impl true
+  def handle_info({:ok, :dependency, _action, _repo_data}, state) do
+    MishkaInstaller.Installer.DepHandler.extensions_json_path()
+    |> File.rm_rf()
+    json_check_and_create()
+    {:noreply, state}
   end
 
   @impl true

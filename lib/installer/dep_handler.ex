@@ -220,7 +220,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  defp extensions_json_path() do
+  def extensions_json_path() do
     MishkaInstaller.get_config(:project_path) || File.cwd!()
     |> Path.join(["deployment/", "extensions/", "extensions.json"])
   end
