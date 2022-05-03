@@ -90,7 +90,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     case read_dep_json() do
       {:ok, :read_dep_json, data} ->
         Enum.map(data, fn item ->
-          mix_git(data["type"], item)
+          mix_creator(data["type"], item)
         end)
       {:error, :read_dep_json, msg} ->
         raise msg <> ". To make sure, re-create the JSON file from scratch."
@@ -262,17 +262,17 @@ defmodule MishkaInstaller.Installer.DepHandler do
                   {:error, :add_new_app, :file, "Unfortunately, the JSON concerned file either does not exist or we do not have access to it.
                   You can delete or create it in your panel, but before that please check you have enough access to edit it."}
 
-  defp mix_git("hex", data) do
+  defp mix_creator("hex", data) do
     {String.to_atom(data["app"]), "~> #{String.trim(data["version"])}"}
   end
 
-  defp mix_git("upload", data) do
+  defp mix_creator("upload", data) do
     uploaded_extension = MishkaInstaller.get_config(:project_path) || File.cwd!()
     |> Path.join(["deployment/", "extensions/", "#{data["app"]}"])
     {String.to_atom(data["app"]), path: uploaded_extension}
   end
 
-  defp mix_git("git", data) do
+  defp mix_creator("git", data) do
     case data["tag"] do
       nil ->
         {String.to_atom(data["app"]), git: data["url"]}
