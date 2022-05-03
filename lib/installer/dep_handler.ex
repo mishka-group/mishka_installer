@@ -55,7 +55,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
   }
   ```
   """
-  # TODO: if the application we want to added has migration what we should to do?
 
   @type t() :: %__MODULE__{
     app: String.t(),
@@ -88,7 +87,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   def mix_read_from_json() do
-    # TODO: Convert mix deps from json file
+    case read_dep_json() do
+      {:ok, :read_dep_json, data} ->
+        Enum.map(data, fn item ->
+          mix_git(data["type"], item)
+        end)
+      {:error, :read_dep_json, msg} ->
+        raise msg <> ". To make sure, re-create the JSON file from scratch."
+    end
   end
 
   @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
@@ -255,4 +261,23 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp insert_new_ap({:open_file, {:error, _posix}}, _app_info, _exist_json), do:
                   {:error, :add_new_app, :file, "Unfortunately, the JSON concerned file either does not exist or we do not have access to it.
                   You can delete or create it in your panel, but before that please check you have enough access to edit it."}
+
+  defp mix_git("hex", data) do
+    {String.to_atom(data["app"]), "~> #{String.trim(data["version"])}"}
+  end
+
+  defp mix_git("upload", data) do
+    uploaded_extension = MishkaInstaller.get_config(:project_path) || File.cwd!()
+    |> Path.join(["deployment/", "extensions/", "#{data["app"]}"])
+    {String.to_atom(data["app"]), path: uploaded_extension}
+  end
+
+  defp mix_git("git", data) do
+    case data["tag"] do
+      nil ->
+        {String.to_atom(data["app"]), git: data["url"]}
+      _ ->
+        {String.to_atom(data["app"]), git: data["url"], tag: data["tag"]}
+    end
+  end
 end
