@@ -106,12 +106,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     |> File.rm_rf()
     with {:ok, :check_or_create_deps_json, json} <- DepHandler.check_or_create_deps_json(),
          {:ok, :read_dep_json, data} <- DepHandler.read_dep_json(json) do
-          data
-          |> Enum.filter(&(&1["dependency_type"] == "force_update"))
-          |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
-      else
-        _ ->
-          []
-      end
+        data
+        |> Enum.filter(&(&1["dependency_type"] == "force_update"))
+        |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
+    end
+  rescue
+    _e -> []
   end
 end
