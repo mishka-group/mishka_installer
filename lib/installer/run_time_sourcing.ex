@@ -53,9 +53,10 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> Enum.reject(& is_nil(&1))
   end
 
-  @spec deps :: list
-  def deps() do
-    [{:get, "deps.get"}, {:compile, "deps.compile"}]
+  # If you have a Task in your project you can load it in a list like [{:task_one, "ecto.migrate"}], it should be a list
+  @spec deps(list()) :: list
+  def deps(custom_command \\ []) when is_list(custom_command) do
+    [{:get, "deps.get"}, {:compile, "deps.compile"}] ++ custom_command
     |> Enum.map(fn {operation, command} ->
       {stream, status} = System.cmd("mix", [command], into: IO.stream(), stderr_to_stdout: true)
       %{operation: operation, output: stream, status: status}

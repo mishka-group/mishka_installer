@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.Installer.DepHandler do
   alias MishkaInstaller.Reference.OnChangeDependency
   @event "on_change_dependency"
-  defstruct [:app, :version, :type, :url, :git_tag, :timeout, :dependency_type, :update_server, dependencies: []]
+  defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, :update_server, dependencies: []]
   @moduledoc """
 
   A module that holds new dependencies' information, and add them into database or validating to implement in runtime
@@ -22,7 +22,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       type: :git, # :hex, if user upload elixir libraries (path), we should keep them in a temporary folder, and Docker should make it valume
       url: "https://github.com/mishka-group/mishka_installer", # if it is hex: https://hex.pm/packages/mishka_installer
       git_tag: "0.0.2", # we consider it when it is a git, and if does not exist we get master,
-      timeout: 3000, # it can be a feature, How long does it take to start?
+      custom_command: "ecto.migrate", # you can write nil or you task file like ecto.migrate
       dependency_type: :none, # :force_update, When you use this, the RunTime sourcing check what dependencies you use in your program have a higher version
       #compared to the old source. it just notice admin there is a update, it does not force the source to be updated
       dependencies: [ # this part let mishka_installer to know can update or not dependencies of a app, we should consider a backup file
@@ -42,7 +42,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     type: "hex",
     url: "https://hex.pm/packages/mishka_social",
     git_tag: nil,
-    timeout: nil,
+    custom_command: nil,
     dependency_type: "force_update",
     update_server: nil,
     dependencies: [
@@ -63,7 +63,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     type: String.t(),
     url: String.t(),
     git_tag: String.t(),
-    timeout: timeout(),
+    custom_command: String.t(),
     dependency_type: String.t(),
     update_server: String.t(),
     dependencies: [map()],
