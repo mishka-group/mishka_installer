@@ -136,5 +136,14 @@ children = [
 ]
 ```
 
+در موقع استفاده می توانید خطوط زیر را در فایل کانفیگ خود قرار بدهید.
+
+
+```elixir
+config :mishka_installer, :basic,
+  repo: YOUR_Repo,
+  pubsub: YOUR_PUBSUB or nil,
+  html_router: YOUR_WEBSITE_ROUTER_MODULE
+``
 شما می توانید پیشنهاد های ما و دیگر همکاران را در ریپازیتوری [Proposals](https://github.com/mishka-group/Proposals) ببنید و اگر خودتان درخواستی یا ایده ای دارید در آن جا با توضیحات کامل برای ما ارسال کنید. **لطفا با همکاری در ارائه پیشنهادها و بررسی پروژه کمک کنید تا گروه [میشکا](https://github.com/mishka-group) بتواند محصولات بیشتری را تولید و در اختیار برنامه نویسان و مدیران سایت ها و نرم‌افزار های آنلاین قرار بدهد**.
 
