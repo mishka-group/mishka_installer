@@ -79,7 +79,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
         {:ok, :dependency_changes_notifier, :no_state, "We could not find any registered-app that has important state, hence you can update safely."}
       _value ->
         MishkaInstaller.Hook.call(event: @event, state: %OnChangeDependency{app: app, status: status}, operation: :no_return)
-        MishkaInstaller.Installer.DepChangesProtector.push(app, status)
+        # TODO: it should be save in db and create json and state from the db
+        # TODO: check the app exist in database, if yes so edit the status to `force_update` if not send user and error, please submit the app at first
+        # TODO: after that you can notif and check
+
         {:ok, :dependency_changes_notifier, :registered_app,
         "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
          After their response, we will change the #{app} dependency and let you know about its latest news."}
@@ -240,13 +243,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
       end)
   end
 
-  defp insert_new_ap({:open_file, {:ok, file}}, app_info, exist_json) do
+  defp insert_new_ap({:open_file, {:ok, _file}}, app_info, exist_json) do
     with {:decode, {:ok, exist_json_data}} <- {:decode, Jason.decode(exist_json)},
          {:duplicate_app, false} <- {:duplicate_app, Enum.any?(exist_json_data, &(&1["app"] == Map.get(app_info, :app) || Map.get(app_info, "app")))},
          map_app_info <- [Map.from_struct(app_info)],
-         {:encode, {:ok, new_apps}} <- {:encode, Jason.encode(exist_json_data ++ map_app_info)},
+         {:encode, {:ok, _new_apps}} <- {:encode, Jason.encode(exist_json_data ++ map_app_info)},
          {:ok, :add, :dependency, repo_data} <- MishkaInstaller.Dependency.create(Map.from_struct(app_info)) do
-          IO.binwrite(file, new_apps)
+          # after the new app added into the database, the DepChangesProtector module remove the json file and re-create it
           {:ok, :add_new_app, repo_data}
     else
       {:decode, {:error, _error}} ->

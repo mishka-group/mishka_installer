@@ -129,12 +129,21 @@ use MishkaInstaller.Hook,
     initial: []
 ```
 
-The last step to use the plugin you have to put it in your `Application` module so that whenever the server is turned off and on, the plugin is run again and if it is not registered, a copy of its support will be provided once in the database.
+The last two step to use the plugin you have to put it in your `Application` module so that whenever the server is turned off and on, the plugin is run again and if it is not registered, a copy of its support will be provided once in the database.
 
 ```elixir
 children = [
   %{id: YOUR_PLUGIN_MODULE, start: {YOUR_PLUGIN_MODULE, :start_link, [[]]}}
 ]
+```
+
+And add these config in your project like `/config/config.exs`
+
+```elixir
+config :mishka_installer, :basic,
+  repo: YOUR_Repo,
+  pubsub: YOUR_PUBSUB or nil,
+  html_router: YOUR_WEBSITE_ROUTER_MODULE
 ```
 
 You can see our recommendations and other colleagues in the [Proposal](https://github.com/mishka-group/Proposals) repository, and if you have a request or idea, send us the full description.
