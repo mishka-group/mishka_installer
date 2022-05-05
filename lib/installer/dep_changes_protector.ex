@@ -143,16 +143,12 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     else
       {:compile_status, true} ->
         MishkaInstaller.dependency_activity("compiling", %{state: answer}, "high")
-        nil
       {:error, :get_record_by_field, :dependency} ->
         MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "no_app_found"}, "high")
-        nil
       {:error, :edit, action, :dependency} when action in [:uuid, :get_record_by_id] ->
         MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "no_app_found"}, "high")
-        nil
       {:error, :edit, :dependency, repo_error} ->
         MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "edit", error: repo_error}, "high")
-        nil
     end
   end
 end

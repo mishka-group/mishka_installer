@@ -168,7 +168,6 @@ defmodule MishkaInstaller.Hook do
   @spec call([{:event, event()} | {:operation, :no_return} | {:state, struct()}]) :: any
   def call(event: event_name, state: state, operation: :no_return) do
     call(event: event_name, state: state)
-  after
     state
   end
 

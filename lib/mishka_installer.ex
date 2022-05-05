@@ -18,8 +18,7 @@ defmodule MishkaInstaller do
     )
   end
 
-  @spec dependency_activity(String.t(), map, String.t(), String.t()) ::
-          :ignore | {:error, any} | {:ok, pid} | {:ok, pid, any}
+  @spec dependency_activity(String.t(), map, String.t(), String.t()) :: nil
   def dependency_activity(action, state, priority, status \\ "error") do
     MishkaInstaller.Activity.create_activity_by_start_child(%{
       type: "dependency",
@@ -37,6 +36,7 @@ defmodule MishkaInstaller do
         end
       end)
     }))
+    nil
   end
 
   def ip(user_ip), do: is_bitstring(user_ip) && user_ip || Enum.join(Tuple.to_list(user_ip), ".")
