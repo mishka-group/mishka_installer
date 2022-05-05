@@ -30,8 +30,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     GenServer.cast(__MODULE__, :clean)
   end
 
-  def deps(custom_command \\ []) do
-    GenServer.cast(__MODULE__, {:deps, custom_command})
+  def deps(app, custom_command \\ []) do
+    GenServer.cast(__MODULE__, {:deps, app, custom_command})
   end
 
   @impl true
@@ -62,9 +62,10 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_info({ref, _answer}, %{ref: ref} = state) do
+  def handle_info({ref, answer}, %{ref: ref} = state) do
     # The task completed successfully
-    {:noreply, %{state | ref: nil}}
+    update_dependency_type(answer, ref, state)
+    {:noreply, Map.merge(state, %{ref: nil, app: nil})}
   end
 
   @impl true
@@ -103,12 +104,12 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_cast({:deps, custom_command}, state) do
+  def handle_cast({:deps, app, custom_command}, state) do
     task =
       Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
         MishkaInstaller.Installer.RunTimeSourcing.deps(custom_command)
       end)
-    {:noreply, %{state | ref: task.ref}}
+    {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
   end
 
   @impl true
@@ -134,5 +135,24 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
   rescue
     _e -> []
+  end
+
+  defp update_dependency_type(answer, ref, state) do
+    with {:compile_status, false} <- {:compile_status, Enum.any?(answer, & &1.status != 0)},
+         {:ok, :get_record_by_field, :dependency, record_info} <- MishkaInstaller.Dependency.show_by_name(state.app),
+         {:ok, :edit, :dependency, _repo_data} <- MishkaInstaller.Dependency.edit(%{"id" => record_info.id, "dependency_type" => "none"}) do
+
+          json_check_and_create()
+    else
+      {:compile_status, true} ->
+        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref}, "high")
+
+      {:error, :get_record_by_field, :dependency} ->
+        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref, action: "no_app_found"}, "high")
+      {:error, :edit, action, :dependency} when action in [:uuid, :get_record_by_id] ->
+        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref, action: "no_app_found"}, "high")
+      {:error, :edit, :dependency, repo_error} ->
+        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref, action: "edit", error: repo_error}, "high")
+    end
   end
 end
