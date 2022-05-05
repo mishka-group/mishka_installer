@@ -22,6 +22,7 @@ defmodule MishkaInstaller.Application do
       {Registry, keys: :unique, name: PluginStateRegistry},
       {DynamicSupervisor, plugin_runner_config},
       {Task.Supervisor, name: MishkaInstaller.Activity},
+      {Task.Supervisor, name: DepChangesProtectorTask},
       {Phoenix.PubSub, name: MishkaInstaller.PubSub},
       MishkaInstaller.Installer.DepChangesProtector
     ] ++ test_plugin
