@@ -29,7 +29,14 @@ defmodule MishkaInstaller do
       priority: priority,
       status: status,
       user_id: nil
-    }, state)
+    }, Map.merge(state, %{
+      state: Enum.map(state.state, fn item ->
+        case item do
+          %{operation: operation, output: output, status: status} -> %{operation: operation, output: Map.from_struct(output), status: status}
+          value -> value
+        end
+      end)
+    }))
   end
 
   def ip(user_ip), do: is_bitstring(user_ip) && user_ip || Enum.join(Tuple.to_list(user_ip), ".")

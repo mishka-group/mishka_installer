@@ -64,12 +64,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_info({ref, answer}, %{ref: ref} = state) do
     # The task completed successfully
-    update_dependency_type(answer, ref, state)
-    {:noreply, Map.merge(state, %{ref: nil, app: nil})}
+    {:noreply, Map.merge(state, %{data: update_dependency_type(answer, state) || state, ref: nil, app: nil})}
   end
 
   @impl true
-  def handle_info({:DOWN, ref, :process, _pid, _reason}, %{ref: ref} = state) do
+  def handle_info({:DOWN, _ref, :process, _pid, _status}, state) do
     {:noreply, %{state | ref: nil}}
   end
 
@@ -122,9 +121,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     # TODO: check tne new version of a app from hex, if its type is hex -> Ref: https://github.com/hexpm/hexpm/issues/1124
   end
 
-  def is_dependency_compiling?() do
-    # TODO: Create queue for installing multi deps, and compiling, check oban: https://github.com/sorentwo/oban
-  end
+  def is_dependency_compiling?(), do: if(is_nil(get().ref), do: false, else: true)
 
   # For now, we decided to remove and re-create JSON file to prevent user not to delete or wrong edit manually
   defp json_check_and_create() do
@@ -137,7 +134,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     _e -> []
   end
 
-  defp update_dependency_type(answer, ref, state) do
+  defp update_dependency_type(answer, state) do
     with {:compile_status, false} <- {:compile_status, Enum.any?(answer, & &1.status != 0)},
          {:ok, :get_record_by_field, :dependency, record_info} <- MishkaInstaller.Dependency.show_by_name(state.app),
          {:ok, :edit, :dependency, _repo_data} <- MishkaInstaller.Dependency.edit(%{"id" => record_info.id, "dependency_type" => "none"}) do
@@ -145,14 +142,17 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
           json_check_and_create()
     else
       {:compile_status, true} ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref}, "high")
-
+        MishkaInstaller.dependency_activity("compiling", %{state: answer}, "high")
+        nil
       {:error, :get_record_by_field, :dependency} ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref, action: "no_app_found"}, "high")
+        MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "no_app_found"}, "high")
+        nil
       {:error, :edit, action, :dependency} when action in [:uuid, :get_record_by_id] ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref, action: "no_app_found"}, "high")
+        MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "no_app_found"}, "high")
+        nil
       {:error, :edit, :dependency, repo_error} ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer, ref: ref, action: "edit", error: repo_error}, "high")
+        MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "edit", error: repo_error}, "high")
+        nil
     end
   end
 end
