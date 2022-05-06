@@ -1,6 +1,7 @@
 defmodule MishkaInstaller.Installer.DepHandler do
   alias MishkaInstaller.Reference.OnChangeDependency
   @event "on_change_dependency"
+  alias MishkaInstaller.Dependency
   defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, :update_server, dependencies: []]
   @moduledoc """
 
@@ -72,20 +73,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
-  @spec dependency_changes_notifier(String.t(), String.t()) :: any
+
+
   def dependency_changes_notifier(app, status \\ "force_update") do
     case MishkaInstaller.PluginState.get_all(event: @event) do
       [] ->
-        {:ok, :dependency_changes_notifier, :no_state, "We could not find any registered-app that has important state, hence you can update safely."}
+        update_app_status(app, status, :no_state)
       _value ->
         MishkaInstaller.Hook.call(event: @event, state: %OnChangeDependency{app: app, status: status}, operation: :no_return)
-        # TODO: it should be save in db and create json and state from the db
-        # TODO: check the app exist in database, if yes so edit the status to `force_update` if not send user and error, please submit the app at first
-        # TODO: after that you can notif and check
-
-        {:ok, :dependency_changes_notifier, :registered_app,
-        "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
-         After their response, we will change the #{app} dependency and let you know about its latest news."}
+        update_app_status(app, status, :registered_app)
     end
   end
 
@@ -281,6 +277,23 @@ defmodule MishkaInstaller.Installer.DepHandler do
         {String.to_atom(data["app"]), git: data["url"]}
       _ ->
         {String.to_atom(data["app"]), git: data["url"], tag: data["tag"]}
+    end
+  end
+
+  defp update_app_status(app, status, state) do
+    with {:ok, :change_dependency_type_with_app, _repo_data} <- Dependency.change_dependency_type_with_app(app, status) do
+         {:ok, :dependency_changes_notifier, state,
+         if state == :no_state do
+          "We could not find any registered-app that has important state, hence you can update safely."
+         else
+          "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
+          After their response, we will change the #{app} dependency and let you know about its latest news."
+         end
+      }
+    else
+      {:error, :change_dependency_type_with_app, :dependency, _error} ->
+        {:error, :dependency_changes_notifier,
+        "Unfortunately we couldn't find your app, if you did not submit the app you want to update please add it at first and send request to this app."}
     end
   end
 end

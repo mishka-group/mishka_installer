@@ -65,6 +65,21 @@ defmodule MishkaInstaller.Dependency do
     |> Enum.map(&struct(MishkaInstaller.Installer.DepHandler, &1))
   end
 
+  @spec change_dependency_type_with_app(String.t(), String.t()) :: {:ok, :change_dependency_type_with_app, map()}
+       | {:error, :change_dependency_type_with_app, :dependency, atom() | map()}
+  def change_dependency_type_with_app(app, dependency_type) do
+    with {:ok, :get_record_by_field, :dependency, record_info} <- MishkaInstaller.Dependency.show_by_name(app),
+         {:ok, :edit, :dependency, repo_data} <- MishkaInstaller.Dependency.edit(%{"id" => record_info.id, "dependency_type" => dependency_type}) do
+          {:ok, :change_dependency_type_with_app, repo_data}
+    else
+      {:error, :get_record_by_field, :dependency} -> {:error, :change_dependency_type_with_app, :dependency, :not_found}
+      {:error, :edit, action, :dependency} when action in [:uuid, :get_record_by_id] ->
+        {:error, :change_dependency_type_with_app, :dependency, :not_found}
+      {:error, :edit, :dependency, repo_error} ->
+        {:error, :change_dependency_type_with_app, :dependency, repo_error}
+    end
+  end
+
   defp fields(query) do
     from [dep] in query,
     order_by: [desc: dep.inserted_at, desc: dep.id],

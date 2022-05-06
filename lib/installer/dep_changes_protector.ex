@@ -134,20 +134,17 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     _e -> []
   end
 
-  defp update_dependency_type(answer, state) do
+  defp update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:compile_status, false} <- {:compile_status, Enum.any?(answer, & &1.status != 0)},
-         {:ok, :get_record_by_field, :dependency, record_info} <- MishkaInstaller.Dependency.show_by_name(state.app),
-         {:ok, :edit, :dependency, _repo_data} <- MishkaInstaller.Dependency.edit(%{"id" => record_info.id, "dependency_type" => "none"}) do
+         {:ok, :change_dependency_type_with_app, _repo_data} <- MishkaInstaller.Dependency.change_dependency_type_with_app(state.app, dependency_type) do
 
           json_check_and_create()
     else
       {:compile_status, true} ->
         MishkaInstaller.dependency_activity("compiling", %{state: answer}, "high")
-      {:error, :get_record_by_field, :dependency} ->
+      {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
         MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "no_app_found"}, "high")
-      {:error, :edit, action, :dependency} when action in [:uuid, :get_record_by_id] ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "no_app_found"}, "high")
-      {:error, :edit, :dependency, repo_error} ->
+      {:error, :change_dependency_type_with_app, :dependency, repo_error} ->
         MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "edit", error: repo_error}, "high")
     end
   end
