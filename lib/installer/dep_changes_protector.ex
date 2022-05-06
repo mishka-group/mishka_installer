@@ -52,10 +52,10 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     if Mix.env() not in [:dev, :test], do: Logger.info("OTP Dependencies changes protector Cache server was valued by JSON.")
     Process.send_after(self(), :check_json, @re_check_json_time)
     new_state =
-      if is_dependency_compiling?() do
-        state
+      if is_nil(state.ref) do
+        Map.merge(state, %{data: json_check_and_create()})
       else
-        {:noreply, Map.merge(state, %{data: json_check_and_create()})}
+        state
       end
     {:noreply, new_state}
   end
@@ -76,6 +76,21 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_info({:DOWN, _ref, :process, _pid, _status}, state) do
     {:noreply, %{state | ref: nil}}
+  end
+
+  def handle_info({:do_compile, app, custom_command}, state) do
+    new_state =
+      if is_nil(state.ref) do
+        task =
+          Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
+            MishkaInstaller.Installer.RunTimeSourcing.deps(custom_command)
+          end)
+        {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
+      else
+        Process.send_after(self(), {:do_compile, app, custom_command}, @re_check_json_time)
+        {:noreply, state}
+      end
+      new_state
   end
 
   @impl true
@@ -110,12 +125,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_cast({:deps, app, custom_command}, state) do
-    # TODO: if is_dependency_compiling?() is true? do not let him run it again until to get false status
-    task =
-      Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-        MishkaInstaller.Installer.RunTimeSourcing.deps(custom_command)
-      end)
-    {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
+    Process.send_after(self(), {:do_compile, app, custom_command}, 100)
+    {:noreply, state}
   end
 
   @impl true
