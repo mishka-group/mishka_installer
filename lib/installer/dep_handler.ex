@@ -74,7 +74,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
 
-
+  @spec dependency_changes_notifier(String.t(), String.t()) ::
+          {:error, :dependency_changes_notifier, String.t()}
+          | {:ok, :dependency_changes_notifier, :no_state | :registered_app, String.t()}
   def dependency_changes_notifier(app, status \\ "force_update") do
     case MishkaInstaller.PluginState.get_all(event: @event) do
       [] ->
@@ -85,6 +87,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @spec mix_read_from_json :: list
   def mix_read_from_json() do
     case read_dep_json() do
       {:ok, :read_dep_json, data} ->
@@ -121,7 +124,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-
+  @spec compare_sub_dependencies_with_json(any) :: list | {:error, :compare_sub_dependencies_with_json, String.t()}
   def compare_sub_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
     with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
          {:ok, :read_dep_json, json_data} <- read_dep_json(exist_json) do
@@ -182,6 +185,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @spec get_deps_from_mix(module()) :: list
   def get_deps_from_mix(mix_module) do
     [{:deps, app_info} | _t] = Keyword.filter(mix_module.project, fn {key, _value} -> key == :deps end)
     Enum.map(app_info, fn app_info ->
@@ -190,6 +194,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
+  @spec get_deps_from_mix_lock :: list
   def get_deps_from_mix_lock() do
     Mix.Dep.Lock.read
     |> Map.to_list()
@@ -199,10 +204,21 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
+  @spec read_dep_json(any) :: {:error, :read_dep_json, String.t()} | {:ok, :read_dep_json, list()}
   def read_dep_json(json \\ File.read!(extensions_json_path())) do
     {:ok, :read_dep_json, json |> Jason.decode!()}
   rescue
     _e -> {:error, :read_dep_json, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
+  end
+
+  def extensions_json_path() do
+    MishkaInstaller.get_config(:project_path) || File.cwd!()
+    |> Path.join(["deployment/", "extensions/", "extensions.json"])
+  end
+
+  def is_there_update?() do
+    # TODO: Check is there update from a developer json url, and get it from plugin/componnet mix file, Consider queue
+    # TODO: check tne new version of a app from hex, if its type is hex -> Ref: https://github.com/hexpm/hexpm/issues/1124
   end
 
   defp create_deps_json_directory(project_path, folder_path) do
@@ -223,11 +239,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
         check_or_create_deps_json(project_path)
       _error -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this file. Please add it manually."}
     end
-  end
-
-  def extensions_json_path() do
-    MishkaInstaller.get_config(:project_path) || File.cwd!()
-    |> Path.join(["deployment/", "extensions/", "extensions.json"])
   end
 
   # Ref: https://elixirforum.com/t/how-to-improve-sort-of-maps-in-a-list-which-have-duplicate-key/47486

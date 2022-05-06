@@ -101,7 +101,6 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
           new_app = %{app: app, status: status, time: DateTime.utc_now}
           {:reply, new_app, Map.merge(state, %{data: state.data ++ [new_app]})}
         _ ->
-
           {:reply, {:duplicate, app}, state}
       end
     new_state
@@ -134,11 +133,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     {:noreply, []}
   end
 
-  def is_there_update?() do
-    # TODO: Check is there update from a developer json url, and get it from plugin/componnet mix file, Consider queue
-    # TODO: check tne new version of a app from hex, if its type is hex -> Ref: https://github.com/hexpm/hexpm/issues/1124
-  end
-
+  @spec is_dependency_compiling? :: boolean
   def is_dependency_compiling?(), do: if(is_nil(get().ref), do: false, else: true)
 
   # For now, we decided to remove and re-create JSON file to prevent user not to delete or wrong edit manually
