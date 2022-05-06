@@ -89,7 +89,7 @@ defmodule MishkaInstaller.Dependency do
       type: dep.type,
       url: dep.url,
       git_tag: dep.git_tag,
-      timeout: dep.timeout,
+      custom_command: dep.custom_command,
       dependency_type: dep.dependency_type,
       update_server: dep.update_server,
       dependencies: dep.dependencies
