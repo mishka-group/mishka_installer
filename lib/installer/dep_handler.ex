@@ -101,7 +101,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   @spec append_mix([tuple()]) :: list
   def append_mix(list) do
-    new_list = list |> Enum.map(&(Tuple.to_list(&1) |> Enum.take(1) |> List.first()))
+    new_list = Enum.map(list , &(&1.app))
     Enum.map(mix_read_from_json(), & mix_item(&1, new_list))
     |> Enum.reject(& is_nil(&1))
   rescue
