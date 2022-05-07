@@ -102,10 +102,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @spec append_mix([tuple()]) :: list
   def append_mix(list) do
     new_list = Enum.map(list , &(&1.app))
-    Enum.map(mix_read_from_json(), & mix_item(&1, new_list))
+    json_mix = Enum.map(mix_read_from_json(), & mix_item(&1, new_list))
     |> Enum.reject(& is_nil(&1))
+    list ++ json_mix
   rescue
-    _e -> []
+    _e -> list ++ []
   end
 
   @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
