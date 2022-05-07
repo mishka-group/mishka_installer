@@ -99,6 +99,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @spec append_mix([tuple()]) :: list
+  def append_mix(list) do
+    new_list = list |> Enum.map(&(Tuple.to_list(&1) |> Enum.take(1) |> List.first()))
+    Enum.map(mix_read_from_json(), & mix_item(&1, new_list))
+    |> Enum.reject(& is_nil(&1))
+  rescue
+    _e -> []
+  end
+
   @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
   def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
     with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
@@ -307,4 +316,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         "Unfortunately we couldn't find your app, if you did not submit the app you want to update please add it at first and send request to this app."}
     end
   end
+
+  defp mix_item({name, _} = value, list), do: if name in list, do: nil, else: value
+  defp mix_item({name, _, _} = value, list), do: if name in list, do: nil, else: value
 end

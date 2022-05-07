@@ -8,6 +8,7 @@
 - [ ] Add private information into state, read only data
 - [ ] Accept developer `git` for installing an extension
 - [ ] Accept developer `hex` for installing an extension
+- [ ] Accept admin `upload` file for installing an extension
 - [ ] Compatible MishkaCms with this version
 - [ ] Document improved and Wiki added
 - [ ] Some types and behaviors added
