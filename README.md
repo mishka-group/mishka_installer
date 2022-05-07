@@ -1,4 +1,5 @@
 # Elixir programming language plugin management system
+[![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml)
 
 ## Build purpose
 ---
