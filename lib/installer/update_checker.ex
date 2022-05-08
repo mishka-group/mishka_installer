@@ -1,5 +1,5 @@
 defmodule MishkaInstaller.Installer.UpdateChecker do
-  use GenServer
+  use GenServer, restart: :permanent
   require Logger
   @update_check_time 300_000
   alias MishkaInstaller.Installer.DepHandler
@@ -34,6 +34,7 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
 
   @impl true
   def handle_info(:check_update, state) do
+    Logger.info("OTP UpdateChecker check update tasks were sent.")
     Process.send_after(self(), :check_update, @update_check_time)
     {:noreply, check_apps_update(state)}
   end
@@ -54,7 +55,7 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
     |> create_update_task()
   rescue
     _e ->
-      MishkaInstaller.update_activity("updating", %{action: :check_apps_update, status: :extension_json_file}, "high")
+      MishkaInstaller.update_activity(%{action: :check_apps_update, status: :extension_json_file}, "high")
       state
   end
 
@@ -71,12 +72,12 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
         if Version.parse(version) != :error do
           %{app: app["app"], latest_stable_version: version, current_version: app["version"]}
         else
-          MishkaInstaller.update_activity("updating", %{app: app["app"], type: type, status: :server_bad_version}, "high")
+          MishkaInstaller.update_activity(%{app: app["app"], type: type, status: :server_bad_version}, "high")
         end
       {:error, :package, status} ->
-        MishkaInstaller.update_activity("updating", %{app: app["app"], type: type, status: status}, "high")
+        MishkaInstaller.update_activity(%{app: app["app"], type: type, status: status}, "high")
       _ ->
-        MishkaInstaller.update_activity("updating", %{app: app["app"], type: type, status: :server_error}, "high")
+        MishkaInstaller.update_activity(%{app: app["app"], type: type, status: :server_error}, "high")
     end
   end
 

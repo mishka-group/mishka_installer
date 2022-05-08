@@ -1,5 +1,5 @@
 defmodule MishkaInstaller.Installer.DepChangesProtector do
-  use GenServer
+  use GenServer, restart: :permanent
   require Logger
   @re_check_json_time 10_000
 
@@ -154,11 +154,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
           json_check_and_create()
     else
       {:compile_status, true} ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer}, "high")
+        MishkaInstaller.dependency_activity(%{state: answer}, "high")
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "no_app_found"}, "high")
+        MishkaInstaller.dependency_activity(%{state: answer, action: "no_app_found"}, "high")
       {:error, :change_dependency_type_with_app, :dependency, repo_error} ->
-        MishkaInstaller.dependency_activity("compiling", %{state: answer, action: "edit", error: repo_error}, "high")
+        MishkaInstaller.dependency_activity(%{state: answer, action: "edit", error: repo_error}, "high")
     end
   end
 end

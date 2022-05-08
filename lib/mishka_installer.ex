@@ -9,10 +9,10 @@ defmodule MishkaInstaller do
     )
   end
 
-  @spec dependency_activity(String.t(), map, String.t(), String.t()) :: nil
-  def dependency_activity(action, state, priority, status \\ "error") do
+  @spec dependency_activity(map, String.t(), String.t()) :: nil
+  def dependency_activity(state, priority, status \\ "error") do
     MishkaInstaller.Activity.create_activity_by_start_child(
-      activity_required_map("dependency", "compiling", action, priority, status),
+      activity_required_map("dependency", "compiling", "compiling", priority, status),
       Map.merge(state, %{
         state: Enum.map(state.state, fn item ->
           case item do
@@ -24,9 +24,9 @@ defmodule MishkaInstaller do
     nil
   end
 
-  @spec update_activity(String.t(), map, String.t(), String.t()) :: nil
-  def update_activity(action, state, priority, status \\ "error") do
-    MishkaInstaller.Activity.create_activity_by_start_child(activity_required_map("dependency", "updating", action, priority, status), state)
+  @spec update_activity(map, String.t(), String.t()) :: nil
+  def update_activity(state, priority, status \\ "error") do
+    MishkaInstaller.Activity.create_activity_by_start_child(activity_required_map("dependency", "updating", "updating", priority, status), state)
     nil
   end
   def ip(user_ip), do: is_bitstring(user_ip) && user_ip || Enum.join(Tuple.to_list(user_ip), ".")
