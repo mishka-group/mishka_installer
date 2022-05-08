@@ -19,6 +19,7 @@ defmodule MishkaInstaller.Application do
     end
 
     children = [
+      {Finch, name: HexClientApi},
       {Registry, keys: :unique, name: PluginStateRegistry},
       {DynamicSupervisor, plugin_runner_config},
       {Task.Supervisor, name: MishkaInstaller.Activity},

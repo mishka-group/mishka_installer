@@ -31,6 +31,7 @@ defmodule MishkaInstaller.MixProject do
       {:ecto_enum, "~> 1.4"},
       {:mishka_developer_tools, "~> 0.0.6"},
       {:jason, "~> 1.3"},
+      {:finch, "~> 0.12.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
