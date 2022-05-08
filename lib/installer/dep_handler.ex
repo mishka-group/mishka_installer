@@ -226,9 +226,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> Path.join(["deployment/", "extensions/", "extensions.json"])
   end
 
+  @spec is_there_update? :: boolean
   def is_there_update?() do
-    # TODO: Check is there update from a developer json url, and get it from plugin/componnet mix file, Consider queue
-    # TODO: check tne new version of a app from hex, if its type is hex -> Ref: https://github.com/hexpm/hexpm/issues/1124
+    if length(MishkaInstaller.Installer.UpdateChecker.get()) == 0, do: false, else: true
   end
 
   defp create_deps_json_directory(project_path, folder_path) do

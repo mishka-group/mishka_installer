@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.Helper.HexApi do
+defmodule MishkaInstaller.Helper.Sender do
   @moduledoc """
     At first, we try to get basic information from `hex.pm` website; but after releasing some versions of MishkaInstaller,
     this API can be useful for managing packages from admin panel.
@@ -7,11 +7,20 @@ defmodule MishkaInstaller.Helper.HexApi do
   """
   @request_name HexClientApi
 
-  @type app :: String.t()
+  @type app :: map()
 
-  @spec package(app()) :: {:error, :package, :not_found | :unhandled} | {:ok, :package, map()}
-  def package(app) do
-    url = "https://hex.pm/api/packages/#{app}"
+  @spec package(String.t(), app()) :: {:error, :package, :not_found | :unhandled} | {:ok, :package, map()}
+  def package("hex", %{"app" => name} = _app) do
+    send_build(:get, "https://hex.pm/api/packages/#{name}")
+  end
+
+  def package("git", %{"update_server" => url, "tag" => tag} = _app) when not is_nil(url) and not is_nil(tag) do
+    send_build(:get, url)
+  end
+
+  def package(_status, _app), do: {:error, :package, :not_tag}
+
+  defp send_build(:get, url) do
     Finch.build(:get, url)
     |> Finch.request(@request_name)
     |> request_handler()

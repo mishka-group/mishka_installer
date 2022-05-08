@@ -25,7 +25,8 @@ defmodule MishkaInstaller.Application do
       {Task.Supervisor, name: MishkaInstaller.Activity},
       {Task.Supervisor, name: DepChangesProtectorTask},
       {Phoenix.PubSub, name: MishkaInstaller.PubSub},
-      MishkaInstaller.Installer.DepChangesProtector
+      MishkaInstaller.Installer.DepChangesProtector,
+      MishkaInstaller.Installer.UpdateChecker,
     ] ++ test_plugin
 
     opts = [strategy: :one_for_one, name: MishkaInstaller.Supervisor]

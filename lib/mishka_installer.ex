@@ -39,6 +39,19 @@ defmodule MishkaInstaller do
     nil
   end
 
+  @spec update_activity(String.t(), map, String.t(), String.t()) :: nil
+  def update_activity(action, state, priority, status \\ "error") do
+    MishkaInstaller.Activity.create_activity_by_start_child(%{
+      type: "dependency",
+      section: "updating",
+      section_id: nil,
+      action: action,
+      priority: priority,
+      status: status,
+      user_id: nil
+    }, state)
+    nil
+  end
   def ip(user_ip), do: is_bitstring(user_ip) && user_ip || Enum.join(Tuple.to_list(user_ip), ".")
 
   def get_config(item, section \\ :basic) do

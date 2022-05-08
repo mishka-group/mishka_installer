@@ -35,8 +35,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def init(_stack) do
-    Logger.info("OTP Dependencies changes protector Cache server was started")
+  def init(_state) do
+    Logger.info("OTP Dependencies changes protector server was started")
     {:ok, %{data: nil, ref: nil}, {:continue, :check_json}}
   end
 
