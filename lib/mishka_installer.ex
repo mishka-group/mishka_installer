@@ -4,36 +4,21 @@ defmodule MishkaInstaller do
   @spec plugin_activity(String.t(), PluginState.t(), String.t(), String.t()) ::
           :ignore | {:error, any} | {:ok, pid} | {:ok, pid, any}
   def plugin_activity(action, %PluginState{} = plugin, priority, status \\ "info") do
-    MishkaInstaller.Activity.create_activity_by_start_child(%{
-      type: "plugin",
-      section: "other",
-      section_id: nil,
-      action: action,
-      priority: priority,
-      status: status,
-      user_id: nil
-    },
-      Map.from_struct(plugin)
-      |> Map.drop([:parent_pid])
+    MishkaInstaller.Activity.create_activity_by_start_child(
+      activity_required_map("plugin", "other", action, priority, status), Map.drop(Map.from_struct(plugin), [:parent_pid])
     )
   end
 
   @spec dependency_activity(String.t(), map, String.t(), String.t()) :: nil
   def dependency_activity(action, state, priority, status \\ "error") do
-    MishkaInstaller.Activity.create_activity_by_start_child(%{
-      type: "dependency",
-      section: "compiling",
-      section_id: nil,
-      action: action,
-      priority: priority,
-      status: status,
-      user_id: nil
-    }, Map.merge(state, %{
-      state: Enum.map(state.state, fn item ->
-        case item do
-          %{operation: operation, output: output, status: status} -> %{operation: operation, output: Map.from_struct(output), status: status}
-          value -> value
-        end
+    MishkaInstaller.Activity.create_activity_by_start_child(
+      activity_required_map("dependency", "compiling", action, priority, status),
+      Map.merge(state, %{
+        state: Enum.map(state.state, fn item ->
+          case item do
+            %{operation: operation, output: output, status: status} -> %{operation: operation, output: Map.from_struct(output), status: status}
+            value -> value
+          end
       end)
     }))
     nil
@@ -41,15 +26,7 @@ defmodule MishkaInstaller do
 
   @spec update_activity(String.t(), map, String.t(), String.t()) :: nil
   def update_activity(action, state, priority, status \\ "error") do
-    MishkaInstaller.Activity.create_activity_by_start_child(%{
-      type: "dependency",
-      section: "updating",
-      section_id: nil,
-      action: action,
-      priority: priority,
-      status: status,
-      user_id: nil
-    }, state)
+    MishkaInstaller.Activity.create_activity_by_start_child(activity_required_map("dependency", "updating", action, priority, status), state)
     nil
   end
   def ip(user_ip), do: is_bitstring(user_ip) && user_ip || Enum.join(Tuple.to_list(user_ip), ".")
@@ -75,5 +52,17 @@ defmodule MishkaInstaller do
       {:module, _} -> module
       {:error, _} -> raise "This module does not exist or is not configured if it is related to Ecto. Please read the documentation at GitHub."
     end
+  end
+
+  defp activity_required_map(type, section, action, priority, status) do
+    %{
+      type: type,
+      section: section,
+      section_id: nil,
+      action: action,
+      priority: priority,
+      status: status,
+      user_id: nil
+    }
   end
 end
