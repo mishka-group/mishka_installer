@@ -4,6 +4,8 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
   alias MishkaInstaller.Installer.DepHandler
 
   # These are the sample dependencies we are using in MishkaCms
+  # We do not test is_there_update and is_there_update/1 function, because this function is a normal get state from a genserver
+  # We do not test dependency_changes_notifier/2, because this function is a normal get state from a genserver and the event hook was tested
   @old_ueberauth %DepHandler{
     app: "ueberauth",
     version: "0.6.3",
@@ -15,23 +17,6 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     update_server: nil,
     dependencies: [
       %{app: :plug, min: "1.5"}
-    ]
-  }
-
-  @new_ueberauth Map.merge(@old_ueberauth, %{version: "0.7.0"})
-
-  @ueberauth_google %DepHandler{
-    app: "ueberauth_google",
-    version: "0.10.1",
-    type: "hex",
-    url: "https://hex.pm/packages/ueberauth_google",
-    git_tag: nil,
-    custom_command: nil,
-    dependency_type: "force_update",
-    update_server: nil,
-    dependencies: [
-      %{app: :oauth2 , min: "2.0"},
-      %{app: :ueberauth , min: "0.7.0"},
     ]
   }
 
@@ -81,6 +66,26 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
       DepHandler.check_or_create_deps_json()
       [] = assert DepHandler.compare_sub_dependencies_with_json()
       # TODO: Add a test consider installed app with sub dependencies
+    end
+
+    test "Get deps from mix", %{repo_data: _repo_data}  do
+      [
+        %{app: :phoenix_pubsub, version: "~> 2.1"},
+        %{app: :ecto_enum, version: "~> 1.4"},
+        %{app: :mishka_developer_tools, version: "~> 0.0.6"},
+        %{app: :jason, version: "~> 1.3"},
+        %{app: :finch, version: "~> 0.12.0"},
+        %{app: :ex_doc, version: ">= 0.0.0"}
+      ] = assert DepHandler.get_deps_from_mix(MishkaInstaller.MixProject)
+    end
+
+    test "Get deps from mix lock", %{repo_data: _repo_data}  do
+      true = assert is_list(DepHandler.get_deps_from_mix_lock())
+    end
+
+    test "Get extensions json path", %{repo_data: _repo_data}  do
+      true = assert DepHandler.extensions_json_path()
+      |> is_binary()
     end
   end
 
