@@ -68,6 +68,20 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
       list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}]
       [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.3"}] = assert DepHandler.append_mix(list)
     end
+
+    test "Compare dependencies with json", %{repo_data: _repo_data}  do
+      DepHandler.create_deps_json_file(File.cwd!())
+      DepHandler.check_or_create_deps_json()
+      [] = assert DepHandler.compare_dependencies_with_json()
+      # TODO: Add a test consider installed app
+    end
+
+    test "Compare sub dependencies with json", %{repo_data: _repo_data}  do
+      DepHandler.create_deps_json_file(File.cwd!())
+      DepHandler.check_or_create_deps_json()
+      [] = assert DepHandler.compare_sub_dependencies_with_json()
+      # TODO: Add a test consider installed app with sub dependencies
+    end
   end
 
   defp clean_json_file() do
