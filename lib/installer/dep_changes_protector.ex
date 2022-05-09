@@ -1,4 +1,8 @@
 defmodule MishkaInstaller.Installer.DepChangesProtector do
+  @moduledoc """
+    This module helps you to protect the extension.json file and every action like add or delete or even edit a dependency is happened,
+    it can handle it and create new state.
+  """
   use GenServer, restart: :permanent
   require Logger
   @re_check_json_time 10_000

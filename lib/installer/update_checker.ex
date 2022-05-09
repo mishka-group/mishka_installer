@@ -1,4 +1,8 @@
 defmodule MishkaInstaller.Installer.UpdateChecker do
+  @moduledoc """
+    The only responsibility this module has is checking update from different way,
+    this version can just check `hex` site and direct link of a JSON file which has `latest_stable_version` parameter in itself
+  """
   use GenServer, restart: :permanent
   require Logger
   @update_check_time 300_000
