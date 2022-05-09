@@ -231,6 +231,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
     if length(MishkaInstaller.Installer.UpdateChecker.get()) == 0, do: false, else: true
   end
 
+  @spec is_there_update?(String.t()) :: boolean
+  def is_there_update?(app) do
+    if is_nil(MishkaInstaller.Installer.UpdateChecker.get(app)), do: false, else: true
+  end
+
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
       :ok -> check_or_create_deps_json(project_path)

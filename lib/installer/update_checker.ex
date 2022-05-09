@@ -10,7 +10,7 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
-  @spec get(String.t()) :: map()
+  @spec get(String.t()) :: map() | nil
   def get(app) do
     GenServer.call(__MODULE__, {:get, app})
   end
