@@ -57,6 +57,7 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
   def check_apps_update(state) do
     DepHandler.read_dep_json()
     |> create_update_task()
+    |> update_sate()
   rescue
     _e ->
       MishkaInstaller.update_activity(%{action: :check_apps_update, status: :extension_json_file}, "high")
@@ -72,6 +73,8 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
 
   defp create_update_url(%{"type" => type} = app) when type in ["hex", "git"] do
     case Sender.package(type, app) do
+      {:ok, :package, %{"latest_stable_version" => version} = _package} = _data when version in ["master", "main"]->
+        MishkaInstaller.update_activity(%{app: app["app"], type: type, status: :master_git}, "high")
       {:ok, :package, %{"latest_stable_version" => version} = _package} = _data when not is_nil(version) ->
         if Version.parse(version) != :error do
           %{app: app["app"], latest_stable_version: version, current_version: app["version"]}
@@ -86,4 +89,10 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
   end
 
   defp create_update_url(_app), do: nil
+
+  defp update_sate(state) do
+    Enum.filter(state, fn item ->
+      Version.compare(item.latest_stable_version, item.current_version) == :gt
+    end)
+  end
 end
