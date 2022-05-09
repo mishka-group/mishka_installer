@@ -38,14 +38,23 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
   setup_all _tags do
     clean_json_file()
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
-    on_exit fn -> clean_json_file() end
-    [this_is: "is"]
+    [this: "what_it_is"]
+  end
+
+  setup _context do
+    {:ok, :add_new_app, repo_data} = assert DepHandler.add_new_app(@old_ueberauth)
+    on_exit fn ->
+      clean_json_file()
+      MishkaInstaller.Dependency.delete(repo_data.id)
+    end
+    [repo_data: repo_data]
   end
 
   describe "Happy | DepHandler module (▰˘◡˘▰)" do
-    test "add a dependency", %{this_is: _this_is} do
-      {:ok, :add_new_app, _repo_data} = assert DepHandler.add_new_app(@old_ueberauth)
-      {:error, :add_new_app, :changeset, _repo_error} = assert DepHandler.add_new_app(@old_ueberauth)
+    test "Create mix deps list from json file", %{repo_data: _repo_data} do
+      DepHandler.create_deps_json_file(File.cwd!())
+      {:ok, :check_or_create_deps_json, _json_data} = assert DepHandler.check_or_create_deps_json()
+      [{:ueberauth, "~> 0.6.3"}] = assert DepHandler.mix_read_from_json()
     end
   end
 

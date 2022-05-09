@@ -83,6 +83,23 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @spec read_dep_json(any) :: {:error, :read_dep_json, String.t()} | {:ok, :read_dep_json, list()}
+  def read_dep_json(json \\ File.read!(extensions_json_path())) do
+    {:ok, :read_dep_json, json |> Jason.decode!()}
+  rescue
+    _e -> {:error, :read_dep_json, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
+  end
+
+  @spec mix_read_from_json :: list
+  def mix_read_from_json() do
+    case read_dep_json() do
+      {:ok, :read_dep_json, data} ->
+        Enum.map(data, fn item -> mix_creator(item["type"], item) end)
+      {:error, :read_dep_json, msg} ->
+        raise msg <> ". To make sure, re-create the JSON file from scratch."
+    end
+  end
+
   @spec dependency_changes_notifier(String.t(), String.t()) ::
           {:error, :dependency_changes_notifier, String.t()}
           | {:ok, :dependency_changes_notifier, :no_state | :registered_app, String.t()}
@@ -93,18 +110,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
       _value ->
         MishkaInstaller.Hook.call(event: @event, state: %OnChangeDependency{app: app, status: status}, operation: :no_return)
         update_app_status(app, status, :registered_app)
-    end
-  end
-
-  @spec mix_read_from_json :: list
-  def mix_read_from_json() do
-    case read_dep_json() do
-      {:ok, :read_dep_json, data} ->
-        Enum.map(data, fn item ->
-          mix_creator(data["type"], item)
-        end)
-      {:error, :read_dep_json, msg} ->
-        raise msg <> ". To make sure, re-create the JSON file from scratch."
     end
   end
 
@@ -214,13 +219,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
-  @spec read_dep_json(any) :: {:error, :read_dep_json, String.t()} | {:ok, :read_dep_json, list()}
-  def read_dep_json(json \\ File.read!(extensions_json_path())) do
-    {:ok, :read_dep_json, json |> Jason.decode!()}
-  rescue
-    _e -> {:error, :read_dep_json, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
-  end
-
+  @spec extensions_json_path :: binary()
   def extensions_json_path() do
     MishkaInstaller.get_config(:project_path) || File.cwd!()
     |> Path.join(["deployment/", "extensions/", "extensions.json"])
@@ -246,7 +245,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  defp create_deps_json_file(project_path) do
+  @spec create_deps_json_file(binary()) :: {:error, :check_or_create_deps_json, binary} | {:ok, :check_or_create_deps_json, binary}
+  def create_deps_json_file(project_path) do
     case File.open(extensions_json_path(), [:write]) do
       {:ok, file} ->
         IO.binwrite(file, Jason.encode!(MishkaInstaller.Dependency.dependencies()))
