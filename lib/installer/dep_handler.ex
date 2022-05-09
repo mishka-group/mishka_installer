@@ -115,7 +115,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   @spec append_mix([tuple()]) :: list
   def append_mix(list) do
-    new_list = Enum.map(list , &(&1.app))
+    new_list = Enum.map(list , &(&1 |> Tuple.to_list |> List.first()))
     json_mix = Enum.map(mix_read_from_json(), & mix_item(&1, new_list))
     |> Enum.reject(& is_nil(&1))
     list ++ json_mix
@@ -235,16 +235,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     if is_nil(MishkaInstaller.Installer.UpdateChecker.get(app)), do: false, else: true
   end
 
-  defp create_deps_json_directory(project_path, folder_path) do
-    case File.mkdir(Path.join(project_path, folder_path)) do
-      :ok -> check_or_create_deps_json(project_path)
-      {:error, :eacces} -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this directory. Please add it manually."}
-      {:error, :enospc} -> {:error, :check_or_create_deps_json, "there is no space left on the device."}
-      {:error, e} when e in [:eexist, :enoent, :enotdir] ->
-        {:error, :check_or_create_deps_json, "Please contact plugin support when you encounter this error."}
-    end
-  end
-
   @spec create_deps_json_file(binary()) :: {:error, :check_or_create_deps_json, binary} | {:ok, :check_or_create_deps_json, binary}
   def create_deps_json_file(project_path) do
     case File.open(extensions_json_path(), [:write]) do
@@ -253,6 +243,16 @@ defmodule MishkaInstaller.Installer.DepHandler do
         File.close(file)
         check_or_create_deps_json(project_path)
       _error -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this file. Please add it manually."}
+    end
+  end
+
+  defp create_deps_json_directory(project_path, folder_path) do
+    case File.mkdir(Path.join(project_path, folder_path)) do
+      :ok -> check_or_create_deps_json(project_path)
+      {:error, :eacces} -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this directory. Please add it manually."}
+      {:error, :enospc} -> {:error, :check_or_create_deps_json, "there is no space left on the device."}
+      {:error, e} when e in [:eexist, :enoent, :enotdir] ->
+        {:error, :check_or_create_deps_json, "Please contact plugin support when you encounter this error."}
     end
   end
 

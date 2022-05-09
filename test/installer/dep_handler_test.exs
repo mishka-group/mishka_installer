@@ -56,6 +56,18 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
       {:ok, :check_or_create_deps_json, _json_data} = assert DepHandler.check_or_create_deps_json()
       [{:ueberauth, "~> 0.6.3"}] = assert DepHandler.mix_read_from_json()
     end
+
+    test "Read a json", %{repo_data: _repo_data} do
+      {:ok, :read_dep_json, _data} = assert DepHandler.read_dep_json("[]")
+      {:error, :read_dep_json, _msg} = assert DepHandler.read_dep_json("]")
+    end
+
+    test "Create mix deps in mix file", %{repo_data: _repo_data} do
+      DepHandler.create_deps_json_file(File.cwd!())
+      DepHandler.check_or_create_deps_json()
+      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}]
+      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.3"}] = assert DepHandler.append_mix(list)
+    end
   end
 
   defp clean_json_file() do
