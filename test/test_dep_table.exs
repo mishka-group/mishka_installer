@@ -10,7 +10,7 @@ defmodule MishkaInstaller.Repo.Migrations.TestDepTable do
 
       add(:url, :text, null: true)
       add(:git_tag, :string, size: 200, null: true)
-      add(:timeout, :integer, null: true)
+      add(:custom_command, :string, null: true)
       add(:update_server, :text, null: true)
       add(:dependencies, {:array, :map}, null: true)
 

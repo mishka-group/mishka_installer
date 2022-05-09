@@ -74,6 +74,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
 
+  @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) :: :ok | {:error, atom} | {:error, :add_new_app, String.t()}
+  def add_new_app(%__MODULE__{} = app_info) do
+    case check_or_create_deps_json() do
+      {:ok, :check_or_create_deps_json, exist_json} ->
+        insert_new_ap({:open_file, File.open(extensions_json_path(), [:read, :write])}, app_info, exist_json)
+      {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, msg}
+    end
+  end
+
   @spec dependency_changes_notifier(String.t(), String.t()) ::
           {:error, :dependency_changes_notifier, String.t()}
           | {:ok, :dependency_changes_notifier, :no_state | :registered_app, String.t()}
@@ -158,15 +167,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     else
       {:error, :check_or_create_deps_json, msg} -> {:error, :compare_sub_dependencies_with_json, msg}
       _ -> {:error, :compare_sub_dependencies_with_json, "invalid Json file"}
-    end
-  end
-
-  @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) :: :ok | {:error, atom} | {:error, :add_new_app, String.t()}
-  def add_new_app(%__MODULE__{} = app_info) do
-    case check_or_create_deps_json() do
-      {:ok, :check_or_create_deps_json, exist_json} ->
-        insert_new_ap({:open_file, File.open(extensions_json_path(), [:read, :write])}, app_info, exist_json)
-      {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, msg}
     end
   end
 
