@@ -116,11 +116,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @spec append_mix([tuple()]) :: list
   def append_mix(list) do
     new_list = Enum.map(list , &(&1 |> Tuple.to_list |> List.first()))
-    json_mix = Enum.map(mix_read_from_json(), & mix_item(&1, new_list))
-    |> Enum.reject(& is_nil(&1))
-    list ++ json_mix
+    json_mix =
+      Enum.map(mix_read_from_json(), & mix_item(&1, new_list, list))
+      |> Enum.reject(& is_nil(&1))
+      Enum.reject(list, fn item ->
+        (List.first(Tuple.to_list(item))) in Enum.map(json_mix, fn item -> List.first(Tuple.to_list(item)) end)
+      end) ++ json_mix
   rescue
-    _e -> list ++ []
+    _e -> list
   end
 
   @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
@@ -259,10 +262,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # Ref: https://elixirforum.com/t/how-to-improve-sort-of-maps-in-a-list-which-have-duplicate-key/47486
   defp merge_json_by_min_version(json_data) do
     Enum.flat_map(json_data, &(&1["dependencies"]))
-      |> Enum.group_by(&(&1["app"]))
-      |> Enum.map(fn {_key, list} ->
-        Enum.max_by(list, &(&1["min"]), Version)
-      end)
+    |> Enum.group_by(&(&1["app"]))
+    |> Enum.map(fn {_key, list} ->
+      Enum.max_by(list, &(&1["min"]), Version)
+    end)
   end
 
   defp insert_new_ap({:open_file, {:ok, _file}}, app_info, exist_json) do
@@ -323,6 +326,33 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  defp mix_item({name, _} = value, list), do: if name in list, do: nil, else: value
-  defp mix_item({name, _, _} = value, list), do: if name in list, do: nil, else: value
+  # The priority of path and git master/main are always higher the `mix` dependencies list.
+  defp mix_item({_app, path: _uploaded_extension} = value, _app_list, _deps_list), do: value
+  defp mix_item({_app, git: _url} = value, _app_list, _deps_list), do: value
+
+  defp mix_item({app, git: _url, tag: imporetd_version} = value, app_list, deps_list) do
+    if app in app_list, do: check_sam_app_version(app, deps_list, imporetd_version, value), else: value
+  end
+
+  defp mix_item({app, imporetd_version} = value, app_list, deps_list) do
+    if app in app_list, do: check_sam_app_version(app, deps_list, imporetd_version, value), else: value
+  end
+
+  defp check_sam_app_version(app, deps_list, imporetd_version, value) do
+    founded_app = Enum.find(deps_list, fn item -> (Enum.take(Tuple.to_list(item), 1) |> List.first()) == app end)
+    case Enum.take(Tuple.to_list(founded_app), 3) |> List.to_tuple do
+      {_founded_app_name, git: _url} -> nil
+      {_founded_app_name, git: _url, tag: tag} ->
+        if Version.compare(clean_mix_version(imporetd_version), clean_mix_version(tag)) in [:eq, :lt], do: nil, else: value
+      {_founded_app_name, version} ->
+        if Version.compare(clean_mix_version(imporetd_version), clean_mix_version(version)) in [:eq, :lt], do: nil, else: value
+    end
+  end
+
+  defp clean_mix_version(version) do
+    version
+    |> String.replace("~>", "")
+    |> String.replace(">=", "")
+    |> String.trim()
+  end
 end

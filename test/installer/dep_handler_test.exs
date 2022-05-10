@@ -50,8 +50,23 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     test "Create mix deps in mix file", %{repo_data: _repo_data} do
       DepHandler.create_deps_json_file(File.cwd!())
       DepHandler.check_or_create_deps_json()
-      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}]
+      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.5.3"}]
       [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.3"}] = assert DepHandler.append_mix(list)
+
+      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.7"}]
+      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.7"}] = assert DepHandler.append_mix(list)
+
+      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url"}]
+      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url"}] = assert DepHandler.append_mix(list)
+
+      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.5.7"}]
+      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.3"}] = assert DepHandler.append_mix(list)
+
+      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.7"}]
+      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.7"}]= assert DepHandler.append_mix(list)
+
+      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.3"}]
+      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.3"}]= assert DepHandler.append_mix(list)
     end
 
     test "Compare dependencies with json", %{repo_data: _repo_data}  do
