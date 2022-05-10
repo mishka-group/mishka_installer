@@ -331,14 +331,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp mix_item({_app, git: _url} = value, _app_list, _deps_list), do: value
 
   defp mix_item({app, git: _url, tag: imporetd_version} = value, app_list, deps_list) do
-    if app in app_list, do: check_sam_app_version(app, deps_list, imporetd_version, value), else: value
+    if app in app_list, do: check_same_app_version(app, deps_list, imporetd_version, value), else: value
   end
 
   defp mix_item({app, imporetd_version} = value, app_list, deps_list) do
-    if app in app_list, do: check_sam_app_version(app, deps_list, imporetd_version, value), else: value
+    if app in app_list, do: check_same_app_version(app, deps_list, imporetd_version, value), else: value
   end
 
-  defp check_sam_app_version(app, deps_list, imporetd_version, value) do
+  defp check_same_app_version(app, deps_list, imporetd_version, value) do
     founded_app = Enum.find(deps_list, fn item -> (Enum.take(Tuple.to_list(item), 1) |> List.first()) == app end)
     case Enum.take(Tuple.to_list(founded_app), 3) |> List.to_tuple do
       {_founded_app_name, git: _url} -> nil
