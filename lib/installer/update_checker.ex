@@ -32,8 +32,7 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
 
   @impl true
   def handle_continue(:start_task, state) do
-    Process.send_after(self(), :check_update, @update_check_time)
-    {:noreply, state}
+    check_custom_pubsub_loaded(state)
   end
 
   @impl true
@@ -41,6 +40,12 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
     Logger.info("OTP UpdateChecker check update tasks were sent.")
     Process.send_after(self(), :check_update, @update_check_time)
     {:noreply, check_apps_update(state)}
+  end
+
+  @impl true
+  def handle_info(:timeout, state) do
+    Logger.info("We are waiting for your custom pubsub is loaded")
+    check_custom_pubsub_loaded(state)
   end
 
   @impl true
@@ -94,5 +99,15 @@ defmodule MishkaInstaller.Installer.UpdateChecker do
     Enum.filter(state, fn item ->
       Version.compare(item.latest_stable_version, item.current_version) == :gt
     end)
+  end
+
+  defp check_custom_pubsub_loaded(state) do
+    custom_pubsub = MishkaInstaller.get_config(:pubsub)
+    cond do
+      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) -> {:noreply, state, 100}
+      true ->
+        Process.send_after(self(), :check_update, @update_check_time)
+        {:noreply, state}
+    end
   end
 end

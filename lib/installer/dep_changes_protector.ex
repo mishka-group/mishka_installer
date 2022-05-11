@@ -46,9 +46,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_continue(:check_json, state) do
-    Process.send_after(self(), :check_json, @re_check_json_time)
-    MishkaInstaller.Dependency.subscribe()
-    {:noreply, state}
+    check_custom_pubsub_loaded(state)
   end
 
   @impl true
@@ -82,6 +80,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     {:noreply, %{state | ref: nil}}
   end
 
+  @impl true
   def handle_info({:do_compile, app, custom_command}, state) do
     new_state =
       if is_nil(state.ref) do
@@ -95,6 +94,12 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
         {:noreply, state}
       end
       new_state
+  end
+
+  @impl true
+  def handle_info(:timeout, state) do
+    Logger.info("We are waiting for your custom pubsub is loaded")
+    check_custom_pubsub_loaded(state)
   end
 
   @impl true
@@ -163,6 +168,17 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
         MishkaInstaller.dependency_activity(%{state: answer, action: "no_app_found"}, "high")
       {:error, :change_dependency_type_with_app, :dependency, repo_error} ->
         MishkaInstaller.dependency_activity(%{state: answer, action: "edit", error: repo_error}, "high")
+    end
+  end
+
+  defp check_custom_pubsub_loaded(state) do
+    custom_pubsub = MishkaInstaller.get_config(:pubsub)
+    cond do
+      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) -> {:noreply, state, 100}
+      true ->
+        Process.send_after(self(), :check_json, @re_check_json_time)
+        MishkaInstaller.Dependency.subscribe()
+        {:noreply, state}
     end
   end
 end
