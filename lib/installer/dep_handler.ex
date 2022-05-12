@@ -166,8 +166,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
               json_min_version: app["min"],
               json_max_version: app["max"],
               installed_version: installed_version,
-              min_status: Version.compare(String.trim(app["min"]), "#{installed_version}"),
-              max_status: Version.compare(String.trim(app["max"]), "#{installed_version}")
+              min_status: if(!is_nil(app["min"]), do: Version.compare(String.trim(app["min"]), "#{installed_version}"), else: nil),
+              max_status: if(!is_nil(app["max"]), do: Version.compare(String.trim(app["max"]), "#{installed_version}"), else: nil)
             }
         end
       end)

@@ -16,7 +16,7 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     dependency_type: "force_update",
     update_server: nil,
     dependencies: [
-      %{app: :plug, min: "1.5"}
+      %{app: :plug, min: "1.5.0"}
     ]
   }
 
@@ -79,7 +79,8 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     test "Compare sub dependencies with json", %{repo_data: _repo_data}  do
       DepHandler.create_deps_json_file(File.cwd!())
       DepHandler.check_or_create_deps_json()
-      [] = assert DepHandler.compare_sub_dependencies_with_json()
+      [%{app: :plug, installed_version: '1.13.6', json_max_version: nil, json_min_version: "1.5.0", max_status: nil, min_status: :lt}]
+      = assert DepHandler.compare_sub_dependencies_with_json()
       # TODO: Add a test consider installed app with sub dependencies
     end
 
@@ -90,7 +91,8 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
         %{app: :mishka_developer_tools, version: "~> 0.0.6"},
         %{app: :jason, version: "~> 1.3"},
         %{app: :finch, version: "~> 0.12.0"},
-        %{app: :ex_doc, version: ">= 0.0.0"}
+        %{app: :ex_doc, version: ">= 0.0.0"},
+        %{app: :phoenix_live_view, version: "~> 0.17.9"}
       ] = assert DepHandler.get_deps_from_mix(MishkaInstaller.MixProject)
     end
 
