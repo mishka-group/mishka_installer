@@ -1,6 +1,7 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   use Phoenix.LiveView
-  alias alias Phoenix.LiveView.JS
+  alias Phoenix.LiveView.JS
+  alias MishkaInstaller.Installer.DepHandler
 
   @impl true
   def render(assigns) do
@@ -15,7 +16,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
-    # TODO: create a hook when user click here open brows
     socket =
       socket
       |> assign(:selected_form, :upload)
@@ -35,14 +35,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   end
 
   @impl Phoenix.LiveView
-  def handle_event("open_file_browse", %{"ref" => ref}, socket) do
-    socket =
-      socket
-      |> push_event("open_file_browse", %{ref: ref})
-    {:noreply, socket}
-  end
-
-  @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "upload"} = _params, socket) do
     uploaded_files =
       consume_uploaded_entries(socket, :dep, fn %{path: path}, _entry ->
@@ -52,6 +44,14 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         {:ok, Routes.static_path(socket, "/uploads/#{Path.basename(dest)}")}
       end)
     {:noreply, update(socket, :uploaded_files, &(&1 ++ uploaded_files))}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("form_select", %{"type" => type} = _params, socket) when type in ["upload", "hex", "git"] do
+    socket =
+      socket
+      |> assign(:selected_form, String.to_atom(type))
+    {:noreply, socket}
   end
 
   @impl Phoenix.LiveView
@@ -67,37 +67,75 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => name} = _params, socket) do
-    # TODO: if this pkg does not exist so install and add to do compile queue
-    # TODO: do not send if this info exists and it is same version, you can notice user he/her is trying to send duplicated-package
-    # TODO: note: if your app developer registerd a plugin to keep some esential state we just notice it, and the app you want to update shoud start updating
-    # TODO: make a way to force update with admin
-    # TODO: after creating all these TODO, please move the code in dephandler module as a main action
     socket =
-      case MishkaInstaller.Helper.Sender.package("hex", %{"app" => name}) do
-        {:ok, :package, _package_info} ->
+      MishkaInstaller.Helper.Sender.package("hex", %{"app" => name})
+      |> check_app_exist?(:hex)
+      |> case do
+        {:ok, :no_state, msg} ->
           socket
-          |> put_flash(:info,
-            "The package concerned was added to the installing queue,
-            please wait to get response and do not try another package until message is received.
-            This is only for the optimal use of your server, otherwise any number of other requests will be added to the installation queue."
-          )
-        {:error, :package, :not_found} ->
+          |> put_flash(:success, msg)
+        {:ok, :registered_app, msg} ->
           socket
-          |> put_flash(:error, "Are you sure you have entered the package name correctly?")
-        {:error, :package, :unhandled} ->
+          |> put_flash(:info, msg)
+        {:error, msg} ->
           socket
-          |> put_flash(:error, "Unfortunately, we cannot connect to Hex server now, please try other time!")
+          |> put_flash(:error, msg)
       end
     {:noreply, socket}
   end
 
-  @impl Phoenix.LiveView
-  def handle_event("form_select", %{"type" => type} = _params, socket) when type in ["upload", "hex", "git"] do
-    socket =
-      socket
-      |> assign(:selected_form, String.to_atom(type))
-    {:noreply, socket}
+  defp check_app_exist?({:ok, :package, pkg}, :hex) do
+    json_find = fn (json, app_name) -> Enum.find(json, &(&1["app"] == app_name)) end
+    with {:ok, :check_or_create_deps_json, exist_json} <- DepHandler.check_or_create_deps_json(),
+         {:new_app?, true, nil} <- {:new_app?, is_nil(json_find.(Jason.decode!(exist_json), pkg["name"])), json_find.(Jason.decode!(exist_json), pkg["name"])},
+         app_info <- create_app_info_from_hex(pkg),
+         {:ok, :add_new_app, _repo_data} <- DepHandler.add_new_app(app_info),
+         {:ok, :dependency_changes_notifier, :no_state, msg} <- DepHandler.dependency_changes_notifier(pkg["name"]) do
+          {:ok, :no_state, msg}
+    else
+      {:error, :check_or_create_deps_json, msg} -> {:error, msg}
+      {:new_app?, false, app} ->
+        if app["version"] == pkg["latest_stable_version"] do
+          {:error, "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"}
+        else
+          MishkaInstaller.Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
+          case DepHandler.dependency_changes_notifier(pkg["name"]) do
+            {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg}
+            {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg}
+            {:error, :dependency_changes_notifier, msg} -> {:error, msg}
+          end
+        end
+      {:error, :add_new_app, :file, msg} -> {:error, msg}
+      {:error, :add_new_app, :changeset, _repo_error} ->
+        # TODO: log this error in activity section
+        {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
+      {:error, :dependency_changes_notifier, msg} -> {:error, msg}
+      {:ok, :dependency_changes_notifier, :registered_app, msg} ->
+        # TODO: create html with a tag to ask user force update or not
+        {:ok, :registered_app, msg}
+    end
   end
+
+  defp check_app_exist?({:error, :package, status}, _) do
+    msg = if status == :not_found, do: "Are you sure you have entered the package name correctly?", else: "Unfortunately, we cannot connect to Hex server now, please try other time!"
+    {:error, msg}
+  end
+
+  defp create_app_info_from_hex(pkg) do
+    %DepHandler{
+      app: pkg["name"],
+      version: pkg["latest_stable_version"],
+      type: "hex",
+      url: pkg["html_url"],
+      dependency_type: "force_update",
+      dependencies: []
+    }
+  end
+  # case DepHandler.dependency_changes_notifier(pkg["name"]) do
+  #   {:ok, :dependency_changes_notifier, :no_state, msg} -> msg
+  #   {:ok, :dependency_changes_notifier, :registered_app, msg} -> msg
+  #   {:error, :dependency_changes_notifier, msg} -> msg
+  # end
 
   def error_to_string(:too_large), do: "Too large"
   def error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
@@ -167,6 +205,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-git mb-4" viewBox="0 0 16 16">
           <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.226 1.226 0 1 1-1.008-.036V5.887a1.226 1.226 0 0 1-.666-1.608L5.093 2.465l-4.79 4.79a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.953-6.953a1.031 1.031 0 0 0 0-1.457"/>
         </svg>
+        <div class="container h-25 d-inline-block"></div>
+        <input name="app" class="form-control form-control-lg mb-3" type="text" placeholder="App name" required>
         <div class="container h-25 d-inline-block"></div>
         <input name="url" class="form-control form-control-lg mb-3" type="text" placeholder="Your Git url" required>
         <div class="container h-25 d-inline-block"></div>
