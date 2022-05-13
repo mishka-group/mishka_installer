@@ -280,7 +280,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       {:decode, {:error, _error}} ->
         {:error, :add_new_app, :file, "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it"}
       {:duplicate_app, true} ->
-        {:error, :add_new_app, :file, "You can not insert new app which is duplicate, if you want to update it please user another function."}
+        {:error, :add_new_app, :file, "You can not insert new app which is duplicate, if you want to update it please use another function."}
       {:encode, {:error, _error}} -> {:error, :add_new_app, :file, "We can not encode your new app data, please check your data."}
       {:error, :add, :dependency, repo_error} -> {:error, :add_new_app, :changeset, repo_error}
     end
