@@ -19,6 +19,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     socket =
       socket
       |> assign(:selected_form, :upload)
+      |> assign(:status_message, {nil, nil})
       |> assign(:uploaded_files, [])
       |> allow_upload(:dep, accept: ~w(.jpg .jpeg .png), max_entries: 1)
     {:ok, socket}
@@ -50,6 +51,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   def handle_event("form_select", %{"type" => type} = _params, socket) when type in ["upload", "hex", "git"] do
     socket =
       socket
+      |> assign(:status_message, {nil, nil})
       |> assign(:selected_form, String.to_atom(type))
     {:noreply, socket}
   end
@@ -73,16 +75,21 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       |> case do
         {:ok, :no_state, msg} ->
           socket
-          |> put_flash(:success, msg)
+          |> assign(:status_message, {:success, msg})
         {:ok, :registered_app, msg} ->
+          # TODO: create html with a tag to ask user force update or not
           socket
-          |> put_flash(:info, msg)
+          |> assign(:status_message, {:info, msg})
         {:error, msg} ->
           socket
-          |> put_flash(:error, msg)
+          |> assign(:status_message, {:danger, msg})
       end
     {:noreply, socket}
   end
+
+  def error_to_string(:too_large), do: "Too large"
+  def error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
+  def error_to_string(:too_many_files), do: "You have selected too many files"
 
   defp check_app_exist?({:ok, :package, pkg}, :hex) do
     json_find = fn (json, app_name) -> Enum.find(json, &(&1["app"] == app_name)) end
@@ -111,7 +118,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
       {:error, :dependency_changes_notifier, msg} -> {:error, msg}
       {:ok, :dependency_changes_notifier, :registered_app, msg} ->
-        # TODO: create html with a tag to ask user force update or not
         {:ok, :registered_app, msg}
     end
   end
@@ -131,15 +137,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       dependencies: []
     }
   end
-  # case DepHandler.dependency_changes_notifier(pkg["name"]) do
-  #   {:ok, :dependency_changes_notifier, :no_state, msg} -> msg
-  #   {:ok, :dependency_changes_notifier, :registered_app, msg} -> msg
-  #   {:error, :dependency_changes_notifier, msg} -> msg
-  # end
-
-  def error_to_string(:too_large), do: "Too large"
-  def error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
-  def error_to_string(:too_many_files), do: "You have selected too many files"
 
   defp dep_form(:upload, assigns) do
     ~H"""
@@ -147,6 +144,14 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
         <%= for err <- upload_errors(@uploads.dep) do %>
           <p class="alert alert-danger"><%= error_to_string(err) %></p>
+          <div class="container h-25 d-inline-block"></div>
+        <% end %>
+        <% {status, message} = @status_message %>
+        <%= if !is_nil(message) do %>
+          <div class="container" id="dep-status-msg">
+            <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
+            <div class="container h-25 d-inline-block"></div>
+          </div>
         <% end %>
         <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-cloud-upload" viewBox="0 0 16 16" id="upload-svg" phx-click={JS.dispatch("click", to: "#"<>@uploads.dep.ref)}>
           <path fill-rule="evenodd" d="M4.406 1.342A5.53 5.53 0 0 1 8 0c2.69 0 4.923 2 5.166 4.579C14.758 4.804 16 6.137 16 7.773 16 9.569 14.502 11 12.687 11H10a.5.5 0 0 1 0-1h2.688C13.979 10 15 8.988 15 7.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 2.825 10.328 1 8 1a4.53 4.53 0 0 0-2.941 1.1c-.757.652-1.153 1.438-1.153 2.055v.448l-.445.049C2.064 4.805 1 5.952 1 7.318 1 8.785 2.23 10 3.781 10H6a.5.5 0 0 1 0 1H3.781C1.708 11 0 9.366 0 7.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383z"/>
@@ -182,6 +187,13 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     ~H"""
       <section id="dep-hex-getter" class="col-md-6 mx-auto">
       <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
+        <% {status, message} = @status_message %>
+        <%= if !is_nil(message) do %>
+          <div class="container" id="dep-status-msg">
+            <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
+            <div class="container h-25 d-inline-block"></div>
+          </div>
+        <% end %>
         <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-hexagon mb-4" viewBox="0 0 16 16">
           <path d="M14 4.577v6.846L8 15l-6-3.577V4.577L8 1l6 3.577zM8.5.134a1 1 0 0 0-1 0l-6 3.577a1 1 0 0 0-.5.866v6.846a1 1 0 0 0 .5.866l6 3.577a1 1 0 0 0 1 0l6-3.577a1 1 0 0 0 .5-.866V4.577a1 1 0 0 0-.5-.866L8.5.134z"/>
         </svg>
@@ -202,6 +214,13 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     ~H"""
       <section id="dep-hex-getter" class="col-md-6 mx-auto">
       <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
+        <% {status, message} = @status_message %>
+        <%= if !is_nil(message) do %>
+          <div class="container" id="dep-status-msg">
+            <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
+            <div class="container h-25 d-inline-block"></div>
+          </div>
+        <% end %>
         <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" fill="currentColor" class="bi bi-git mb-4" viewBox="0 0 16 16">
           <path d="M15.698 7.287 8.712.302a1.03 1.03 0 0 0-1.457 0l-1.45 1.45 1.84 1.84a1.223 1.223 0 0 1 1.55 1.56l1.773 1.774a1.224 1.224 0 0 1 1.267 2.025 1.226 1.226 0 0 1-2.002-1.334L8.58 5.963v4.353a1.226 1.226 0 1 1-1.008-.036V5.887a1.226 1.226 0 0 1-.666-1.608L5.093 2.465l-4.79 4.79a1.03 1.03 0 0 0 0 1.457l6.986 6.986a1.03 1.03 0 0 0 1.457 0l6.953-6.953a1.031 1.031 0 0 0 0-1.457"/>
         </svg>
