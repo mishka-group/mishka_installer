@@ -1,6 +1,5 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   use Phoenix.LiveView
-  use DvoteWeb, :live_view
   alias Phoenix.LiveView.JS
   alias MishkaInstaller.Installer.DepHandler
 
