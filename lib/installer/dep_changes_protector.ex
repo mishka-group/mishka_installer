@@ -157,12 +157,13 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   defp update_dependency_type(answer, state, dependency_type \\ "none") do
-    with {:compile_status, false} <- {:compile_status, Enum.any?(answer, & &1.status != 0)},
+    with {:compile_status, false, _answer} <- {:compile_status, Enum.any?(answer, & &1.status != 0), answer},
          {:ok, :change_dependency_type_with_app, _repo_data} <- MishkaInstaller.Dependency.change_dependency_type_with_app(state.app, dependency_type) do
-
+          # TODO: send answer as pubsub
           json_check_and_create()
     else
-      {:compile_status, true} ->
+      {:compile_status, true, _answer} ->
+        # TODO: send answer as pubsub
         MishkaInstaller.dependency_activity(%{state: answer}, "high")
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
         MishkaInstaller.dependency_activity(%{state: answer, action: "no_app_found"}, "high")

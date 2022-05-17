@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   use Phoenix.LiveView
   alias Phoenix.LiveView.JS
-  alias MishkaInstaller.Installer.DepHandler
+  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector}
 
   @impl true
   def render(assigns) do
@@ -60,6 +60,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("update_app", %{"type" => type} = _params, socket) when type in ["force_update", "soft_update"] do
+    if type == "force_update", do: DepChangesProtector.deps(socket.assigns.app_name)
     socket =
       socket
       |> assign(:status_message, {:info, "Your request was sent, after receiving any changes we send you a notification"})
@@ -85,7 +86,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       MishkaInstaller.Helper.Sender.package("hex", %{"app" => name})
       |> check_app_exist?(:hex)
       |> case do
-        {:ok, :no_state, msg} ->
+        {:ok, :no_state, msg, app_name} ->
+          MishkaInstaller.Installer.DepChangesProtector.deps(app_name)
           socket
           |> assign(:status_message, {:success, msg})
         {:ok, :registered_app, msg, app_name} ->
@@ -110,7 +112,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
          app_info <- create_app_info_from_hex(pkg),
          {:ok, :add_new_app, _repo_data} <- DepHandler.add_new_app(app_info),
          {:ok, :dependency_changes_notifier, :no_state, msg} <- DepHandler.dependency_changes_notifier(pkg["name"]) do
-          {:ok, :no_state, msg}
+          {:ok, :no_state, msg, pkg["name"]}
     else
       {:error, :check_or_create_deps_json, msg} -> {:error, msg}
       {:new_app?, false, app} ->
@@ -280,7 +282,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
             Wait for the app response!
           </button>
           <button type="button" class="btn btn-outline-danger" phx-click="update_app" phx-value-type="force_update">
-
            Do Force Update now!
           </button>
         </form>
