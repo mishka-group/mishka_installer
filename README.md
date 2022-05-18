@@ -8,6 +8,8 @@
 Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and SMS; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code. 
 > We have used this library in the [Mishka content management system](https://github.com/mishka-group/mishka-cms).
 
+**NOTICE: This library is under heavy development.** Expect version 0.0.2 and for using the new features please wait until new release is out.
+
 ## Plugin management system implementation theory
 ---
 The library categorizes your whole software design structure into many parts; and has an appropriate dependency that is optional with `Genserver`; it considers a monitoring branch for each of your plugins, which results in fewer errors and `downtime`. The considered part:
