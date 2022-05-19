@@ -52,13 +52,13 @@ defmodule MishkaInstaller.Installer.MixCreator do
     }
   end
 
-  defp dep(name, full_version, dep_line, _other_options) do
-    {:__block__, [line: dep_line],
+  defp dep(name, full_version, dep_line, other_options) do
+    {:{},
+      [trailing_comments: [], leading_comments: [], closing: [line: dep_line], line: dep_line],
       [
-        {
-          name,
-          {:__block__, [line: dep_line, delimiter: "\""], clean_mix_version(full_version)}
-        }
+        {:__block__, [trailing_comments: [], leading_comments: [], line: dep_line], [name]},
+        {:__block__, [trailing_comments: [], leading_comments: [], delimiter: "\"", line: dep_line], clean_mix_version(full_version)},
+        implement_other_options(other_options, dep_line, :nested)
       ]
     }
   end
@@ -86,6 +86,13 @@ defmodule MishkaInstaller.Installer.MixCreator do
   defp implement_other_options(other_options, dep_line) do
     Enum.map(other_options, fn {key, value} ->
       {{:__block__, [format: :keyword, line: dep_line], [key]}, {:__block__, [delimiter: "\"", line: dep_line], [value]}}
+    end)
+  end
+
+  defp implement_other_options(other_options, dep_line, :nested) do
+    Enum.map(other_options, fn {key, value} ->
+      {{:__block__, [trailing_comments: [], leading_comments: [], format: :keyword, line: dep_line], [key]},
+      {:__block__, [trailing_comments: [], leading_comments: [], line: dep_line], [value]}}
     end)
   end
 
