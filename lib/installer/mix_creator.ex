@@ -1,13 +1,18 @@
 defmodule MishkaInstaller.Installer.MixCreator do
 
-  def backup_mix(_mix_path) do
+  @spec backup_mix(binary) :: {:error, atom} | {:ok, non_neg_integer}
+  def backup_mix(mix_path), do: File.copy(mix_path, backup_path())
 
-  end
+  @spec backup_mix(binary(), :lock) :: {:error, atom} | {:ok, non_neg_integer}
+  def backup_mix(lock_path, :lock), do: File.copy(lock_path, backup_path("mix.lock"))
 
-  def restore_mix(_mix_path) do
+  @spec restore_mix(binary) :: {:error, atom} | {:ok, non_neg_integer}
+  def restore_mix(mix_path), do: File.copy(backup_path(), mix_path)
 
-  end
+  @spec restore_mix(binary(), :lock) :: {:error, atom} | {:ok, non_neg_integer}
+  def restore_mix(lock_path, :lock), do: File.copy(backup_path("mix.lock"), lock_path)
 
+  @spec create_mix([tuple()], binary()) :: :ok | {:error, atom}
   def create_mix(list_of_deps, mix_path) do
     content =
       File.read!(mix_path)
@@ -27,7 +32,7 @@ defmodule MishkaInstaller.Installer.MixCreator do
       end)
       |> Sourceror.to_string()
 
-    File.write("/Users/shahryar/Desktop/dvote/deployment/mix.exs", content)
+    File.write(mix_path, content)
   end
 
   defp dep(:git, name, url, dep_line, other_options) do
@@ -114,5 +119,10 @@ defmodule MishkaInstaller.Installer.MixCreator do
           |> String.trim()
         ["~> " <> full_version]
     end
+  end
+
+  defp backup_path(file_name \\ "original_mix.exs") do
+    MishkaInstaller.get_config(:project_path) || File.cwd!()
+    |> Path.join(["deployment/", "extensions/", "#{file_name}"])
   end
 end
