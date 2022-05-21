@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   use Phoenix.LiveView
   alias Phoenix.LiveView.JS
-  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector}
+  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector, RunTimeSourcing}
 
   @impl true
   def render(assigns) do
@@ -43,7 +43,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         dest = Path.join([:code.priv_dir(:my_app), "static", "uploads", Path.basename(path)])
         # The `static/uploads` directory must exist for `File.cp!/2` to work.
         File.cp!(path, dest)
-        {:ok, Routes.static_path(socket, "/uploads/#{Path.basename(dest)}")}
+        # {:ok, Routes.static_path(socket, "/uploads/#{Path.basename(dest)}")}
       end)
     {:noreply, update(socket, :uploaded_files, &(&1 ++ uploaded_files))}
   end
@@ -60,7 +60,11 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("update_app", %{"type" => type} = _params, socket) when type in ["force_update", "soft_update"] do
-    if type == "force_update", do: DepChangesProtector.deps(socket.assigns.app_name)
+    if type == "force_update" do
+      DepChangesProtector.deps(socket.assigns.app_name, false)
+      # TODO: it should be from pubsub
+      RunTimeSourcing.do_runtime(String.to_atom(socket.assigns.app_name), :force_update)
+    end
     socket =
       socket
       |> assign(:status_message, {:info, "Your request was sent, after receiving any changes we send you a notification"})
@@ -86,11 +90,12 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       MishkaInstaller.Helper.Sender.package("hex", %{"app" => name})
       |> check_app_exist?(:hex)
       |> case do
-        {:ok, :no_state, msg, app_name} ->
-          MishkaInstaller.Installer.DepChangesProtector.deps(app_name)
+        # new_app?(true) == first time install, new_app?(false) == exists before
+        {:ok, :no_state, msg, app_name, new_app?: new_app} ->
+          DepChangesProtector.deps(app_name, new_app)
           socket
           |> assign(:status_message, {:success, msg})
-        {:ok, :registered_app, msg, app_name} ->
+        {:ok, :registered_app, msg, app_name, new_app?: _new_app} ->
           socket
           |> assign(:app_name, app_name)
           |> assign(:status_message, {:info, msg})
@@ -101,6 +106,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     {:noreply, socket}
   end
 
+  @spec error_to_string(:not_accepted | :too_large | :too_many_files) :: String.t()
   def error_to_string(:too_large), do: "Too large"
   def error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
   def error_to_string(:too_many_files), do: "You have selected too many files"
@@ -112,33 +118,35 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
          app_info <- create_app_info_from_hex(pkg),
          {:ok, :add_new_app, _repo_data} <- DepHandler.add_new_app(app_info),
          {:ok, :dependency_changes_notifier, :no_state, msg} <- DepHandler.dependency_changes_notifier(pkg["name"]) do
-          {:ok, :no_state, msg, pkg["name"]}
+          {:ok, :no_state, msg, pkg["name"], new_app?: true}
     else
+      {:new_app?, false, app} -> msg_of_exit_app(app, pkg)
       {:error, :check_or_create_deps_json, msg} -> {:error, msg}
-      {:new_app?, false, app} ->
-        if app["version"] == pkg["latest_stable_version"] do
-          {:error, "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"}
-        else
-          MishkaInstaller.Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
-          case DepHandler.dependency_changes_notifier(pkg["name"]) do
-            {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg}
-            {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"]}
-            {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-          end
-        end
       {:error, :add_new_app, :file, msg} -> {:error, msg}
       {:error, :add_new_app, :changeset, _repo_error} ->
         # TODO: log this error in activity section
         {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
       {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-      {:ok, :dependency_changes_notifier, :registered_app, msg} ->
-        {:ok, :registered_app, msg}
+      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, new_app?: true}
     end
   end
 
   defp check_app_exist?({:error, :package, status}, _) do
     msg = if status == :not_found, do: "Are you sure you have entered the package name correctly?", else: "Unfortunately, we cannot connect to Hex server now, please try other time!"
     {:error, msg}
+  end
+
+  defp msg_of_exit_app(app, pkg) do
+    if app["version"] == pkg["latest_stable_version"] do
+      {:error, "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"}
+    else
+      MishkaInstaller.Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
+      case DepHandler.dependency_changes_notifier(pkg["name"]) do
+        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg, new_app?: false}
+        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"], new_app?: false}
+        {:error, :dependency_changes_notifier, msg} -> {:error, msg}
+      end
+    end
   end
 
   defp create_app_info_from_hex(pkg) do

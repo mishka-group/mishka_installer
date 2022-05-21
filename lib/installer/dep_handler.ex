@@ -58,14 +58,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
   """
 
   @type t() :: %__MODULE__{
-    app: String.t(),
-    version: String.t(),
-    type: String.t(),
-    url: String.t(),
-    git_tag: String.t(),
-    custom_command: String.t(),
-    dependency_type: String.t(),
-    update_server: String.t(),
+    app: String.t() | nil,
+    version: String.t() | nil,
+    type: String.t() | nil,
+    url: String.t() | nil,
+    git_tag: String.t() | nil,
+    custom_command: String.t() | nil,
+    dependency_type: String.t() | nil,
+    update_server: String.t() | nil,
     dependencies: [map()],
   }
 
@@ -74,12 +74,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
 
-  @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) :: :ok | {:error, atom} | {:error, :add_new_app, String.t()}
+  @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) ::
+          {:ok, :add_new_app, any} | {:error, :add_new_app, :changeset | :file, any}
   def add_new_app(%__MODULE__{} = app_info) do
     case check_or_create_deps_json() do
       {:ok, :check_or_create_deps_json, exist_json} ->
         insert_new_ap({:open_file, File.open(extensions_json_path(), [:read, :write])}, app_info, exist_json)
-      {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, msg}
+      {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, :file, msg}
     end
   end
 
