@@ -6,7 +6,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   use GenServer, restart: :permanent
   require Logger
   @re_check_json_time 10_000
-
+  @module "dep_changes_protector"
   alias MishkaInstaller.Installer.DepHandler
 
   @spec start_link(list()) :: :ignore | {:error, any} | {:ok, pid}
@@ -159,11 +159,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   defp update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:compile_status, false, _answer} <- {:compile_status, Enum.any?(answer, & &1.status != 0), answer},
          {:ok, :change_dependency_type_with_app, _repo_data} <- MishkaInstaller.Dependency.change_dependency_type_with_app(state.app, dependency_type) do
-          # TODO: send answer as pubsub
+          notify_subscribers({:ok, answer})
           json_check_and_create()
     else
-      {:compile_status, true, _answer} ->
-        # TODO: send answer as pubsub
+      {:compile_status, true, answer} ->
+        notify_subscribers({:error, answer})
         MishkaInstaller.dependency_activity(%{state: answer}, "high")
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
         MishkaInstaller.dependency_activity(%{state: answer, action: "no_app_found"}, "high")
@@ -181,5 +181,15 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
         MishkaInstaller.Dependency.subscribe()
         {:noreply, state}
     end
+  end
+
+  @spec subscribe :: :ok | {:error, {:already_registered, pid}}
+  def subscribe do
+    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module )
+  end
+
+  @spec notify_subscribers({atom(), any}) :: :ok | {:error, any}
+  def notify_subscribers({status, answer}) do
+    Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module , {status, String.to_atom(@module), answer})
   end
 end
