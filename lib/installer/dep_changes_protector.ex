@@ -82,6 +82,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info({:do_compile, app, new_app, custom_command}, state) do
+    # TODO: get custom command from json file
     new_state =
       if is_nil(state.ref) do
         task =
@@ -159,11 +160,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   defp update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:compile_status, false, _answer} <- {:compile_status, Enum.any?(answer, & &1.status != 0), answer},
          {:ok, :change_dependency_type_with_app, _repo_data} <- MishkaInstaller.Dependency.change_dependency_type_with_app(state.app, dependency_type) do
-          notify_subscribers({:ok, answer})
+          notify_subscribers({:ok, answer, state.app})
           json_check_and_create()
     else
       {:compile_status, true, answer} ->
-        notify_subscribers({:error, answer})
+        notify_subscribers({:error, answer, state.app})
         MishkaInstaller.dependency_activity(%{state: answer}, "high")
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
         MishkaInstaller.dependency_activity(%{state: answer, action: "no_app_found"}, "high")
@@ -185,11 +186,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @spec subscribe :: :ok | {:error, {:already_registered, pid}}
   def subscribe do
-    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module )
+    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module)
   end
 
-  @spec notify_subscribers({atom(), any}) :: :ok | {:error, any}
-  def notify_subscribers({status, answer}) do
-    Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module , {status, String.to_atom(@module), answer})
+  @spec notify_subscribers({atom(), any, String.t() | atom()}) :: :ok | {:error, any}
+  def notify_subscribers({status, answer, app}) do
+    Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module , {status, String.to_atom(@module), answer, app})
   end
 end

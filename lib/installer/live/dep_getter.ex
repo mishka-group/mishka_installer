@@ -1,7 +1,8 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   use Phoenix.LiveView
   alias Phoenix.LiveView.JS
-  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector, RunTimeSourcing}
+  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector, RunTimeSourcing, MixCreator}
+  require Logger
 
   @impl true
   def render(assigns) do
@@ -16,6 +17,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def mount(_params, _session, socket) do
+    DepChangesProtector.subscribe()
     socket =
       socket
       |> assign(:selected_form, :upload)
@@ -84,16 +86,17 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     {:noreply, socket}
   end
 
+  # Tip: new_app?(true) == first time install, new_app?(false) == exists before
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => name} = _params, socket) do
-    socket =
+    new_socket =
       MishkaInstaller.Helper.Sender.package("hex", %{"app" => name})
       |> check_app_exist?(:hex)
       |> case do
-        # new_app?(true) == first time install, new_app?(false) == exists before
         {:ok, :no_state, msg, app_name, new_app?: new_app} ->
-          DepChangesProtector.deps(app_name, new_app)
+          check_new_mix_file(app_name, new_app)
           socket
+          |> assign(:app_name, app_name)
           |> assign(:status_message, {:success, msg})
         {:ok, :registered_app, msg, app_name, new_app?: _new_app} ->
           socket
@@ -103,6 +106,21 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           socket
           |> assign(:status_message, {:danger, msg})
       end
+    {:noreply, new_socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:ok, :dep_changes_protector, _answer, app}, socket) do
+    IO.inspect(app)
+    String.to_atom(app)
+    |> RunTimeSourcing.do_runtime(:add)
+    |> IO.inspect()
+    {:noreply, socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_info({:error, :dep_changes_protector, answer}, socket) do
+    IO.inspect(answer)
     {:noreply, socket}
   end
 
@@ -295,5 +313,19 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         </form>
       </section>
     """
+  end
+
+  defp check_new_mix_file(app_name, new_app) do
+    list_json_dpes =
+      Enum.map(DepHandler.mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!("mix.exs"), "#{key}") end)
+      |> Enum.any?(& !&1)
+
+    MixCreator.create_mix(Dvote.MixProject.project[:deps], "mix.exs")
+    if list_json_dpes do
+      Logger.warn("Try to re-create Mix file")
+      check_new_mix_file(app_name, new_app)
+    else
+      DepChangesProtector.deps(app_name, new_app)
+    end
   end
 end

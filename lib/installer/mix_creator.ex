@@ -4,13 +4,13 @@ defmodule MishkaInstaller.Installer.MixCreator do
   def backup_mix(mix_path), do: File.copy(mix_path, backup_path())
 
   @spec backup_mix(binary(), :lock) :: {:error, atom} | {:ok, non_neg_integer}
-  def backup_mix(lock_path, :lock), do: File.copy(lock_path, backup_path("mix.lock"))
+  def backup_mix(lock_path, :lock), do: File.copy(lock_path, backup_path("original_mix.lock"))
 
   @spec restore_mix(binary) :: {:error, atom} | {:ok, non_neg_integer}
   def restore_mix(mix_path), do: File.copy(backup_path(), mix_path)
 
   @spec restore_mix(binary(), :lock) :: {:error, atom} | {:ok, non_neg_integer}
-  def restore_mix(lock_path, :lock), do: File.copy(backup_path("mix.lock"), lock_path)
+  def restore_mix(lock_path, :lock), do: File.copy(backup_path("original_mix.lock"), lock_path)
 
   @spec create_mix([tuple()], binary()) :: :ok | {:error, atom}
   def create_mix(list_of_deps, mix_path) do
