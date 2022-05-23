@@ -225,8 +225,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   @spec extensions_json_path :: binary()
   def extensions_json_path() do
-    MishkaInstaller.get_config(:project_path) || File.cwd!()
-    |> Path.join(["deployment/", "extensions/", "extensions.json"])
+    path = MishkaInstaller.get_config(:project_path) || File.cwd!()
+    Path.join(path, ["deployment/", "extensions/", "extensions.json"])
   end
 
   @spec is_there_update? :: boolean
