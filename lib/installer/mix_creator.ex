@@ -122,7 +122,7 @@ defmodule MishkaInstaller.Installer.MixCreator do
   end
 
   defp backup_path(file_name \\ "original_mix.exs") do
-    MishkaInstaller.get_config(:project_path) || File.cwd!()
-    |> Path.join(["deployment/", "extensions/", "#{file_name}"])
+    path = MishkaInstaller.get_config(:project_path) || File.cwd!()
+    Path.join(path, ["deployment/", "extensions/", "#{file_name}"])
   end
 end

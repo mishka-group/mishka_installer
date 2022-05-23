@@ -180,7 +180,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @spec check_or_create_deps_json(binary) :: {:ok, :check_or_create_deps_json, String.t()} | {:error, :check_or_create_deps_json, String.t()}
-  def check_or_create_deps_json(project_path \\ MishkaInstaller.get_config(:project_path) || File.cwd!()) do
+  def check_or_create_deps_json(project_path \\ (MishkaInstaller.get_config(:project_path) || File.cwd!())) do
     with {:deployment_path, true} <- {:deployment_path, File.exists?(Path.join(project_path, ["deployment"]))},
          {:extensions_path, true} <- {:extensions_path, File.exists?(Path.join(project_path, ["deployment/", "extensions"]))},
          {:json_file, true} <- {:json_file, File.exists?(extensions_json_path())},
@@ -296,8 +296,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   defp mix_creator("upload", data) do
-    uploaded_extension = MishkaInstaller.get_config(:project_path) || File.cwd!()
-    |> Path.join(["deployment/", "extensions/", "#{data["app"]}"])
+    uploaded_extension =
+      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{data["app"]}"])
     {String.to_atom(data["app"]), path: uploaded_extension}
   end
 
