@@ -21,6 +21,7 @@
 - [ ] Create a Quick GUI installer
 - [ ] Update MishkaCms docker package for this version(volume `extensions.json`)
 - [ ] Add private parameters to event hooks
-- [ ] Preparing dependencies for force-update and soft-update to keep essential data (like state in updating)
+- [x] Preparing dependencies for force-update and soft-update to keep essential data (like state in updating)
+- [x] Mix deps creator
 
 > Accepting zip file of release is not supported in this version

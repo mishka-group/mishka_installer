@@ -87,8 +87,7 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     test "Get deps from mix", %{repo_data: _repo_data}  do
       [
         %{app: :phoenix_pubsub, version: "~> 2.1"},
-        %{app: :ecto_enum, version: "~> 1.4"},
-        %{app: :mishka_developer_tools, version: "~> 0.0.6"},
+        %{app: :mishka_developer_tools, version: "~> 0.0.7"},
         %{app: :jason, version: "~> 1.3"},
         %{app: :finch, version: "~> 0.12.0"},
         %{app: :ex_doc, version: ">= 0.0.0"},

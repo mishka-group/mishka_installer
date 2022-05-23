@@ -6,16 +6,16 @@ defmodule MishkaInstaller.Database.DependencySchema do
   @foreign_key_type :binary_id
 
   schema "dependencies" do
-    field :app, :string, null: false
-    field :version, :string, null: false
-    field :type, MishkaInstaller.DependencyEnum, null: false
-    field :dependency_type, MishkaInstaller.DependencyTypeEnum, null: false
+    field :app, :string
+    field :version, :string
+    field :type, MishkaInstaller.DependencyEnum
+    field :dependency_type, MishkaInstaller.DependencyTypeEnum
 
-    field :url, :string, null: true
-    field :git_tag, :string, null: true
-    field :custom_command, :string, null: true
-    field :update_server, :string, null: true
-    field :dependencies, {:array, :map}, null: true
+    field :url, :string
+    field :git_tag, :string
+    field :custom_command, :string
+    field :update_server, :string
+    field :dependencies, {:array, :map}
 
     timestamps(type: :utc_datetime)
   end

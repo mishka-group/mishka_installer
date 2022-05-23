@@ -6,13 +6,13 @@ defmodule MishkaInstaller.Database.PluginSchema do
   @foreign_key_type :binary_id
 
   schema "plugins" do
-    field :name, :string, null: false
-    field :event, :string, null: false
-    field :priority, :integer, null: false
-    field :status, MishkaInstaller.PluginStatusEnum, null: false, default: :started
-    field :depend_type, MishkaInstaller.PluginDependTypeEnum, null: false, default: :soft
-    field :depends, {:array, :string}, null: true
-    field :extra, {:array, :map}, null: false
+    field :name, :string
+    field :event, :string
+    field :priority, :integer
+    field :status, MishkaInstaller.PluginStatusEnum, default: :started
+    field :depend_type, MishkaInstaller.PluginDependTypeEnum, default: :soft
+    field :depends, {:array, :string}
+    field :extra, {:array, :map}
 
     timestamps(type: :utc_datetime)
   end
