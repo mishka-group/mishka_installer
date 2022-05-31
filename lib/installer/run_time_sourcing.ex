@@ -53,14 +53,19 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> Enum.reject(& is_nil(&1))
   end
 
-  # If you have a Task in your project you can load it in a list like [{:task_one, "ecto.migrate"}], it should be a list
-  @spec deps(list()) :: list
-  def deps(custom_command \\ []) when is_list(custom_command) do
-    [{:get, "deps.get"}, {:compile, "deps.compile"}] ++ custom_command
-    |> Enum.map(fn {operation, command} ->
-      {stream, status} = System.cmd("mix", [command], into: IO.stream(), stderr_to_stdout: true)
-      %{operation: operation, output: stream, status: status}
-    end)
+  @spec do_deps_compile(String.t()) :: {:ok, :do_deps_compile, String.t()}| {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
+  def do_deps_compile(app) do
+    deps_path = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
+    File.cd(MishkaInstaller.get_config(:project_path) || File.cwd!())
+    with %{operation: "deps.get", output: _stream, status: 0} <- cmd("deps.get"),
+         {:change_dir, :ok} <- {:change_dir, File.cd(deps_path)},
+         %{operation: "deps.compile", output: _stream, status: 0} <- cmd("deps.compile") do
+      {:ok, :do_deps_compile, app}
+    else
+      %{operation: "deps.get", output: stream, status: 1} -> {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
+      {:change_dir, file_error} -> {:error, :do_deps_compile, app, operation: "File.cd", output: file_error}
+      %{operation: "deps.compile", output: stream, status: 1} -> {:error, :do_deps_compile, app, operation: "deps.compile", output: stream}
+    end
   end
 
   @spec prepend_compiled_apps(any) :: {:ok, :prepend_compiled_apps} | {:error, do_runtime(), ensure(), list}
@@ -106,4 +111,9 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   defp application_ensure(error, _app, _status), do: error
+
+  defp cmd(command, operation \\ "mix") do
+    {stream, status} = System.cmd(operation, [command], into: IO.stream(), stderr_to_stdout: true)
+    %{operation: command, output: stream, status: status}
+  end
 end

@@ -34,8 +34,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     GenServer.cast(__MODULE__, :clean)
   end
 
-  def deps(app, new_app, custom_command \\ []) do
-    GenServer.cast(__MODULE__, {:deps, app, new_app, custom_command})
+  def deps(app, new_app) do
+    GenServer.cast(__MODULE__, {:deps, app, new_app})
   end
 
   @impl true
@@ -81,17 +81,17 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_info({:do_compile, app, new_app, custom_command}, state) do
+  def handle_info({:do_compile, app, new_app}, state) do
     # TODO: get custom command from json file
     new_state =
       if is_nil(state.ref) do
         task =
           Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-            MishkaInstaller.Installer.RunTimeSourcing.deps(custom_command)
+            MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile(app)
           end)
         {:noreply, Map.merge(state, %{ref: task.ref, app: app, app_status: new_app})}
       else
-        Process.send_after(self(), {:do_compile, app, custom_command}, @re_check_json_time)
+        Process.send_after(self(), {:do_compile, app}, @re_check_json_time)
         {:noreply, state}
       end
       new_state
@@ -133,8 +133,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_cast({:deps, app, new_app, custom_command}, state) do
-    Process.send_after(self(), {:do_compile, app, new_app, custom_command}, 100)
+  def handle_cast({:deps, app, new_app}, state) do
+    Process.send_after(self(), {:do_compile, app, new_app}, 100)
     {:noreply, state}
   end
 
