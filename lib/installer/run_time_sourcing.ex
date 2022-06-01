@@ -55,17 +55,24 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   @spec do_deps_compile(String.t()) :: {:ok, :do_deps_compile, String.t()}| {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
   def do_deps_compile(app) do
-    deps_path = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
-    File.cd(MishkaInstaller.get_config(:project_path) || File.cwd!())
-    with %{operation: "deps.get", output: _stream, status: 0} <- cmd("deps.get"),
+    # I delete the File.cwd!() as a default path because we need to back again, and it needs many conditions especially in DDD project
+    with _cd_path <- File.cd(MishkaInstaller.get_config(:project_path)),
+         %{operation: "deps.get", output: _stream, status: 0} <- cmd("deps.get"),
+         deps_path <- Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{app}"]),
          {:change_dir, :ok} <- {:change_dir, File.cd(deps_path)},
+         {:inside_app, %{operation: "deps.get", output: _stream, status: 0}} <- {:inside_app, cmd("deps.get")},
          %{operation: "deps.compile", output: _stream, status: 0} <- cmd("deps.compile") do
       {:ok, :do_deps_compile, app}
     else
       %{operation: "deps.get", output: stream, status: 1} -> {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
+      {:inside_app, %{operation: "deps.get", output: stream, status: 1} }-> {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
       {:change_dir, file_error} -> {:error, :do_deps_compile, app, operation: "File.cd", output: file_error}
       %{operation: "deps.compile", output: stream, status: 1} -> {:error, :do_deps_compile, app, operation: "deps.compile", output: stream}
+      _ -> {:error, :do_deps_compile, app, operation: "File.cd", output: "Wrong path"}
     end
+  after
+    # Maybe a developer does not consider changed-path, so for preventing issues we back to the project path after each compiling
+    File.cd(MishkaInstaller.get_config(:project_path))
   end
 
   @spec prepend_compiled_apps(any) :: {:ok, :prepend_compiled_apps} | {:error, do_runtime(), ensure(), list}
