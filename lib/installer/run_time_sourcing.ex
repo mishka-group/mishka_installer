@@ -120,7 +120,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   defp application_ensure(error, _app, _status), do: error
 
   defp cmd(command, operation \\ "mix") do
-    {stream, status} = System.cmd(operation, [command], into: IO.stream(), stderr_to_stdout: true)
+    {stream, status} = System.cmd(operation, [command], into: IO.stream(), stderr_to_stdout: true, env: [{"MIX_ENV", "#{Mix.env()}"}])
     %{operation: command, output: stream, status: status}
   end
 end
