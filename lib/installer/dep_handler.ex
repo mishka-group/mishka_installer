@@ -252,17 +252,34 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
   # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
-  @spec compare_installed_deps_with_app_file(binary()) :: list()
+  @spec compare_installed_deps_with_app_file(any) :: list | {:error, :compare_installed_deps_with_app_file, String.t()}
   def compare_installed_deps_with_app_file(app) do
-    # TODO: check this app exist in deps or not
-    # TODO: check if _build app exist
-    # TODO: get all .app file and vsn
-    # TODO: compare vsns with installed app, if any app has newer version, so put it in the list
-    # TODO: do not consider the apps which is older than installed version
-    # with {:ok, bin} <- read_app(lib_path),
-    #      {:ok, {:application, _, properties}} <- consult_app_file(bin) do
-    #       properties
-    # end
+    new_app_path = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
+    if File.dir?(new_app_path) and File.dir?(new_app_path <> "/_build/#{Mix.env()}/lib") do
+      File.ls!(new_app_path <> "/_build/#{Mix.env()}/lib")
+      |> Enum.map(fn sub_app ->
+        with {:ok, bin} <- read_app(new_app_path, sub_app) ,
+             {:ok, {:application, _, properties}} <- consult_app_file(bin),
+             true <- compare_version_of_file_and_installed_app(properties, sub_app),
+             true <- sub_app != app do
+              {sub_app, new_app_path <> "/_build/#{Mix.env()}/lib/#{sub_app}"}
+        else
+          _ -> nil
+        end
+      end)
+      |> Enum.reject(& is_nil(&1))
+    else
+      {:error, :compare_installed_deps_with_app_file, "App folder or _build does not exist"}
+    end
+  end
+
+  defp compare_version_of_file_and_installed_app(file_properties, sub_app) do
+    ver = Application.spec(String.to_atom(sub_app), :vsn)
+    if !is_nil(ver) do
+      Version.compare("#{file_properties[:vsn]}", "#{ver}") == :gt
+    else
+      true
+    end
   end
 
   defp read_app(lib_path, sub_app) do
