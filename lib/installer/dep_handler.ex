@@ -252,7 +252,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
   # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
-  @spec compare_installed_deps_with_app_file(any) :: list | {:error, :compare_installed_deps_with_app_file, String.t()}
+  @spec compare_installed_deps_with_app_file(String.t()) :: list | {:error, :compare_installed_deps_with_app_file, String.t()}
   def compare_installed_deps_with_app_file(app) do
     new_app_path = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
     if File.dir?(new_app_path) and File.dir?(new_app_path <> "/_build/#{Mix.env()}/lib") do
@@ -269,7 +269,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       end)
       |> Enum.reject(& is_nil(&1))
     else
-      {:error, :compare_installed_deps_with_app_file, "App folder or _build does not exist"}
+      {:error, :compare_installed_deps_with_app_file, "App folder or its _build does not exist"}
     end
   end
 
