@@ -250,6 +250,32 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
+  # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
+  @spec compare_installed_deps_with_app_file(binary()) :: list()
+  def compare_installed_deps_with_app_file(app) do
+    # TODO: check this app exist in deps or not
+    # TODO: check if _build app exist
+    # TODO: get all .app file and vsn
+    # TODO: compare vsns with installed app, if any app has newer version, so put it in the list
+    # TODO: do not consider the apps which is older than installed version
+    # with {:ok, bin} <- read_app(lib_path),
+    #      {:ok, {:application, _, properties}} <- consult_app_file(bin) do
+    #       properties
+    # end
+  end
+
+  defp read_app(lib_path, sub_app) do
+    File.read("#{lib_path}/_build/#{Mix.env()}/lib/#{sub_app}/ebin/#{sub_app}.app")
+  end
+
+  defp consult_app_file(bin) do
+    # The path could be located in an .ez archive, so we use the prim loader.
+    with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)) do
+      :erl_parse.parse_term(tokens)
+    end
+  end
+
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
       :ok -> check_or_create_deps_json(project_path)
