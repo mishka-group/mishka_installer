@@ -1,7 +1,8 @@
 defmodule MishkaInstaller.Installer.DepHandler do
   alias MishkaInstaller.Reference.OnChangeDependency
   @event "on_change_dependency"
-  alias MishkaInstaller.Dependency
+  alias MishkaInstaller.{Dependency, Installer.MixCreator, Installer.DepChangesProtector}
+  require Logger
   defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, :update_server, dependencies: []]
   @moduledoc """
 
@@ -57,6 +58,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   ```
   """
 
+  @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
   @type t() :: %__MODULE__{
     app: String.t() | nil,
     version: String.t() | nil,
@@ -69,11 +71,19 @@ defmodule MishkaInstaller.Installer.DepHandler do
     dependencies: [map()],
   }
 
-  @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
+  def run(:hex, app) do
+    MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
+    |> check_app_exist?(:hex)
+    |> case do
+      {:ok, :no_state, _msg, app_name, first_binding: first_binding} ->
+        check_new_mix_file(app_name, first_binding)
+      {:ok, :registered_app, _msg, _app_name, first_binding: _first_binding} -> {:ok, :registered_app}
+      {:error, msg} ->  {:danger, msg}
+    end
+  end
 
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
-
   @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) ::
           {:ok, :add_new_app, any} | {:error, :add_new_app, :changeset | :file, any}
   def add_new_app(%__MODULE__{} = app_info) do
@@ -398,5 +408,69 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> String.replace("~>", "")
     |> String.replace(">=", "")
     |> String.trim()
+  end
+
+  defp check_app_exist?({:ok, :package, pkg}, :hex) do
+    json_find = fn (json, app_name) -> Enum.find(json, &(&1["app"] == app_name)) end
+    with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
+         {:first_binding, true, nil} <- {:first_binding, is_nil(json_find.(Jason.decode!(exist_json), pkg["name"])), json_find.(Jason.decode!(exist_json), pkg["name"])},
+         app_info <- create_app_info_from_hex(pkg),
+         {:ok, :add_new_app, _repo_data} <- add_new_app(app_info),
+         {:ok, :dependency_changes_notifier, :no_state, msg} <- dependency_changes_notifier(pkg["name"]) do
+          {:ok, :no_state, msg, pkg["name"], first_binding: true}
+    else
+      {:first_binding, false, app} -> msg_of_exit_app(app, pkg)
+      {:error, :check_or_create_deps_json, msg} -> {:error, msg}
+      {:error, :add_new_app, :file, msg} -> {:error, msg}
+      {:error, :add_new_app, :changeset, _repo_error} ->
+        # TODO: log this error in activity section
+        {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
+      {:error, :dependency_changes_notifier, msg} -> {:error, msg}
+      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, first_binding: true}
+    end
+  end
+
+  defp check_app_exist?({:error, :package, status}, _) do
+    msg = if status == :not_found, do: "Are you sure you have entered the package name correctly?", else: "Unfortunately, we cannot connect to Hex server now, please try other time!"
+    {:error, msg}
+  end
+
+  defp msg_of_exit_app(app, pkg) do
+    if app["version"] == pkg["latest_stable_version"] do
+      {:error, "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"}
+    else
+      Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
+      case dependency_changes_notifier(pkg["name"]) do
+        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg, first_binding: false}
+        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"], first_binding: false}
+        {:error, :dependency_changes_notifier, msg} -> {:error, msg}
+      end
+    end
+  end
+
+  defp create_app_info_from_hex(pkg) do
+    %__MODULE__{
+      app: pkg["name"],
+      version: pkg["latest_stable_version"],
+      type: "hex",
+      url: pkg["html_url"],
+      dependency_type: "force_update",
+      dependencies: []
+    }
+  end
+
+  defp check_new_mix_file(app_name, new_app) do
+    mix_path = MishkaInstaller.get_config(:mix_path)
+    list_json_dpes =
+      Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
+      |> Enum.any?(& !&1)
+
+    MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
+    if list_json_dpes do
+      Logger.warn("Try to re-create Mix file")
+      check_new_mix_file(app_name, new_app)
+    else
+      DepChangesProtector.deps(app_name, new_app)
+    end
   end
 end

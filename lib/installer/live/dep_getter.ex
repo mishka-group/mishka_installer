@@ -86,19 +86,19 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     {:noreply, socket}
   end
 
-  # Tip: new_app?(true) == first time install, new_app?(false) == exists before
+  # Tip: first_binding?(true) == first time install, first_binding?(false) == exists before
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => name} = _params, socket) do
     new_socket =
       MishkaInstaller.Helper.Sender.package("hex", %{"app" => name})
       |> check_app_exist?(:hex)
       |> case do
-        {:ok, :no_state, msg, app_name, new_app?: new_app} ->
+        {:ok, :no_state, msg, app_name, first_binding: new_app} ->
           check_new_mix_file(app_name, new_app)
           socket
           |> assign(:app_name, app_name)
           |> assign(:status_message, {:success, msg})
-        {:ok, :registered_app, msg, app_name, new_app?: _new_app} ->
+        {:ok, :registered_app, msg, app_name, first_binding: _new_app} ->
           socket
           |> assign(:app_name, app_name)
           |> assign(:status_message, {:info, msg})
@@ -132,20 +132,20 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   defp check_app_exist?({:ok, :package, pkg}, :hex) do
     json_find = fn (json, app_name) -> Enum.find(json, &(&1["app"] == app_name)) end
     with {:ok, :check_or_create_deps_json, exist_json} <- DepHandler.check_or_create_deps_json(),
-         {:new_app?, true, nil} <- {:new_app?, is_nil(json_find.(Jason.decode!(exist_json), pkg["name"])), json_find.(Jason.decode!(exist_json), pkg["name"])},
+         {:first_binding, true, nil} <- {:first_binding, is_nil(json_find.(Jason.decode!(exist_json), pkg["name"])), json_find.(Jason.decode!(exist_json), pkg["name"])},
          app_info <- create_app_info_from_hex(pkg),
          {:ok, :add_new_app, _repo_data} <- DepHandler.add_new_app(app_info),
          {:ok, :dependency_changes_notifier, :no_state, msg} <- DepHandler.dependency_changes_notifier(pkg["name"]) do
-          {:ok, :no_state, msg, pkg["name"], new_app?: true}
+          {:ok, :no_state, msg, pkg["name"], first_binding: true}
     else
-      {:new_app?, false, app} -> msg_of_exit_app(app, pkg)
+      {:first_binding, false, app} -> msg_of_exit_app(app, pkg)
       {:error, :check_or_create_deps_json, msg} -> {:error, msg}
       {:error, :add_new_app, :file, msg} -> {:error, msg}
       {:error, :add_new_app, :changeset, _repo_error} ->
         # TODO: log this error in activity section
         {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
       {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, new_app?: true}
+      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, first_binding: true}
     end
   end
 
@@ -160,8 +160,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     else
       MishkaInstaller.Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
       case DepHandler.dependency_changes_notifier(pkg["name"]) do
-        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg, new_app?: false}
-        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"], new_app?: false}
+        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg, first_binding: false}
+        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"], first_binding: false}
         {:error, :dependency_changes_notifier, msg} -> {:error, msg}
       end
     end

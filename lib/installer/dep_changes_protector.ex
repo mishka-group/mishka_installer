@@ -82,7 +82,6 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info({:do_compile, app, new_app}, state) do
-    # TODO: get custom command from json file
     new_state =
       if is_nil(state.ref) do
         task =
