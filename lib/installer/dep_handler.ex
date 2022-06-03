@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.Installer.DepHandler do
   alias MishkaInstaller.Reference.OnChangeDependency
   @event "on_change_dependency"
-  alias MishkaInstaller.{Dependency, Installer.MixCreator, Installer.DepChangesProtector}
+  alias MishkaInstaller.{Dependency, Installer.MixCreator, Installer.DepChangesProtector, Installer.RunTimeSourcing}
   require Logger
   defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, :update_server, dependencies: []]
   @moduledoc """
@@ -263,25 +263,34 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
   # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
-  @spec compare_installed_deps_with_app_file(String.t()) :: list | {:error, :compare_installed_deps_with_app_file, String.t()}
+  @spec compare_installed_deps_with_app_file(String.t()) :: {:error, :compare_installed_deps_with_app_file, String.t()} |
+        {:ok, :compare_installed_deps_with_app_file, list()}
   def compare_installed_deps_with_app_file(app) do
     new_app_path = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
     if File.dir?(new_app_path) and File.dir?(new_app_path <> "/_build/#{Mix.env()}/lib") do
-      File.ls!(new_app_path <> "/_build/#{Mix.env()}/lib")
-      |> Enum.map(fn sub_app ->
-        with {:ok, bin} <- read_app(new_app_path, sub_app) ,
-             {:ok, {:application, _, properties}} <- consult_app_file(bin),
-             true <- compare_version_of_file_and_installed_app(properties, sub_app),
-             true <- sub_app != app do
-              {sub_app, new_app_path <> "/_build/#{Mix.env()}/lib/#{sub_app}"}
-        else
-          _ -> nil
-        end
-      end)
-      |> Enum.reject(& is_nil(&1))
+      apps_list =
+        File.ls!(new_app_path <> "/_build/#{Mix.env()}/lib")
+        |> Enum.map(fn sub_app ->
+          with {:ok, bin} <- read_app(new_app_path, sub_app) ,
+              {:ok, {:application, _, properties}} <- consult_app_file(bin),
+              true <- compare_version_of_file_and_installed_app(properties, sub_app) do
+                {sub_app, new_app_path <> "/_build/#{Mix.env()}/lib/#{sub_app}"}
+          else
+            _ -> nil
+          end
+        end)
+        |> Enum.reject(& is_nil(&1))
+      {:ok, :compare_installed_deps_with_app_file, apps_list}
     else
       {:error, :compare_installed_deps_with_app_file, "App folder or its _build does not exist"}
     end
+  end
+
+  def move_and_replace_compiled_app_build(app_list) do
+    Enum.map(app_list, fn {app, build_path} ->
+      MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(app), :uninstall)
+      File.cp_r(build_path, Path.join(RunTimeSourcing.get_build_path(), "#{app}"))
+    end)
   end
 
   defp compare_version_of_file_and_installed_app(file_properties, sub_app) do

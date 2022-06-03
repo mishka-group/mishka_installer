@@ -34,7 +34,9 @@ defmodule MishkaInstaller.MixProject do
       {:finch, "~> 0.12.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:phoenix_live_view, "~> 0.17.9"},
-      {:sourceror, "~> 0.11.1"}
+      {:sourceror, "~> 0.11.1"},
+      {:httpoison, "~> 1.8.1"},
+      {:timex, "~> 3.7.8"}
     ]
   end
 

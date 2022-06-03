@@ -61,11 +61,13 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
          deps_path <- Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{app}"]),
          {:change_dir, :ok} <- {:change_dir, File.cd(deps_path)},
          {:inside_app, %{operation: "deps.get", output: _stream, status: 0}} <- {:inside_app, cmd("deps.get")},
-         %{operation: "deps.compile", output: _stream, status: 0} <- cmd("deps.compile") do
+         %{operation: "deps.compile", output: _stream, status: 0} <- cmd("deps.compile"),
+         {:compile_main_app, %{operation: "compile", output: _stream, status: 0}} <- {:compile_main_app, cmd("compile")} do
       {:ok, :do_deps_compile, app}
     else
       %{operation: "deps.get", output: stream, status: 1} -> {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
-      {:inside_app, %{operation: "deps.get", output: stream, status: 1} }-> {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
+      {:inside_app, %{operation: "deps.get", output: stream, status: 1}} -> {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
+      {:compile_main_app, %{operation: "compile", output: stream, status: 1}} -> {:error, :do_deps_compile, app, operation: "compile", output: stream}
       {:change_dir, file_error} -> {:error, :do_deps_compile, app, operation: "File.cd", output: file_error}
       %{operation: "deps.compile", output: stream, status: 1} -> {:error, :do_deps_compile, app, operation: "deps.compile", output: stream}
       _ -> {:error, :do_deps_compile, app, operation: "File.cd", output: "Wrong path"}
@@ -88,7 +90,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
-  defp get_build_path(mode \\ Mix.env()) do
+  def get_build_path(mode \\ Mix.env()) do
     Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["_build/", "#{mode}/", "lib"])
   end
 
