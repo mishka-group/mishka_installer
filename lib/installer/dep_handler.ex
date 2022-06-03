@@ -459,7 +459,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   end
 
-  defp check_new_mix_file(app_name, new_app) do
+  defp check_new_mix_file(app_name, first_binding) do
     mix_path = MishkaInstaller.get_config(:mix_path)
     list_json_dpes =
       Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
@@ -468,9 +468,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
     MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
     if list_json_dpes do
       Logger.warn("Try to re-create Mix file")
-      check_new_mix_file(app_name, new_app)
+      check_new_mix_file(app_name, first_binding)
     else
-      DepChangesProtector.deps(app_name, new_app)
+      DepChangesProtector.deps(app_name, first_binding)
     end
   end
 end

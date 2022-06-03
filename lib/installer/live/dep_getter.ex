@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   use Phoenix.LiveView
   alias Phoenix.LiveView.JS
-  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector, RunTimeSourcing, MixCreator}
+  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector, RunTimeSourcing}
   require Logger
 
   @impl true
@@ -89,24 +89,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   # Tip: first_binding?(true) == first time install, first_binding?(false) == exists before
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => name} = _params, socket) do
-    new_socket =
-      MishkaInstaller.Helper.Sender.package("hex", %{"app" => name})
-      |> check_app_exist?(:hex)
-      |> case do
-        {:ok, :no_state, msg, app_name, first_binding: new_app} ->
-          check_new_mix_file(app_name, new_app)
-          socket
-          |> assign(:app_name, app_name)
-          |> assign(:status_message, {:success, msg})
-        {:ok, :registered_app, msg, app_name, first_binding: _new_app} ->
-          socket
-          |> assign(:app_name, app_name)
-          |> assign(:status_message, {:info, msg})
-        {:error, msg} ->
-          socket
-          |> assign(:status_message, {:danger, msg})
-      end
-    {:noreply, new_socket}
+    DepHandler.run(:hex, name)
+    {:noreply, socket}
   end
 
   @impl Phoenix.LiveView
@@ -128,55 +112,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   def error_to_string(:too_large), do: "Too large"
   def error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
   def error_to_string(:too_many_files), do: "You have selected too many files"
-
-  defp check_app_exist?({:ok, :package, pkg}, :hex) do
-    json_find = fn (json, app_name) -> Enum.find(json, &(&1["app"] == app_name)) end
-    with {:ok, :check_or_create_deps_json, exist_json} <- DepHandler.check_or_create_deps_json(),
-         {:first_binding, true, nil} <- {:first_binding, is_nil(json_find.(Jason.decode!(exist_json), pkg["name"])), json_find.(Jason.decode!(exist_json), pkg["name"])},
-         app_info <- create_app_info_from_hex(pkg),
-         {:ok, :add_new_app, _repo_data} <- DepHandler.add_new_app(app_info),
-         {:ok, :dependency_changes_notifier, :no_state, msg} <- DepHandler.dependency_changes_notifier(pkg["name"]) do
-          {:ok, :no_state, msg, pkg["name"], first_binding: true}
-    else
-      {:first_binding, false, app} -> msg_of_exit_app(app, pkg)
-      {:error, :check_or_create_deps_json, msg} -> {:error, msg}
-      {:error, :add_new_app, :file, msg} -> {:error, msg}
-      {:error, :add_new_app, :changeset, _repo_error} ->
-        # TODO: log this error in activity section
-        {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
-      {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, first_binding: true}
-    end
-  end
-
-  defp check_app_exist?({:error, :package, status}, _) do
-    msg = if status == :not_found, do: "Are you sure you have entered the package name correctly?", else: "Unfortunately, we cannot connect to Hex server now, please try other time!"
-    {:error, msg}
-  end
-
-  defp msg_of_exit_app(app, pkg) do
-    if app["version"] == pkg["latest_stable_version"] do
-      {:error, "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"}
-    else
-      MishkaInstaller.Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
-      case DepHandler.dependency_changes_notifier(pkg["name"]) do
-        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg, first_binding: false}
-        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"], first_binding: false}
-        {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-      end
-    end
-  end
-
-  defp create_app_info_from_hex(pkg) do
-    %DepHandler{
-      app: pkg["name"],
-      version: pkg["latest_stable_version"],
-      type: "hex",
-      url: pkg["html_url"],
-      dependency_type: "force_update",
-      dependencies: []
-    }
-  end
 
   defp dep_form(:upload, assigns) do
     ~H"""
@@ -313,20 +248,5 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         </form>
       </section>
     """
-  end
-
-  defp check_new_mix_file(app_name, new_app) do
-    mix_path = MishkaInstaller.get_config(:mix_path)
-    list_json_dpes =
-      Enum.map(DepHandler.mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
-      |> Enum.any?(& !&1)
-
-    MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
-    if list_json_dpes do
-      Logger.warn("Try to re-create Mix file")
-      check_new_mix_file(app_name, new_app)
-    else
-      DepChangesProtector.deps(app_name, new_app)
-    end
   end
 end
