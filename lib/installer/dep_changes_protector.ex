@@ -166,9 +166,9 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
         notify_subscribers({:error, output, app})
         MishkaInstaller.dependency_activity(%{state: [answer]}, "high")
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
-        MishkaInstaller.dependency_activity(%{state: answer, action: "no_app_found"}, "high")
+        MishkaInstaller.dependency_activity(%{state: [answer], action: "no_app_found"}, "high")
       {:error, :change_dependency_type_with_app, :dependency, repo_error} ->
-        MishkaInstaller.dependency_activity(%{state: answer, action: "edit", error: repo_error}, "high")
+        MishkaInstaller.dependency_activity(%{state: [answer], action: "edit", error: repo_error}, "high")
     end
   end
 
