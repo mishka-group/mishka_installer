@@ -156,7 +156,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     _e -> []
   end
 
-  defp update_dependency_type(answer, state, dependency_type \\ "none") do
+  def update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:ok, :do_deps_compile, app_name} <- answer,
          {:ok, :change_dependency_type_with_app, _repo_data} <- MishkaInstaller.Dependency.change_dependency_type_with_app(app_name, dependency_type) do
           notify_subscribers({:ok, answer, state.app})
@@ -164,7 +164,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     else
       {:error, :do_deps_compile, app, operation: _operation, output: output} ->
         notify_subscribers({:error, output, app})
-        MishkaInstaller.dependency_activity(%{state: answer}, "high")
+        MishkaInstaller.dependency_activity(%{state: [answer]}, "high")
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
         MishkaInstaller.dependency_activity(%{state: answer, action: "no_app_found"}, "high")
       {:error, :change_dependency_type_with_app, :dependency, repo_error} ->

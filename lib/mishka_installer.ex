@@ -16,7 +16,10 @@ defmodule MishkaInstaller do
       Map.merge(state, %{
         state: Enum.map(state.state, fn item ->
           case item do
-            %{operation: operation, output: output, status: status} -> %{operation: operation, output: Map.from_struct(output), status: status}
+            {:error, :do_deps_compile, app, operation: operation, output: output} when is_struct(output) ->
+              %{operation: operation, output: Map.from_struct(output), status: status, app: app}
+            {:error, :do_deps_compile, app, operation: operation, output: output} ->
+              %{operation: operation, output: output, status: status, app: app}
             value -> value
           end
       end)
