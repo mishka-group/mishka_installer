@@ -63,7 +63,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   @impl Phoenix.LiveView
   def handle_event("update_app", %{"type" => type} = _params, socket) when type in ["force_update", "soft_update"] do
     if type == "force_update" do
-      DepChangesProtector.deps(socket.assigns.app_name, false)
+      DepChangesProtector.deps(socket.assigns.app_name)
       # TODO: it should be from pubsub
       RunTimeSourcing.do_runtime(String.to_atom(socket.assigns.app_name), :force_update)
     end

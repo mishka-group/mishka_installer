@@ -76,7 +76,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> check_app_exist?(:hex)
     |> case do
       {:ok, :no_state, msg, app_name} ->
-        check_new_mix_file(app_name)
+        create_mix_file_and_start_compile(app_name)
         {:ok, :run, :no_state, app_name, msg}
       {:ok, :registered_app, msg, app_name} -> {:ok, :run, :registered_app, app_name, msg}
       {:error, msg} ->  {:error, :run, msg}
@@ -460,7 +460,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   end
 
-  defp check_new_mix_file(app_name) do
+  defp create_mix_file_and_start_compile(app_name) do
     mix_path = MishkaInstaller.get_config(:mix_path)
     list_json_dpes =
       Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
@@ -469,7 +469,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
     if list_json_dpes do
       Logger.warn("Try to re-create Mix file")
-      check_new_mix_file(app_name)
+      create_mix_file_and_start_compile(app_name)
     else
       DepChangesProtector.deps(app_name)
     end
