@@ -86,11 +86,22 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     {:noreply, socket}
   end
 
-  # Tip: first_binding?(true) == first time install, first_binding?(false) == exists before
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => name} = _params, socket) do
-    DepHandler.run(:hex, name)
-    {:noreply, socket}
+    new_socket =
+      case DepHandler.run(:hex, name) do
+        {:ok, :run, :no_state, app_name, msg} ->
+          socket
+          |> assign(:app_name, app_name)
+          |> assign(:status_message, {:success, msg})
+        {:ok, :run, :registered_app, _app_name, msg} ->
+          IO.inspect(msg)
+          socket
+        {:error, :run, msg} ->
+          IO.inspect(msg)
+          socket
+      end
+    {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView

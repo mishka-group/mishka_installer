@@ -75,10 +75,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
     |> check_app_exist?(:hex)
     |> case do
-      {:ok, :no_state, _msg, app_name, first_binding: first_binding} ->
-        check_new_mix_file(app_name, first_binding)
-      {:ok, :registered_app, _msg, _app_name, first_binding: _first_binding} -> {:ok, :registered_app}
-      {:error, msg} ->  {:danger, msg}
+      {:ok, :no_state, msg, app_name} ->
+        check_new_mix_file(app_name)
+        {:ok, :run, :no_state, app_name, msg}
+      {:ok, :registered_app, msg, app_name} -> {:ok, :run, :registered_app, app_name, msg}
+      {:error, msg} ->  {:error, :run, msg}
     end
   end
 
@@ -417,7 +418,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
          app_info <- create_app_info_from_hex(pkg),
          {:ok, :add_new_app, _repo_data} <- add_new_app(app_info),
          {:ok, :dependency_changes_notifier, :no_state, msg} <- dependency_changes_notifier(pkg["name"]) do
-          {:ok, :no_state, msg, pkg["name"], first_binding: true}
+          {:ok, :no_state, msg, pkg["name"]}
     else
       {:first_binding, false, app} -> msg_of_exit_app(app, pkg)
       {:error, :check_or_create_deps_json, msg} -> {:error, msg}
@@ -426,7 +427,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         # TODO: log this error in activity section
         {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
       {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, first_binding: true}
+      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg}
     end
   end
 
@@ -441,8 +442,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     else
       Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
       case dependency_changes_notifier(pkg["name"]) do
-        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg, first_binding: false}
-        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"], first_binding: false}
+        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg}
+        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"]}
         {:error, :dependency_changes_notifier, msg} -> {:error, msg}
       end
     end
@@ -459,7 +460,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   end
 
-  defp check_new_mix_file(app_name, first_binding) do
+  defp check_new_mix_file(app_name) do
     mix_path = MishkaInstaller.get_config(:mix_path)
     list_json_dpes =
       Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
@@ -468,9 +469,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
     MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
     if list_json_dpes do
       Logger.warn("Try to re-create Mix file")
-      check_new_mix_file(app_name, first_binding)
+      check_new_mix_file(app_name)
     else
-      DepChangesProtector.deps(app_name, first_binding)
+      DepChangesProtector.deps(app_name)
     end
   end
 end
