@@ -70,13 +70,6 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_info({_ref, answer}, state) when is_list(answer) do
-    # The task completed successfully
-    IO.inspect(answer)
-    {:noreply, state}
-  end
-
-  @impl true
   def handle_info({_ref, {:installing_app, app_res}}, state) do
     IO.inspect(app_res)
     {:noreply, state}
