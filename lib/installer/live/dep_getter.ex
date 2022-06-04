@@ -104,18 +104,14 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     {:noreply, new_socket}
   end
 
+
   @impl Phoenix.LiveView
-  def handle_info({:ok, :dep_changes_protector, _answer, app}, socket) do
-    IO.inspect(app)
-    String.to_atom(app)
-    |> RunTimeSourcing.do_runtime(:add)
-    |> IO.inspect()
+  def handle_info({:error, :dep_changes_protector, _answer, _app}, socket) do
     {:noreply, socket}
   end
 
   @impl Phoenix.LiveView
-  def handle_info({:error, :dep_changes_protector, answer}, socket) do
-    IO.inspect(answer)
+  def handle_info({:ok, :dep_changes_protector, _answer, _app}, socket) do
     {:noreply, socket}
   end
 

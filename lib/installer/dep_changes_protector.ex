@@ -70,8 +70,14 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_info({_ref, {:installing_app, app_res}}, state) do
-    IO.inspect(app_res)
+  def handle_info({_ref, {:installing_app, app_name, app_res, _move_apps}}, state) do
+    case app_res do
+      {:ok, :application_ensure} ->
+        notify_subscribers({:ok, app_res, app_name})
+      {:error, do_runtime, ensure, output} ->
+        notify_subscribers({:error, app_res, app_name})
+        MishkaInstaller.dependency_activity(%{state: [{:error, do_runtime, app_name, operation: ensure, output: output}]}, "high")
+    end
     {:noreply, state}
   end
 
@@ -165,13 +171,12 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   def update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:ok, :do_deps_compile, app_name} <- answer,
          {:ok, :change_dependency_type_with_app, _repo_data} <- MishkaInstaller.Dependency.change_dependency_type_with_app(app_name, dependency_type) do
-          notify_subscribers({:ok, answer, state.app})
           json_check_and_create()
           with {:ok, :compare_installed_deps_with_app_file, apps_list} <- DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
             Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-              DepHandler.move_and_replace_compiled_app_build(apps_list)
+              move_apps = DepHandler.move_and_replace_compiled_app_build(apps_list)
               app_res = MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
-              {:installing_app, app_res}
+              {:installing_app, app_name, app_res, move_apps}
             end)
           end
     else
