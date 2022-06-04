@@ -77,9 +77,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> case do
       {:ok, :no_state, msg, app_name} ->
         create_mix_file_and_start_compile(app_name)
-        {:ok, :run, :no_state, app_name, msg}
-      {:ok, :registered_app, msg, app_name} -> {:ok, :run, :registered_app, app_name, msg}
-      {:error, msg} ->  {:error, :run, msg}
+        %{"app_name" => app_name, "status_message_type" => :success, "message" => msg, "selected_form" => :hex}
+      {:ok, :registered_app, msg, app_name} ->
+        %{"app_name" => app_name, "status_message_type" => :info, "message" => msg, "selected_form" => :registered_app}
+      {:error, msg} ->
+        %{"app_name" => nil, "status_message_type" => :danger, "message" => msg, "selected_form" => :hex}
     end
   end
 

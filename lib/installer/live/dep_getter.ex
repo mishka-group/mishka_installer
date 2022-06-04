@@ -88,19 +88,12 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => name} = _params, socket) do
+    res = DepHandler.run(:hex, name)
     new_socket =
-      case DepHandler.run(:hex, name) do
-        {:ok, :run, :no_state, app_name, msg} ->
-          socket
-          |> assign(:app_name, app_name)
-          |> assign(:status_message, {:success, msg})
-        {:ok, :run, :registered_app, _app_name, msg} ->
-          IO.inspect(msg)
-          socket
-        {:error, :run, msg} ->
-          IO.inspect(msg)
-          socket
-      end
+      socket
+      |> assign(:app_name, res["app_name"])
+      |> assign(:status_message, {res["status_message_type"], res["message"]})
+      |> assign(:selected_form, res["selected_form"])
     {:noreply, new_socket}
   end
 
