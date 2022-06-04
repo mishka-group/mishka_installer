@@ -6,6 +6,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   @type ensure() :: :bad_directory | :load | :no_directory | :sure_all_started
   @type do_runtime() :: :application_ensure | :prepend_compiled_apps
+  @type app_name() :: String.t() | atom()
 
   @spec do_runtime(atom(), atom()) ::{:ok, :application_ensure} | {:error, do_runtime(), ensure(), any}
   def do_runtime(app, :add) when is_atom(app) do
@@ -90,8 +91,26 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
+  @spec get_build_path(atom()) :: binary
   def get_build_path(mode \\ Mix.env()) do
     Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["_build/", "#{mode}/", "lib"])
+  end
+
+  # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
+  # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
+  @spec read_app(binary(), app_name()) :: {:error, atom} | {:ok, binary}
+  def read_app(lib_path, sub_app) do
+    File.read("#{lib_path}/_build/#{Mix.env()}/lib/#{sub_app}/ebin/#{sub_app}.app")
+  end
+
+  @spec consult_app_file(binary) :: {:error, {non_neg_integer | {non_neg_integer, pos_integer}, atom, any}}
+          | {:ok, any}
+          | {:error, {non_neg_integer | {non_neg_integer, pos_integer}, atom, any}, non_neg_integer | {non_neg_integer, pos_integer}}
+  def consult_app_file(bin) do
+    # The path could be located in an .ez archive, so we use the prim loader.
+    with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)) do
+      :erl_parse.parse_term(tokens)
+    end
   end
 
   defp application_ensure({:ok, :prepend_compiled_apps}, app, :add) do

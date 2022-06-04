@@ -58,6 +58,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   ```
   """
 
+  @type app_name() :: String.t() | atom()
   @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
   @type t() :: %__MODULE__{
     app: String.t() | nil,
@@ -73,6 +74,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
+  @spec run(:hex, app_name()) :: map()
   def run(:hex, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
     |> check_app_exist?(:hex)
@@ -265,8 +267,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
-  # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
   @spec compare_installed_deps_with_app_file(String.t()) :: {:error, :compare_installed_deps_with_app_file, String.t()} |
         {:ok, :compare_installed_deps_with_app_file, list()}
   def compare_installed_deps_with_app_file(app) do
@@ -275,8 +275,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
       apps_list =
         File.ls!(new_app_path <> "/_build/#{Mix.env()}/lib")
         |> Enum.map(fn sub_app ->
-          with {:ok, bin} <- read_app(new_app_path, sub_app) ,
-              {:ok, {:application, _, properties}} <- consult_app_file(bin),
+          with {:ok, bin} <- RunTimeSourcing.read_app(new_app_path, sub_app) ,
+              {:ok, {:application, _, properties}} <- RunTimeSourcing.consult_app_file(bin),
               true <- compare_version_of_file_and_installed_app(properties, sub_app) do
                 {sub_app, new_app_path <> "/_build/#{Mix.env()}/lib/#{sub_app}"}
           else
@@ -303,17 +303,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
       Version.compare("#{file_properties[:vsn]}", "#{ver}") == :gt
     else
       true
-    end
-  end
-
-  defp read_app(lib_path, sub_app) do
-    File.read("#{lib_path}/_build/#{Mix.env()}/lib/#{sub_app}/ebin/#{sub_app}.app")
-  end
-
-  defp consult_app_file(bin) do
-    # The path could be located in an .ez archive, so we use the prim loader.
-    with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)) do
-      :erl_parse.parse_term(tokens)
     end
   end
 
