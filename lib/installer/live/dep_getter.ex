@@ -115,7 +115,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:upload, assigns) do
     ~H"""
-    <section id="dep-getter" class="col-md-6 mx-auto" phx-drop-target={@uploads.dep.ref}>
+    <section id="dep-getter" class="col-md-6 mx-auto text-center" phx-drop-target={@uploads.dep.ref}>
       <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
         <%= for err <- upload_errors(@uploads.dep) do %>
           <p class="alert alert-danger"><%= error_to_string(err) %></p>
