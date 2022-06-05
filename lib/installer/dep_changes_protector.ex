@@ -174,6 +174,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
           json_check_and_create()
           with {:ok, :compare_installed_deps_with_app_file, apps_list} <- DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
             Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
+              MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :uninstall)
               {
                 :installing_app,
                 app_name,
