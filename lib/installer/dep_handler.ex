@@ -419,6 +419,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
           "Unfortunately, an error occurred while storing the data in the database.
           To check for errors, see the Activities section, and if this error persists, report it to support."
         }
+      {:error, :update_app_version, :older_version} ->
+        {:error,
+          "You have already installed this library and the installed version is the same as the latest version of the Hex site.
+          Please take action when a new version of this app is released"}
     end
   end
 
