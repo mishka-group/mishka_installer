@@ -1,7 +1,10 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   use Phoenix.LiveView
   alias Phoenix.LiveView.JS
-  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector, RunTimeSourcing}
+  alias MishkaInstaller.Installer.{DepHandler, DepChangesProtector}
+  alias MishkaInstaller.Reference.OnChangeDependency
+  alias MishkaInstaller.Hook
+  @event "on_change_dependency"
   require Logger
 
   @impl true
@@ -63,9 +66,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   @impl Phoenix.LiveView
   def handle_event("update_app", %{"type" => type} = _params, socket) when type in ["force_update", "soft_update"] do
     if type == "force_update" do
-      DepChangesProtector.deps(socket.assigns.app_name)
-      # TODO: it should be from pubsub
-      RunTimeSourcing.do_runtime(String.to_atom(socket.assigns.app_name), :force_update)
+      ""
+    else
+      Hook.call(event: @event, state: %OnChangeDependency{app: socket.assigns.app_name, status: :force_update}, operation: :no_return)
     end
     socket =
       socket

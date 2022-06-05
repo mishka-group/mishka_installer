@@ -54,12 +54,14 @@ defmodule MishkaInstaller.Dependency do
     crud_get_by_field("app", app)
   end
 
-  @spec update_app_version(String.t(), String.t()) :: {:update_app_version, :not_found} | {:error, :edit, any, any} | {:ok, :edit, atom(), map()}
-  def update_app_version(app_name, version) do
-    case crud_get_by_field("app", app_name) do
-      {:error, :get_record_by_field, _} -> {:update_app_version, :not_found}
-      {:ok, :get_record_by_field, _atom, repo_data} ->
-        edit(%{"id" => repo_data.id, "version" => version, "dependency_type" => "force_update"})
+  def update_app_version(id, version) do
+    crud_edit(%{"id" => id, "version" => version, "dependency_type" => "force_update"})
+  end
+
+  def create_or_update(data) do
+    case show_by_name(data.app) do
+      {:error, :get_record_by_field, :dependency} -> create(data)
+      {:ok, :get_record_by_field, :dependency, record_info} -> update_app_version(record_info.id, record_info.version)
     end
   end
 

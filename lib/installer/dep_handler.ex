@@ -1,5 +1,4 @@
 defmodule MishkaInstaller.Installer.DepHandler do
-  alias MishkaInstaller.Reference.OnChangeDependency
   @event "on_change_dependency"
   alias MishkaInstaller.{Dependency, Installer.MixCreator, Installer.DepChangesProtector, Installer.RunTimeSourcing}
   require Logger
@@ -77,7 +76,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @spec run(:hex, app_name()) :: map()
   def run(:hex, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
-    |> check_app_exist?(:hex)
+    |> check_app_status(:hex)
     |> case do
       {:ok, :no_state, msg, app_name} ->
         create_mix_file_and_start_compile(app_name)
@@ -115,19 +114,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
         Enum.map(data, fn item -> mix_creator(item["type"], item) end)
       {:error, :read_dep_json, msg} ->
         raise msg <> ". To make sure, re-create the JSON file from scratch."
-    end
-  end
-
-  @spec dependency_changes_notifier(String.t(), String.t()) ::
-          {:error, :dependency_changes_notifier, String.t()}
-          | {:ok, :dependency_changes_notifier, :no_state | :registered_app, String.t()}
-  def dependency_changes_notifier(app, status \\ "force_update") do
-    case MishkaInstaller.PluginState.get_all(event: @event) do
-      [] ->
-        update_app_status(app, status, :no_state)
-      _value ->
-        MishkaInstaller.Hook.call(event: @event, state: %OnChangeDependency{app: app, status: status}, operation: :no_return)
-        update_app_status(app, status, :registered_app)
     end
   end
 
@@ -366,23 +352,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  defp update_app_status(app, status, state) do
-    with {:ok, :change_dependency_type_with_app, _repo_data} <- Dependency.change_dependency_type_with_app(app, status) do
-         {:ok, :dependency_changes_notifier, state,
-         if state == :no_state do
-          "We could not find any registered-app that has important state, hence you can update safely."
-         else
-          "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
-          After their response, we will change the #{app} dependency and let you know about its latest news."
-         end
-      }
-    else
-      {:error, :change_dependency_type_with_app, :dependency, _error} ->
-        {:error, :dependency_changes_notifier,
-        "Unfortunately we couldn't find your app, if you did not submit the app you want to update please add it at first and send request to this app."}
-    end
-  end
-
   # The priority of path and git master/main are always higher the `mix` dependencies list.
   defp mix_item({_app, path: _uploaded_extension} = value, _app_list, _deps_list), do: value
   defp mix_item({_app, git: _url} = value, _app_list, _deps_list), do: value
@@ -413,41 +382,43 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> String.trim()
   end
 
-  defp check_app_exist?({:ok, :package, pkg}, :hex) do
-    json_find = fn (json, app_name) -> Enum.find(json, &(&1["app"] == app_name)) end
-    with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
-         {:first_binding, true, nil} <- {:first_binding, is_nil(json_find.(Jason.decode!(exist_json), pkg["name"])), json_find.(Jason.decode!(exist_json), pkg["name"])},
-         app_info <- create_app_info_from_hex(pkg),
-         {:ok, :add_new_app, _repo_data} <- add_new_app(app_info),
-         {:ok, :dependency_changes_notifier, :no_state, msg} <- dependency_changes_notifier(pkg["name"]) do
-          {:ok, :no_state, msg, pkg["name"]}
-    else
-      {:first_binding, false, app} -> msg_of_exit_app(app, pkg)
-      {:error, :check_or_create_deps_json, msg} -> {:error, msg}
-      {:error, :add_new_app, :file, msg} -> {:error, msg}
-      {:error, :add_new_app, :changeset, _repo_error} ->
-        # TODO: log this error in activity section
-        {:error, "This error occurs when you can not add a new plugin to the database. If repeated, please contact support."}
-      {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-      {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg}
-    end
+  defp check_app_status({:ok, :package, pkg}, :hex) do
+    create_app_info_from_hex(pkg)
+    |> Map.from_struct()
+    |> sync_app_with_database()
   end
 
-  defp check_app_exist?({:error, :package, status}, _) do
+  defp check_app_status({:error, :package, status}, _) do
     msg = if status == :not_found, do: "Are you sure you have entered the package name correctly?", else: "Unfortunately, we cannot connect to Hex server now, please try other time!"
     {:error, msg}
   end
 
-  defp msg_of_exit_app(app, pkg) do
-    if app["version"] == pkg["latest_stable_version"] do
-      {:error, "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"}
-    else
-      Dependency.update_app_version(app["app"], pkg["latest_stable_version"])
-      case dependency_changes_notifier(pkg["name"]) do
-        {:ok, :dependency_changes_notifier, :no_state, msg} -> {:ok, :no_state, msg}
-        {:ok, :dependency_changes_notifier, :registered_app, msg} -> {:ok, :registered_app, msg, pkg["name"]}
-        {:error, :dependency_changes_notifier, msg} -> {:error, msg}
-      end
+  defp sync_app_with_database(data) do
+    case Dependency.create_or_update(data) do
+      {:ok, :add, :dependency, repo_data} ->
+        {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
+
+      {:ok, :edit, :dependency, repo_data} ->
+        if MishkaInstaller.PluginState.get_all(event: @event) == [] do
+          {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
+        else
+          {:ok, :registered_app,
+          "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
+          After their response, we will change the #{repo_data.app} dependency and let you know about its latest news.", repo_data.app}
+        end
+      {:error, action, :dependency, _repo_error} when action in [:add, :edit] ->
+        # TODO: save it in activities
+        {:error,
+          "Unfortunately, an error occurred while storing the data in the database.
+          To check for errors, see the Activities section, and if this error persists, report it to support."
+        }
+
+      {:error, action, :uuid, _error_tag} when action in [:uuid, :get_record_by_id] ->
+        # TODO: save it in activities
+        {:error,
+          "Unfortunately, an error occurred while storing the data in the database.
+          To check for errors, see the Activities section, and if this error persists, report it to support."
+        }
     end
   end
 

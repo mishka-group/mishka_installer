@@ -23,5 +23,6 @@
 - [ ] Add private parameters to event hooks
 - [x] Preparing dependencies for force-update and soft-update to keep essential data (like state in updating)
 - [x] Mix deps creator
+- [x] Add run function for adding a new dep
 
 > Accepting zip file of release is not supported in this version
