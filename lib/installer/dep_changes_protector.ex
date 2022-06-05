@@ -175,7 +175,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
           with {:ok, :compare_installed_deps_with_app_file, apps_list} <- DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
             Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
               move_apps = DepHandler.move_and_replace_compiled_app_build(apps_list)
-              app_res = MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
+              app_res = MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :force_update)
               {:installing_app, app_name, app_res, move_apps}
             end)
           end
