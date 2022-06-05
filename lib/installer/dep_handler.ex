@@ -88,6 +88,21 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  def create_mix_file_and_start_compile(app_name) do
+    mix_path = MishkaInstaller.get_config(:mix_path)
+    list_json_dpes =
+      Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
+      |> Enum.any?(& !&1)
+
+    MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
+    if list_json_dpes do
+      Logger.warn("Try to re-create Mix file")
+      create_mix_file_and_start_compile(app_name)
+    else
+      DepChangesProtector.deps(app_name)
+    end
+  end
+
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
   @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) ::
@@ -435,20 +450,5 @@ defmodule MishkaInstaller.Installer.DepHandler do
       dependency_type: "force_update",
       dependencies: []
     }
-  end
-
-  defp create_mix_file_and_start_compile(app_name) do
-    mix_path = MishkaInstaller.get_config(:mix_path)
-    list_json_dpes =
-      Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
-      |> Enum.any?(& !&1)
-
-    MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
-    if list_json_dpes do
-      Logger.warn("Try to re-create Mix file")
-      create_mix_file_and_start_compile(app_name)
-    else
-      DepChangesProtector.deps(app_name)
-    end
   end
 end
