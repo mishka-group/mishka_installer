@@ -70,7 +70,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_info({_ref, {:installing_app, app_name, app_res, _move_apps}}, state) do
+  def handle_info({_ref, {:installing_app, app_name, _move_apps, app_res}}, state) do
     case app_res do
       {:ok, :application_ensure} ->
         notify_subscribers({:ok, app_res, app_name})
@@ -174,9 +174,12 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
           json_check_and_create()
           with {:ok, :compare_installed_deps_with_app_file, apps_list} <- DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
             Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-              move_apps = DepHandler.move_and_replace_compiled_app_build(apps_list)
-              app_res = MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
-              {:installing_app, app_name, app_res, move_apps}
+              {
+                :installing_app,
+                app_name,
+                DepHandler.move_and_replace_compiled_app_build(apps_list),
+                MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
+              }
             end)
           end
     else
