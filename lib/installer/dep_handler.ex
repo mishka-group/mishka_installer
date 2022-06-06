@@ -405,35 +405,41 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   defp sync_app_with_database(data) do
-    case Dependency.create_or_update(data) do
-      {:ok, :add, :dependency, repo_data} ->
-        {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
-
-      {:ok, :edit, :dependency, repo_data} ->
-        if MishkaInstaller.PluginState.get_all(event: @event) == [] do
+    if compare_version_with_installed_app(data.app, data.version) do
+      case Dependency.create_or_update(data) do
+        {:ok, :add, :dependency, repo_data} ->
           {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
-        else
-          {:ok, :registered_app,
-          "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
-          After their response, we will change the #{repo_data.app} dependency and let you know about its latest news.", repo_data.app}
-        end
-      {:error, action, :dependency, _repo_error} when action in [:add, :edit] ->
-        # TODO: save it in activities
-        {:error,
-          "Unfortunately, an error occurred while storing the data in the database.
-          To check for errors, see the Activities section, and if this error persists, report it to support."
-        }
 
-      {:error, action, :uuid, _error_tag} when action in [:uuid, :get_record_by_id] ->
-        # TODO: save it in activities
-        {:error,
-          "Unfortunately, an error occurred while storing the data in the database.
-          To check for errors, see the Activities section, and if this error persists, report it to support."
-        }
-      {:error, :update_app_version, :older_version} ->
-        {:error,
-          "You have already installed this library and the installed version is the same as the latest version of the Hex site.
-          Please take action when a new version of this app is released"}
+        {:ok, :edit, :dependency, repo_data} ->
+          if MishkaInstaller.PluginState.get_all(event: @event) == [] do
+            {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
+          else
+            {:ok, :registered_app,
+            "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
+            After their response, we will change the #{repo_data.app} dependency and let you know about its latest news.", repo_data.app}
+          end
+        {:error, action, :dependency, _repo_error} when action in [:add, :edit] ->
+          # TODO: save it in activities
+          {:error,
+            "Unfortunately, an error occurred while storing the data in the database.
+            To check for errors, see the Activities section, and if this error persists, report it to support."
+          }
+
+        {:error, action, :uuid, _error_tag} when action in [:uuid, :get_record_by_id] ->
+          # TODO: save it in activities
+          {:error,
+            "Unfortunately, an error occurred while storing the data in the database.
+            To check for errors, see the Activities section, and if this error persists, report it to support."
+          }
+        {:error, :update_app_version, :older_version} ->
+          {:error,
+            "You have already installed this library and the installed version is the same as the latest version of the Hex site.
+            Please take action when a new version of this app is released"}
+      end
+    else
+      {:error,
+            "You have already installed this library and the installed version is the same as the latest version of the Hex site.
+            Please take action when a new version of this app is released"}
     end
   end
 
