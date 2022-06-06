@@ -100,6 +100,13 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     {:noreply, new_socket}
   end
 
+  @impl Phoenix.LiveView
+  def handle_event("clean_error", _params, socket) do
+    new_socket =
+      socket
+      |> assign(:status_message, {nil, nil})
+    {:noreply, new_socket}
+  end
 
   @impl Phoenix.LiveView
   def handle_info({:error, :dep_changes_protector, _answer, _app}, socket) do
@@ -126,8 +133,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <% end %>
         <% {status, message} = @status_message %>
         <%= if !is_nil(message) do %>
-          <div class="container" id="dep-status-msg" style="display: show;">
-            <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
+          <div class="container" id="dep-status-msg">
+            <div class={"alert alert-#{status}"} role="alert" phx-click="clean_error"><%= message %></div>
             <div class="container h-25 d-inline-block"></div>
           </div>
         <% end %>
@@ -167,8 +174,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
-            <div class="container" id="dep-status-msg" style="display: show;">
-              <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
+            <div class="container" id="dep-status-msg">
+              <div class={"alert alert-#{status}"} role="alert" phx-click="clean_error"><%= message %></div>
               <div class="container h-25 d-inline-block"></div>
             </div>
           <% end %>
@@ -194,8 +201,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
-            <div class="container" id="dep-status-msg" style="display: show;">
-              <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
+            <div class="container" id="dep-status-msg">
+              <div class={"alert alert-#{status}"} role="alert" phx-click="clean_error"><%= message %></div>
               <div class="container h-25 d-inline-block"></div>
             </div>
           <% end %>
@@ -232,9 +239,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           </svg>
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
-            <div class="container" id="dep-status-msg" style="display: show;">
+            <div class="container" id="dep-status-msg">
               <div class="container h-25 d-inline-block"></div>
-              <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
+              <div class={"alert alert-#{status}"} role="alert" phx-click="clean_error"><%= message %></div>
             </div>
           <% end %>
           <div class="alert alert-secondary text-center prefer-alert">
