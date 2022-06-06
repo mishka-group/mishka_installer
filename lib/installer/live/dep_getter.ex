@@ -126,7 +126,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <% end %>
         <% {status, message} = @status_message %>
         <%= if !is_nil(message) do %>
-          <div class="container" id="dep-status-msg">
+          <div class="container" id="dep-status-msg" style="display: show;">
             <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
             <div class="container h-25 d-inline-block"></div>
           </div>
@@ -167,7 +167,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
-            <div class="container" id="dep-status-msg">
+            <div class="container" id="dep-status-msg" style="display: show;">
               <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
               <div class="container h-25 d-inline-block"></div>
             </div>
@@ -194,7 +194,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
-            <div class="container" id="dep-status-msg">
+            <div class="container" id="dep-status-msg" style="display: show;">
               <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
               <div class="container h-25 d-inline-block"></div>
             </div>
@@ -232,7 +232,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           </svg>
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
-            <div class="container" id="dep-status-msg">
+            <div class="container" id="dep-status-msg" style="display: show;">
               <div class="container h-25 d-inline-block"></div>
               <div class={"alert alert-#{status}"} role="alert" phx-click={JS.hide(to: "#dep-status-msg")}><%= message %></div>
             </div>
