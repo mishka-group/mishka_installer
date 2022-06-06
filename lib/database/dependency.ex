@@ -6,6 +6,7 @@ defmodule MishkaInstaller.Dependency do
   > Do not use these functions directly, because we do not update JSON file in this module, some functions were prepared in DepHandler module for you.
   """
   alias MishkaInstaller.Database.DependencySchema
+  alias MishkaInstaller.Installer.DepHandler
   import Ecto.Query
   use MishkaDeveloperTools.DB.CRUD,
           module: DependencySchema,
@@ -62,7 +63,7 @@ defmodule MishkaInstaller.Dependency do
     case show_by_name(data.app) do
       {:error, :get_record_by_field, :dependency} -> create(data)
       {:ok, :get_record_by_field, :dependency, record_info} ->
-        if Version.compare(data.version, record_info.version) == :gt do
+        if Version.compare(data.version, record_info.version) == :gt and DepHandler.compare_version_with_installed_app(data.app, data.version) do
           update_app_version(record_info.id, data.version)
         else
           {:error, :update_app_version, :older_version}

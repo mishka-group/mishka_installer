@@ -278,7 +278,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         |> Enum.map(fn sub_app ->
           with {:ok, bin} <- RunTimeSourcing.read_app(new_app_path, sub_app) ,
               {:ok, {:application, _, properties}} <- RunTimeSourcing.consult_app_file(bin),
-              true <- compare_version_of_file_and_installed_app(properties, sub_app) do
+              true <- compare_version_with_installed_app(properties[:vsn], sub_app) do
                 {sub_app, new_app_path <> "/_build/#{Mix.env()}/lib/#{sub_app}"}
           else
             _ -> nil
@@ -298,13 +298,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
-  defp compare_version_of_file_and_installed_app(file_properties, sub_app) do
-    ver = Application.spec(String.to_atom(sub_app), :vsn)
-    if !is_nil(ver) do
-      Version.compare("#{file_properties[:vsn]}", "#{ver}") == :gt
-    else
-      true
-    end
+  def compare_version_with_installed_app(app, version) do
+    ver = Application.spec(String.to_atom(app), :vsn)
+    if !is_nil(ver), do: Version.compare("#{version}", "#{ver}") == :gt, else: true
   end
 
   defp create_deps_json_directory(project_path, folder_path) do
