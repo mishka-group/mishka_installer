@@ -59,6 +59,7 @@ defmodule MishkaInstaller.Dependency do
     crud_edit(%{"id" => id, "version" => version, "dependency_type" => "force_update"})
   end
 
+  @spec create_or_update(map()) :: tuple()
   def create_or_update(data) do
     case show_by_name(data.app) do
       {:error, :get_record_by_field, :dependency} -> create(data)
