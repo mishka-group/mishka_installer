@@ -9,7 +9,7 @@ defmodule MishkaInstaller.Helper.Sender do
 
   @type app :: map()
 
-  @spec package(String.t(), app()) :: {:error, :package, :not_found | :unhandled} | {:ok, :package, map()}
+  @spec package(String.t(), app()) :: list | {:error, :package, :mix_file | :not_found | :not_tag | :unhandled} | {:ok, :package, any}
   def package("hex", %{"app" => name} = _app) do
     send_build(:get, "https://hex.pm/api/packages/#{name}")
   end
@@ -72,9 +72,9 @@ defmodule MishkaInstaller.Helper.Sender do
     end)
   end
 
-  def convert_github_output(%{version: {:attribute, item}, attributes: attributes}), do: {:version, List.first(Map.get(attributes, item))}
-  def convert_github_output(%{version: ver, attributes: _attributes}) when is_binary(ver), do: {:version, ver}
-  def convert_github_output(%{app: {:attribute, item}, attributes: attributes}), do: {:app, List.first(Map.get(attributes, item))}
-  def convert_github_output(%{app: ver, attributes: _attributes}) when is_atom(ver), do: {:app, ver}
-  def convert_github_output(_), do: {:error, :convert_github_output}
+  defp convert_github_output(%{version: {:attribute, item}, attributes: attributes}), do: {:version, List.first(Map.get(attributes, item))}
+  defp convert_github_output(%{version: ver, attributes: _attributes}) when is_binary(ver), do: {:version, ver}
+  defp convert_github_output(%{app: {:attribute, item}, attributes: attributes}), do: {:app, List.first(Map.get(attributes, item))}
+  defp convert_github_output(%{app: ver, attributes: _attributes}) when is_atom(ver), do: {:app, ver}
+  defp convert_github_output(_), do: {:error, :package, :convert_github_output}
 end
