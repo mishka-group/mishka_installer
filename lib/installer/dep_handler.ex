@@ -2,7 +2,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @event "on_change_dependency"
   alias MishkaInstaller.{Dependency, Installer.MixCreator, Installer.DepChangesProtector, Installer.RunTimeSourcing}
   require Logger
-  defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, :update_server, dependencies: []]
+  defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, dependencies: []]
   @moduledoc """
 
   A module that holds new dependencies' information, and add them into database or validating to implement in runtime
@@ -29,8 +29,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       dependencies: [ # this part let mishka_installer to know can update or not dependencies of a app, we should consider a backup file
         %{app: :mishka_developer_tools, max: "0.0.2", min: "0.0.1"},
         %{app: :mishka_social, max: "0.0.2", min: "0.0.1"}
-      ],
-      update_server: "https://github.com/mishka-group/mishka_installer/blob/master/update.json", # Check is there a higher version?
+      ]
     }
   ]
   ```
@@ -45,7 +44,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     git_tag: nil,
     custom_command: nil,
     dependency_type: "force_update",
-    update_server: nil,
     dependencies: [
       %{app: :phoenix, min: "1.6"},
       %{app: :phoenix_live_view, max: "0.17.7", min: "0.17.7"},
@@ -68,7 +66,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     git_tag: String.t() | nil,
     custom_command: String.t() | nil,
     dependency_type: String.t() | nil,
-    update_server: String.t() | nil,
     dependencies: [map()],
   }
 

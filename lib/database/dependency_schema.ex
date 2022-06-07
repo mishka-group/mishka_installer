@@ -14,13 +14,12 @@ defmodule MishkaInstaller.Database.DependencySchema do
     field :url, :string
     field :git_tag, :string
     field :custom_command, :string
-    field :update_server, :string
     field :dependencies, {:array, :map}
 
     timestamps(type: :utc_datetime)
   end
 
-  @all_fields ~w(app version type url dependency_type git_tag custom_command update_server dependencies)a
+  @all_fields ~w(app version type url dependency_type git_tag custom_command dependencies)a
   @required_fields ~w(app version type dependency_type)a
 
   @spec changeset(struct(), map()) :: Ecto.Changeset.t()

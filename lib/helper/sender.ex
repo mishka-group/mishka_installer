@@ -14,10 +14,6 @@ defmodule MishkaInstaller.Helper.Sender do
     send_build(:get, "https://hex.pm/api/packages/#{name}")
   end
 
-  def package("git", %{"update_server" => url, "tag" => tag} = _app) when not is_nil(url) and not is_nil(tag) do
-    send_build(:get, url)
-  end
-
   def package("github", %{"url" => url, "tag" => tag} = _app) when not is_nil(url) and not is_nil(tag) do
     new_url = String.replace(url, "https://github.com/", "https://raw.githubusercontent.com/") <> "/#{tag}/mix.exs"
     send_build(:get, new_url, :normal)

@@ -14,7 +14,6 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     git_tag: nil,
     custom_command: nil,
     dependency_type: "force_update",
-    update_server: nil,
     dependencies: [
       %{app: :plug, min: "1.5.0"}
     ]

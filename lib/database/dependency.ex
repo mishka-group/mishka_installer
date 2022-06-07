@@ -80,7 +80,7 @@ defmodule MishkaInstaller.Dependency do
 
   def dependencies(:struct) do
     dependencies()
-    |> Enum.map(&struct(MishkaInstaller.Installer.DepHandler, &1))
+    |> Enum.map(&struct(DepHandler, &1))
   end
 
   @spec change_dependency_type_with_app(String.t(), String.t()) :: {:ok, :change_dependency_type_with_app, map()}
@@ -109,7 +109,6 @@ defmodule MishkaInstaller.Dependency do
       git_tag: dep.git_tag,
       custom_command: dep.custom_command,
       dependency_type: dep.dependency_type,
-      update_server: dep.update_server,
       dependencies: dep.dependencies
     }
   end
