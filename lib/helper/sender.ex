@@ -45,7 +45,7 @@ defmodule MishkaInstaller.Helper.Sender do
 
   defp get_basic_information_form_github({:ok, :package, body}) do
     case Code.string_to_quoted(body) do
-      {:ok, ast} -> ast_github_basic_information(ast, [:app, :version])
+      {:ok, ast} -> ast_github_basic_information(ast, [:app, :version, :source_url])
       _ -> {:error, :package, :mix_file}
     end
   end
@@ -72,9 +72,12 @@ defmodule MishkaInstaller.Helper.Sender do
     end)
   end
 
+  # I duplicated the code to make this operation clear instead of getting dynamically and make it complicated.
   defp convert_github_output(%{version: {:attribute, item}, attributes: attributes}), do: {:version, List.first(Map.get(attributes, item))}
   defp convert_github_output(%{version: ver, attributes: _attributes}) when is_binary(ver), do: {:version, ver}
   defp convert_github_output(%{app: {:attribute, item}, attributes: attributes}), do: {:app, List.first(Map.get(attributes, item))}
   defp convert_github_output(%{app: ver, attributes: _attributes}) when is_atom(ver), do: {:app, ver}
+  defp convert_github_output(%{source_url: {:attribute, item}, attributes: attributes}), do: {:source_url, List.first(Map.get(attributes, item))}
+  defp convert_github_output(%{source_url: ver, attributes: _attributes}) when is_binary(ver), do: {:source_url, ver}
   defp convert_github_output(_), do: {:error, :package, :convert_github_output}
 end
