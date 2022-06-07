@@ -24,5 +24,6 @@
 - [x] Preparing dependencies for force-update and soft-update to keep essential data (like state in updating)
 - [x] Mix deps creator
 - [x] Add run function for adding a new dep
+- [ ] Use fixed-issue of deletion from MishkaDeveloperTools [#9](https://github.com/mishka-group/mishka_developer_tools/issues/9)
 
 > Accepting zip file of release is not supported in this version

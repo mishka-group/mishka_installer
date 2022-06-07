@@ -6,6 +6,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   alias MishkaInstaller.Hook
   @event "on_change_dependency"
   require Logger
+  @allowed_fields ["select_form", "app", "url", "git_tag", "update_server"]
 
   @impl true
   def render(assigns) do
@@ -79,19 +80,19 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   end
 
   @impl Phoenix.LiveView
-  def handle_event("save", %{"select_form" => "git"} = _params, socket) do
-    # TODO: if this pkg does not exist so install and add to do compile queue
-    # TODO: do not send if this info exists and it is same version, you can notice user he/her is trying to send duplicated-package
-    # TODO: note: if your app developer registerd a plugin to keep some esential state we just notice it, and the app you want to update shoud start updating
-    # TODO: if it is master do not update db and the other places
-    # TODO: make a way to force update with admin
-    # TODO: after creating all these TODO, please move the code in dephandler module as a main action
-    {:noreply, socket}
+  def handle_event("save", %{"select_form" => "git", "app" => _name, "url" => _url, "git_tag" => _tag, "update_server" => _update_server} = params, socket) do
+    res = DepHandler.run(:git, Map.take(params, @allowed_fields))
+    new_socket =
+      socket
+      |> assign(:app_name, res["app_name"])
+      |> assign(:status_message, {res["status_message_type"], res["message"]})
+      |> assign(:selected_form, res["selected_form"])
+    {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
-  def handle_event("save", %{"select_form" => "hex", "app" => name} = _params, socket) do
-    res = DepHandler.run(:hex, name)
+  def handle_event("save", %{"select_form" => "hex", "app" => app} = _params, socket) do
+    res = DepHandler.run(:hex, app)
     new_socket =
       socket
       |> assign(:app_name, res["app_name"])

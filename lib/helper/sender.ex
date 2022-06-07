@@ -18,18 +18,57 @@ defmodule MishkaInstaller.Helper.Sender do
     send_build(:get, url)
   end
 
-  def package(_status, _app), do: {:error, :package, :not_tag}
-
-  defp send_build(:get, url) do
-    Finch.build(:get, url)
-    |> Finch.request(@request_name)
-    |> request_handler()
+  def package("github", %{"url" => url, "tag" => tag} = _app) when not is_nil(url) and not is_nil(tag) do
+    new_url = String.replace(url, "https://github.com/", "https://raw.githubusercontent.com/") <> "/#{tag}/mix.exs"
+    send_build(:get, new_url, :normal)
+    |> get_basic_information_form_github()
   end
 
-  defp request_handler({:ok, %Finch.Response{body: body, headers: _headers, status: 200}}) do
+  def package(_status, _app), do: {:error, :package, :not_tag}
+
+  defp send_build(:get, url, request \\ :json) do
+    Finch.build(:get, url)
+    |> Finch.request(@request_name)
+    |> request_handler(request)
+  end
+
+  defp request_handler({:ok, %Finch.Response{body: body, headers: _headers, status: 200}}, :json) do
     {:ok, :package, Jason.decode!(body)}
   end
 
-  defp request_handler({:ok, %Finch.Response{status: 404}}), do: {:error, :package, :not_found}
-  defp request_handler(_outputs), do: {:error, :package, :unhandled}
+  defp request_handler({:ok, %Finch.Response{body: body, headers: _headers, status: 200}}, :normal) do
+    {:ok, :package, body}
+  end
+
+  defp request_handler({:ok, %Finch.Response{status: 404}}, _), do: {:error, :package, :not_found}
+  defp request_handler(_outputs, _), do: {:error, :package, :unhandled}
+
+  defp get_basic_information_form_github({:ok, :package, body}) do
+    case Code.string_to_quoted(body) do
+      {:ok, ast} -> ast_github_basic_information(ast, [:app, :version])
+      _ -> {:error, :package, :mix_file}
+    end
+  end
+
+  defp get_basic_information_form_github(output), do: output
+
+  defp ast_github_basic_information(ast, selection) do
+    Enum.map(selection, fn item ->
+      {_ast, acc} =
+        Macro.postwalk(ast, %{"#{item}": nil, attributes: %{}}, fn
+          {:@, _, [{name, _, value}]} = ast, acc when is_atom(name) and not is_nil(value) ->
+            {ast, put_in(acc.attributes[name], value)}
+
+          {^item, {:@, _, [{name, _, nil}]}} = ast, acc ->
+            {ast, Map.put(acc, item, {:attribute, name})}
+
+          {^item, value} = ast, acc ->
+            {ast, Map.put(acc, item, value)}
+
+          ast, acc ->
+            {ast, acc}
+        end)
+      acc
+    end)
+  end
 end

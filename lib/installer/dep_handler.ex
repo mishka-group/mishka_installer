@@ -58,6 +58,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   """
 
   @type app_name() :: String.t() | atom()
+  @type run() :: :hex | :git | :upload
   @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
   @type t() :: %__MODULE__{
     app: String.t() | nil,
@@ -73,7 +74,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
-  @spec run(:hex, app_name()) :: map()
+
+  @spec run(:git | :hex, map()) :: map()
   def run(:hex, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
     |> check_app_status(:hex)
@@ -86,6 +88,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
       {:error, msg} ->
         %{"app_name" => nil, "status_message_type" => :danger, "message" => msg, "selected_form" => :hex}
     end
+  end
+
+  def run(:git, app) do
+    app
   end
 
   def create_mix_file_and_start_compile(app_name) do
