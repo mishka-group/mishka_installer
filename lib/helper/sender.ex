@@ -68,7 +68,13 @@ defmodule MishkaInstaller.Helper.Sender do
           ast, acc ->
             {ast, acc}
         end)
-      acc
+        convert_github_output(acc)
     end)
   end
+
+  def convert_github_output(%{version: {:attribute, item}, attributes: attributes}), do: {:version, List.first(Map.get(attributes, item))}
+  def convert_github_output(%{version: ver, attributes: _attributes}) when is_binary(ver), do: {:version, ver}
+  def convert_github_output(%{app: {:attribute, item}, attributes: attributes}), do: {:app, List.first(Map.get(attributes, item))}
+  def convert_github_output(%{app: ver, attributes: _attributes}) when is_atom(ver), do: {:app, ver}
+  def convert_github_output(_), do: {:error, :convert_github_output}
 end

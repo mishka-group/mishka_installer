@@ -75,7 +75,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
 
-  @spec run(:git | :hex, map()) :: map()
+  @spec run(run(), map()) :: map()
   def run(:hex, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
     |> check_app_status(:hex)
