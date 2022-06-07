@@ -52,6 +52,7 @@ defmodule MishkaInstaller.Helper.Sender do
 
   defp get_basic_information_form_github(output), do: output
 
+  # Ref: https://elixirforum.com/t/getting-basic-information-of-a-elixir-project-from-github/48231/7
   defp ast_github_basic_information(ast, selection) do
     Enum.map(selection, fn item ->
       {_ast, acc} =

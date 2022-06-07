@@ -75,23 +75,17 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
 
-  @spec run(run(), map()) :: map()
+  @spec run(run(), app_name() | map()) :: map()
   def run(:hex, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
     |> check_app_status(:hex)
-    |> case do
-      {:ok, :no_state, msg, app_name} ->
-        create_mix_file_and_start_compile(app_name)
-        %{"app_name" => app_name, "status_message_type" => :success, "message" => msg, "selected_form" => :hex}
-      {:ok, :registered_app, msg, app_name} ->
-        %{"app_name" => app_name, "status_message_type" => :info, "message" => msg, "selected_form" => :registered_app}
-      {:error, msg} ->
-        %{"app_name" => nil, "status_message_type" => :danger, "message" => msg, "selected_form" => :hex}
-    end
+    |> run_request_handler(:hex)
   end
 
   def run(:git, app) do
-    app
+    MishkaInstaller.Helper.Sender.package("github", %{"url" => app.url, "tag" => app.tag})
+    |> check_app_status(:git)
+    |> run_request_handler(:git)
   end
 
   def create_mix_file_and_start_compile(app_name) do
@@ -400,13 +394,29 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   defp check_app_status({:ok, :package, pkg}, :hex) do
-    create_app_info_from_hex(pkg)
+    create_app_info(pkg, :hex)
     |> Map.from_struct()
     |> sync_app_with_database()
   end
 
-  defp check_app_status({:error, :package, status}, _) do
-    msg = if status == :not_found, do: "Are you sure you have entered the package name correctly?", else: "Unfortunately, we cannot connect to Hex server now, please try other time!"
+  defp check_app_status(result, :git) do
+    case result do
+      {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
+        {:error, "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is #{result}"}
+      data ->
+        if Enum.any?(data, & (&1 == {:error, :package, :convert_github_output})) do
+          {:error, "Your mix.exs file must contain the app, version and source_url parameters"}
+        else
+          create_app_info(data, :git)
+          |> Map.from_struct()
+          |> sync_app_with_database()
+        end
+    end
+  end
+
+  defp check_app_status({:error, :package, status}, type) do
+    msg = if status == :not_found, do: "Are you sure you have entered the package name or url correctly?",
+          else: "Unfortunately, we cannot connect to #{type} server now, please try other time! or make it correct"
     {:error, msg}
   end
 
@@ -449,12 +459,35 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  defp create_app_info_from_hex(pkg) do
+  defp run_request_handler(status, type) do
+    case status do
+      {:ok, :no_state, msg, app_name} ->
+        create_mix_file_and_start_compile(app_name)
+        %{"app_name" => app_name, "status_message_type" => :success, "message" => msg, "selected_form" => type}
+      {:ok, :registered_app, msg, app_name} ->
+        %{"app_name" => app_name, "status_message_type" => :info, "message" => msg, "selected_form" => :registered_app}
+      {:error, msg} ->
+        %{"app_name" => nil, "status_message_type" => :danger, "message" => msg, "selected_form" => type}
+    end
+  end
+
+  defp create_app_info(pkg, :hex) do
     %__MODULE__{
       app: pkg["name"],
       version: pkg["latest_stable_version"],
       type: "hex",
       url: pkg["html_url"],
+      dependency_type: "force_update",
+      dependencies: []
+    }
+  end
+
+  defp create_app_info([app: app, version: version, source_url: source_url], :git) do
+    %__MODULE__{
+      app: "#{app}",
+      version: "#{version}",
+      type: "git",
+      url: "#{source_url}",
       dependency_type: "force_update",
       dependencies: []
     }
