@@ -76,16 +76,16 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
 
   @spec run(run(), app_name() | map()) :: map()
-  def run(:hex, app) do
+  def run(:hex = type, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
-    |> check_app_status(:hex)
-    |> run_request_handler(:hex)
+    |> check_app_status(type)
+    |> run_request_handler(type)
   end
 
-  def run(:git, app) do
+  def run(:git = type, app) do
     MishkaInstaller.Helper.Sender.package("github", %{"url" => app.url, "tag" => app.tag})
-    |> check_app_status(:git)
-    |> run_request_handler(:git)
+    |> check_app_status(type)
+    |> run_request_handler(type)
   end
 
   def create_mix_file_and_start_compile(app_name) do
