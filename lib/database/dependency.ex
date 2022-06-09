@@ -56,7 +56,6 @@ defmodule MishkaInstaller.Dependency do
   end
 
   def update_app_version(id, data) do
-    IO.inspect(Map.merge(convert_map_from_atom_to_string(data), %{"id" => id, "dependency_type" => "force_update"}))
     crud_edit(Map.merge(convert_map_from_atom_to_string(data), %{"id" => id, "dependency_type" => "force_update"}))
   end
 
