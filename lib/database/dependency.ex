@@ -55,8 +55,9 @@ defmodule MishkaInstaller.Dependency do
     crud_get_by_field("app", app)
   end
 
-  def update_app_version(id, version) do
-    crud_edit(%{"id" => id, "version" => version, "dependency_type" => "force_update"})
+  def update_app_version(id, data) do
+    IO.inspect(Map.merge(convert_map_from_atom_to_string(data), %{"id" => id, "dependency_type" => "force_update"}))
+    crud_edit(Map.merge(convert_map_from_atom_to_string(data), %{"id" => id, "dependency_type" => "force_update"}))
   end
 
   @spec create_or_update(map()) :: tuple()
@@ -65,7 +66,7 @@ defmodule MishkaInstaller.Dependency do
       {:error, :get_record_by_field, :dependency} -> create(data)
       {:ok, :get_record_by_field, :dependency, record_info} ->
         if Version.compare(data.version, record_info.version) == :gt do
-          update_app_version(record_info.id, data.version)
+          update_app_version(record_info.id, data)
         else
           {:error, :update_app_version, :older_version}
         end
@@ -126,5 +127,11 @@ defmodule MishkaInstaller.Dependency do
     end
 
     def notify_subscribers(params, _), do: params
+  end
+
+  defp convert_map_from_atom_to_string(map) do
+    for {key, val} <- map, into: %{} do
+      {to_string(key), to_string(val)}
+    end
   end
 end

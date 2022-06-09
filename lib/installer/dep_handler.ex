@@ -86,6 +86,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   def create_mix_file_and_start_compile(app_name) do
+    create_deps_json_file(MishkaInstaller.get_config(:project_path))
     mix_path = MishkaInstaller.get_config(:mix_path)
     list_json_dpes =
       Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)

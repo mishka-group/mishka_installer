@@ -8,6 +8,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @re_check_json_time 10_000
   @module "dep_changes_protector"
   alias MishkaInstaller.Installer.DepHandler
+  alias MishkaInstaller.Dependency
 
   @spec start_link(list()) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(args \\ []) do
@@ -71,9 +72,15 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info({_ref, {:installing_app, app_name, _move_apps, app_res}}, state) do
+    project_path = MishkaInstaller.get_config(:project_path) || File.cwd!()
     case app_res do
       {:ok, :application_ensure} ->
+        [Path.join(project_path, ["deps/", "#{app_name}", "/_build"]), Path.join(project_path, ["deps/", "#{app_name}", "/deps"])]
+        |> Enum.map(& (File.rm_rf(&1)))
         notify_subscribers({:ok, app_res, app_name})
+      {:error, do_runtime, app, operation: operation, output: output} ->
+        notify_subscribers({:error, app_res, "#{app}"})
+        MishkaInstaller.dependency_activity(%{state: [{:error, do_runtime, "#{app}", operation: operation, output: output}]}, "high")
       {:error, do_runtime, ensure, output} ->
         notify_subscribers({:error, app_res, app_name})
         MishkaInstaller.dependency_activity(%{state: [{:error, do_runtime, app_name, operation: ensure, output: output}]}, "high")
@@ -112,6 +119,13 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   def handle_info(:timeout, state) do
     Logger.info("We are waiting for your custom pubsub is loaded")
     check_custom_pubsub_loaded(state)
+  end
+
+  @impl true
+  def handle_info(_param, state) do
+    # TODO: it should be loged
+    Logger.info("We have an uncontrolled output")
+    {:noreply, state}
   end
 
   @impl true
@@ -170,7 +184,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   def update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:ok, :do_deps_compile, app_name} <- answer,
-         {:ok, :change_dependency_type_with_app, _repo_data} <- MishkaInstaller.Dependency.change_dependency_type_with_app(app_name, dependency_type) do
+         {:ok, :change_dependency_type_with_app, _repo_data} <- Dependency.change_dependency_type_with_app(app_name, dependency_type) do
           json_check_and_create()
           with {:ok, :compare_installed_deps_with_app_file, apps_list} <- DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
             Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
@@ -185,6 +199,9 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
           end
     else
       {:error, :do_deps_compile, app, operation: _operation, output: output} ->
+        with {:ok, :get_record_by_field, :dependency, record_info} <- Dependency.show_by_name(app) do
+          Dependency.delete(record_info.id)
+        end
         notify_subscribers({:error, output, app})
         MishkaInstaller.dependency_activity(%{state: [answer]}, "high")
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->

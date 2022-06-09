@@ -25,7 +25,6 @@ defmodule MishkaInstaller.Installer.MixCreator do
               [app_name | options] = Tuple.to_list(item)
               create_mix_postwalk(app_name, options, dep_line(deps, block_meta))
             end)
-
           {{:defp, meta, [fun, [do: {:__block__, block_meta, [deps]}]]}, state}
         other, state ->
           {other, state}
