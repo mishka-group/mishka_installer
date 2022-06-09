@@ -381,12 +381,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
       {_founded_app_name, version} ->
         if Version.compare(clean_mix_version(imporetd_version), clean_mix_version(version)) in [:eq, :lt], do: nil, else: value
     end
+  rescue
+    _e -> nil
   end
 
   defp clean_mix_version(version) do
     version
     |> String.replace("~>", "")
     |> String.replace(">=", "")
+    |> String.replace("v", "")
     |> String.trim()
   end
 
