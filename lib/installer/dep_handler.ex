@@ -352,11 +352,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   defp mix_creator("git", data) do
-    case data["tag"] do
+    case data["git_tag"] do
       nil ->
         {String.to_atom(data["app"]), git: data["url"]}
       _ ->
-        {String.to_atom(data["app"]), git: data["url"], tag: data["tag"]}
+        {String.to_atom(data["app"]), git: data["url"], tag: data["git_tag"]}
     end
   end
 

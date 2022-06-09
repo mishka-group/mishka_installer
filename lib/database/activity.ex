@@ -66,7 +66,7 @@ defmodule MishkaInstaller.Activity do
           status: params.status,
           action: params.action,
           user_id: params.user_id,
-          extra: extra
+          extra: %{extra: extra}
         }
       )
   end
