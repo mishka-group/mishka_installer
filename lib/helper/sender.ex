@@ -15,9 +15,9 @@ defmodule MishkaInstaller.Helper.Sender do
   end
 
   def package("github", %{"url" => url, "tag" => tag} = _app) when not is_nil(url) and not is_nil(tag) do
-    new_url = String.replace(url, "https://github.com/", "https://raw.githubusercontent.com/") <> "/#{tag}/mix.exs"
+    new_url = String.replace(String.trim(url), "https://github.com/", "https://raw.githubusercontent.com/") <> "/#{String.trim(tag)}/mix.exs"
     send_build(:get, new_url, :normal)
-    |> get_basic_information_form_github(tag)
+    |> get_basic_information_form_github(String.trim(tag))
   end
 
   def package(_status, _app), do: {:error, :package, :not_tag}
