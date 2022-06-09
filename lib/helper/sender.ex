@@ -17,7 +17,7 @@ defmodule MishkaInstaller.Helper.Sender do
   def package("github", %{"url" => url, "tag" => tag} = _app) when not is_nil(url) and not is_nil(tag) do
     new_url = String.replace(url, "https://github.com/", "https://raw.githubusercontent.com/") <> "/#{tag}/mix.exs"
     send_build(:get, new_url, :normal)
-    |> get_basic_information_form_github()
+    |> get_basic_information_form_github(tag)
   end
 
   def package(_status, _app), do: {:error, :package, :not_tag}
@@ -39,17 +39,17 @@ defmodule MishkaInstaller.Helper.Sender do
   defp request_handler({:ok, %Finch.Response{status: 404}}, _), do: {:error, :package, :not_found}
   defp request_handler(_outputs, _), do: {:error, :package, :unhandled}
 
-  defp get_basic_information_form_github({:ok, :package, body}) do
+  defp get_basic_information_form_github({:ok, :package, body}, tag) do
     case Code.string_to_quoted(body) do
-      {:ok, ast} -> ast_github_basic_information(ast, [:app, :version, :source_url])
+      {:ok, ast} -> ast_github_basic_information(ast, [:app, :version, :source_url], tag)
       _ -> {:error, :package, :mix_file}
     end
   end
 
-  defp get_basic_information_form_github(output), do: output
+  defp get_basic_information_form_github(output, _tag), do: output
 
   # Ref: https://elixirforum.com/t/getting-basic-information-of-a-elixir-project-from-github/48231/7
-  defp ast_github_basic_information(ast, selection) do
+  defp ast_github_basic_information(ast, selection, tag) do
     Enum.map(selection, fn item ->
       {_ast, acc} =
         Macro.postwalk(ast, %{"#{item}": nil, attributes: %{}}, fn
@@ -66,7 +66,7 @@ defmodule MishkaInstaller.Helper.Sender do
             {ast, acc}
         end)
         convert_github_output(acc)
-    end)
+    end) ++ [{:tag, tag}]
   end
 
   # I duplicated the code to make this operation clear instead of getting dynamically and make it complicated.

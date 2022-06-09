@@ -479,11 +479,12 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   end
 
-  defp create_app_info([app: app, version: version, source_url: source_url], :git) do
+  defp create_app_info([app: app, version: version, source_url: source_url, tag: tag], :git) do
     %__MODULE__{
       app: "#{app}",
       version: "#{version}",
       type: "git",
+      git_tag: tag,
       url: "#{source_url}",
       dependency_type: "force_update",
       dependencies: []
