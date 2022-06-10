@@ -44,11 +44,10 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "upload"} = _params, socket) do
     uploaded_files =
-      consume_uploaded_entries(socket, :dep, fn %{path: path}, _entry ->
-        dest = Path.join([:code.priv_dir(:my_app), "static", "uploads", Path.basename(path)])
-        # The `static/uploads` directory must exist for `File.cp!/2` to work.
+      consume_uploaded_entries(socket, :dep, fn %{path: path}, entry ->
+        dest = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions", entry.client_name])
         File.cp!(path, dest)
-        # {:ok, Routes.static_path(socket, "/uploads/#{Path.basename(dest)}")}
+        {:ok, dest}
       end)
     {:noreply, update(socket, :uploaded_files, &(&1 ++ uploaded_files))}
   end

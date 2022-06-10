@@ -101,6 +101,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info({:do_compile, app}, state) do
+    # TODO: Can be replaced with oban, Build queues for compiling and installing dependencies
     new_state =
       if is_nil(state.ref) do
         task =
