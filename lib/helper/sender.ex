@@ -6,6 +6,7 @@ defmodule MishkaInstaller.Helper.Sender do
     **Ref: `https://github.com/hexpm/hexpm/issues/1124`**
   """
   @request_name HexClientApi
+  alias MishkaInstaller.Helper.Extra
 
   @type app :: map()
 
@@ -41,40 +42,10 @@ defmodule MishkaInstaller.Helper.Sender do
 
   defp get_basic_information_form_github({:ok, :package, body}, tag) do
     case Code.string_to_quoted(body) do
-      {:ok, ast} -> ast_github_basic_information(ast, [:app, :version, :source_url], tag)
+      {:ok, ast} -> Extra.ast_mix_file_basic_information(ast, [:app, :version, :source_url], [{:tag, tag}])
       _ -> {:error, :package, :mix_file}
     end
   end
 
   defp get_basic_information_form_github(output, _tag), do: output
-
-  # Ref: https://elixirforum.com/t/getting-basic-information-of-a-elixir-project-from-github/48231/7
-  defp ast_github_basic_information(ast, selection, tag) do
-    Enum.map(selection, fn item ->
-      {_ast, acc} =
-        Macro.postwalk(ast, %{"#{item}": nil, attributes: %{}}, fn
-          {:@, _, [{name, _, value}]} = ast, acc when is_atom(name) and not is_nil(value) ->
-            {ast, put_in(acc.attributes[name], value)}
-
-          {^item, {:@, _, [{name, _, nil}]}} = ast, acc ->
-            {ast, Map.put(acc, item, {:attribute, name})}
-
-          {^item, value} = ast, acc ->
-            {ast, Map.put(acc, item, value)}
-
-          ast, acc ->
-            {ast, acc}
-        end)
-        convert_github_output(acc)
-    end) ++ [{:tag, tag}]
-  end
-
-  # I duplicated the code to make this operation clear instead of getting dynamically and make it complicated.
-  defp convert_github_output(%{version: {:attribute, item}, attributes: attributes}), do: {:version, List.first(Map.get(attributes, item))}
-  defp convert_github_output(%{version: ver, attributes: _attributes}) when is_binary(ver), do: {:version, ver}
-  defp convert_github_output(%{app: {:attribute, item}, attributes: attributes}), do: {:app, List.first(Map.get(attributes, item))}
-  defp convert_github_output(%{app: ver, attributes: _attributes}) when is_atom(ver), do: {:app, ver}
-  defp convert_github_output(%{source_url: {:attribute, item}, attributes: attributes}), do: {:source_url, List.first(Map.get(attributes, item))}
-  defp convert_github_output(%{source_url: ver, attributes: _attributes}) when is_binary(ver), do: {:source_url, ver}
-  defp convert_github_output(_), do: {:error, :package, :convert_github_output}
 end

@@ -85,6 +85,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> run_request_handler(type)
   end
 
+  def run(:upload = _type, [app]) do
+    case :zip.unzip(~c'#{app}', [{:cwd, ~c'#{Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions"])}'}]) do
+      {:ok, _content} ->
+        IO.inspect Path.basename(app, ".zip")
+      {:error, _error} ->
+        ""
+    end
+  end
+
   def create_mix_file_and_start_compile(app_name) do
     create_deps_json_file(MishkaInstaller.get_config(:project_path))
     mix_path = MishkaInstaller.get_config(:mix_path)
