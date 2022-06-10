@@ -407,7 +407,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> sync_app_with_database()
   end
 
-  defp check_app_status(result, :git) do
+  defp check_app_status(result, type) when type in [:git, :upload] do
     case result do
       {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
         {:error, "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is #{result}"}
@@ -415,22 +415,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         if Enum.any?(data, & (&1 == {:error, :package, :convert_ast_output})) do
           {:error, "Your mix.exs file must contain the app, version and source_url parameters"}
         else
-          create_app_info(data, :git)
-          |> Map.from_struct()
-          |> sync_app_with_database()
-        end
-    end
-  end
-
-  defp check_app_status(result, :upload) do
-    case result do
-      {:error, :package, result} when result in [:mix_file, :string_mix_file, :unzip] ->
-        {:error, "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is #{result}"}
-      data ->
-        if Enum.any?(data, & (&1 == {:error, :package, :convert_ast_output})) do
-          {:error, "Your mix.exs file must contain the app, version and source_url parameters"}
-        else
-          create_app_info(data, :git)
+          create_app_info(data, if(type == :git, do: :git, else: :path))
           |> Map.from_struct()
           |> sync_app_with_database()
         end
