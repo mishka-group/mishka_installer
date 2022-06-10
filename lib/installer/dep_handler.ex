@@ -1,6 +1,7 @@
 defmodule MishkaInstaller.Installer.DepHandler do
   @event "on_change_dependency"
   alias MishkaInstaller.{Dependency, Installer.MixCreator, Installer.DepChangesProtector, Installer.RunTimeSourcing}
+  alias MishkaInstaller.Helper.Extra
   require Logger
   defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, dependencies: []]
   @moduledoc """
@@ -72,7 +73,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
 
-  @spec run(run(), app_name() | map()) :: map()
+  @spec run(run(), app_name() | map() | list()) :: map()
   def run(:hex = type, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
     |> check_app_status(type)
@@ -85,13 +86,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> run_request_handler(type)
   end
 
-  def run(:upload = _type, [app]) do
-    case :zip.unzip(~c'#{app}', [{:cwd, ~c'#{Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions"])}'}]) do
-      {:ok, _content} ->
-        IO.inspect Path.basename(app, ".zip")
-      {:error, _error} ->
-        ""
-    end
+  def run(:upload = _type, [file_path]) do
+    unzip_dep_folder(file_path)
+    |> check_mix_file_and_get_ast(file_path)
+    |> check_app_status(:upload)
   end
 
   def create_mix_file_and_start_compile(app_name) do
@@ -414,7 +412,22 @@ defmodule MishkaInstaller.Installer.DepHandler do
       {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
         {:error, "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is #{result}"}
       data ->
-        if Enum.any?(data, & (&1 == {:error, :package, :convert_github_output})) do
+        if Enum.any?(data, & (&1 == {:error, :package, :convert_ast_output})) do
+          {:error, "Your mix.exs file must contain the app, version and source_url parameters"}
+        else
+          create_app_info(data, :git)
+          |> Map.from_struct()
+          |> sync_app_with_database()
+        end
+    end
+  end
+
+  defp check_app_status(result, :upload) do
+    case result do
+      {:error, :package, result} when result in [:mix_file, :string_mix_file, :unzip] ->
+        {:error, "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is #{result}"}
+      data ->
+        if Enum.any?(data, & (&1 == {:error, :package, :convert_ast_output})) do
           {:error, "Your mix.exs file must contain the app, version and source_url parameters"}
         else
           create_app_info(data, :git)
@@ -481,6 +494,24 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  defp unzip_dep_folder(file_path) do
+    {:unzip, :zip.unzip(~c'#{file_path}', [{:cwd, ~c'#{Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions"])}'}])}
+  end
+
+  defp check_mix_file_and_get_ast({:unzip, {:ok, _content}}, file_path) do
+    mix_file = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{Path.basename(file_path, ".zip")}", "/mix.exs"])
+    with {:mix_file, {:ok, body}} <- {:mix_file, File.read(mix_file)},
+         {:code, {:ok, ast}} <- {:code, Code.string_to_quoted(body)} do
+
+        Extra.ast_mix_file_basic_information(ast, [:app, :version, :source_url])
+    else
+      {:mix_file, {:error, _error}} -> {:error, :package, :mix_file}
+      {:code, {:error, _error}} -> {:error, :package, :string_mix_file}
+    end
+  end
+
+  defp check_mix_file_and_get_ast({:unzip, {:error, _error}}, _file_path), do: {:error, :package, :unzip}
+
   defp create_app_info(pkg, :hex) do
     %__MODULE__{
       app: pkg["name"],
@@ -492,11 +523,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   end
 
-  defp create_app_info([app: app, version: version, source_url: source_url, tag: tag], :git) do
+  defp create_app_info([app: app, version: version, source_url: source_url, tag: tag], type) when type in [:git, :path] do
     %__MODULE__{
       app: "#{app}",
       version: "#{version}",
-      type: "git",
+      type: "#{type}",
       git_tag: tag,
       url: "#{source_url}",
       dependency_type: "force_update",

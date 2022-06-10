@@ -27,7 +27,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       |> assign(:app_name, nil)
       |> assign(:status_message, {nil, nil})
       |> assign(:uploaded_files, [])
-      |> allow_upload(:dep, accept: ~w(.jpg .jpeg .png), max_entries: 1)
+      |> allow_upload(:dep, accept: ~w(.zip), max_entries: 1)
     {:ok, socket}
   end
 
@@ -39,17 +39,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   @impl Phoenix.LiveView
   def handle_event("cancel_upload", %{"ref" => ref}, socket) do
     {:noreply, cancel_upload(socket, :dep, ref)}
-  end
-
-  @impl Phoenix.LiveView
-  def handle_event("save", %{"select_form" => "upload"} = _params, socket) do
-    uploaded_files =
-      consume_uploaded_entries(socket, :dep, fn %{path: path}, entry ->
-        dest = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions", entry.client_name])
-        File.cp!(path, dest)
-        {:ok, dest}
-      end)
-    {:noreply, update(socket, :uploaded_files, &(&1 ++ uploaded_files))}
   end
 
   @impl Phoenix.LiveView
@@ -100,6 +89,25 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   end
 
   @impl Phoenix.LiveView
+  def handle_event("save", %{"select_form" => "upload"} = _params, socket) do
+    uploaded_files =
+      consume_uploaded_entries(socket, :dep, fn %{path: path}, entry ->
+        IO.inspect(entry)
+        dest = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", entry.client_name])
+        File.cp!(path, dest)
+        {:ok, dest}
+      end)
+
+    res = DepHandler.run(:upload, uploaded_files)
+    new_socket =
+      socket
+      |> assign(:app_name, res["app_name"])
+      |> assign(:status_message, {res["status_message_type"], res["message"]})
+      |> assign(:selected_form, res["selected_form"])
+    {:noreply, update(new_socket, :uploaded_files, &(&1 ++ uploaded_files))}
+  end
+
+  @impl Phoenix.LiveView
   def handle_event("clean_error", _params, socket) do
     new_socket =
       socket
@@ -126,9 +134,11 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     ~H"""
     <section id="dep-getter" class="col-md-6 mx-auto text-center" phx-drop-target={@uploads.dep.ref}>
       <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
-        <%= for err <- upload_errors(@uploads.dep) do %>
-          <p class="alert alert-danger"><%= error_to_string(err) %></p>
-          <div class="container h-25 d-inline-block"></div>
+        <%= for entry <- @uploads.dep.entries do %>
+          <%= for err <- upload_errors(@uploads.dep, entry) do %>
+            <p class="alert alert-danger"><%= error_to_string(err) %></p>
+            <div class="container h-25 d-inline-block"></div>
+          <% end %>
         <% end %>
         <% {status, message} = @status_message %>
         <%= if !is_nil(message) do %>
