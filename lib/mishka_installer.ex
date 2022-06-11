@@ -19,7 +19,7 @@ defmodule MishkaInstaller do
             {:error, :do_deps_compile, app, operation: operation, output: output} when is_struct(output) ->
               %{operation: operation, output: Map.from_struct(output), status: status, app: app}
             {:error, :do_deps_compile, app, operation: operation, output: output} ->
-              %{operation: operation, output: output, status: status, app: app}
+              %{operation: operation, output: Kernel.inspect(output), status: status, app: app}
             value -> value
           end
       end)
