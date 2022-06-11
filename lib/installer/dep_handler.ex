@@ -76,20 +76,20 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @spec run(run(), app_name() | map() | list()) :: map()
   def run(:hex = type, app) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
-    |> check_app_status(type)
+    |> check_app_status(type, nil)
     |> run_request_handler(type)
   end
 
   def run(:git = type, app) do
     MishkaInstaller.Helper.Sender.package("github", %{"url" => app.url, "tag" => app.tag})
-    |> check_app_status(type)
+    |> check_app_status(type, nil)
     |> run_request_handler(type)
   end
 
   def run(:upload = type, [file_path]) do
     unzip_dep_folder(file_path)
     |> check_mix_file_and_get_ast(file_path)
-    |> check_app_status(:upload)
+    |> check_app_status(:upload, file_path)
     |> run_request_handler(type)
   end
 
@@ -402,13 +402,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> String.trim()
   end
 
-  defp check_app_status({:ok, :package, pkg}, :hex) do
+  defp check_app_status({:ok, :package, pkg}, :hex, _) do
     create_app_info(pkg, :hex)
     |> Map.from_struct()
     |> sync_app_with_database()
   end
 
-  defp check_app_status(result, type) when type in [:git, :upload] do
+  defp check_app_status(result, type, file_path) when type in [:git, :upload] do
     case result do
       {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
         {:error, "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is #{result}"}
@@ -418,16 +418,26 @@ defmodule MishkaInstaller.Installer.DepHandler do
         else
           create_app_info(data, if(type == :git, do: type, else: :path))
           |> Map.from_struct()
+          |> rename_folder_to_appname(file_path)
           |> sync_app_with_database()
         end
     end
   end
 
-  defp check_app_status({:error, :package, status}, type) do
+  defp check_app_status({:error, :package, status}, type, _) do
     msg = if status == :not_found, do: "Are you sure you have entered the package name or url correctly?",
           else: "Unfortunately, we cannot connect to #{type} server now, please try other time! or make it correct"
     {:error, msg}
   end
+
+  defp rename_folder_to_appname(data, file_path) when not is_nil(file_path) and is_binary(file_path) do
+    file = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{Path.basename(file_path, ".zip")}"])
+    new_name = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{data.app}"])
+    File.rename!(file, new_name)
+    data
+  end
+
+  defp rename_folder_to_appname(data, _file_path), do: data
 
   defp sync_app_with_database(data) do
     if compare_version_with_installed_app(data.app, data.version) do
