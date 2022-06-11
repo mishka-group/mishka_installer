@@ -86,10 +86,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> run_request_handler(type)
   end
 
-  def run(:upload = _type, [file_path]) do
+  def run(:upload = type, [file_path]) do
     unzip_dep_folder(file_path)
     |> check_mix_file_and_get_ast(file_path)
     |> check_app_status(:upload)
+    |> run_request_handler(type)
   end
 
   def create_mix_file_and_start_compile(app_name) do
@@ -353,7 +354,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     {String.to_atom(data["app"]), "~> #{String.trim(data["version"])}"}
   end
 
-  defp mix_creator("upload", data) do
+  defp mix_creator("path", data) do
     uploaded_extension =
       Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{data["app"]}"])
     {String.to_atom(data["app"]), path: uploaded_extension}
@@ -415,7 +416,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         if Enum.any?(data, & (&1 == {:error, :package, :convert_ast_output})) do
           {:error, "Your mix.exs file must contain the app, version and source_url parameters"}
         else
-          create_app_info(data, if(type == :git, do: :git, else: :path))
+          create_app_info(data, if(type == :git, do: type, else: :path))
           |> Map.from_struct()
           |> sync_app_with_database()
         end
@@ -508,12 +509,23 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   end
 
-  defp create_app_info([app: app, version: version, source_url: source_url, tag: tag], type) when type in [:git, :path] do
+  defp create_app_info([app: app, version: version, source_url: source_url, tag: tag], :git) do
     %__MODULE__{
       app: "#{app}",
       version: "#{version}",
-      type: "#{type}",
+      type: "git",
       git_tag: tag,
+      url: "#{source_url}",
+      dependency_type: "force_update",
+      dependencies: []
+    }
+  end
+
+  defp create_app_info([app: app, version: version, source_url: source_url], :path)do
+    %__MODULE__{
+      app: "#{app}",
+      version: "#{version}",
+      type: "path",
       url: "#{source_url}",
       dependency_type: "force_update",
       dependencies: []
