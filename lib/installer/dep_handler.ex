@@ -418,7 +418,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         else
           create_app_info(data, if(type == :git, do: type, else: :path))
           |> Map.from_struct()
-          |> rename_folder_to_appname(file_path)
+          |> rename_folder_copy_to_deps(file_path)
           |> sync_app_with_database()
         end
     end
@@ -430,14 +430,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
     {:error, msg}
   end
 
-  defp rename_folder_to_appname(data, file_path) when not is_nil(file_path) and is_binary(file_path) do
+  defp rename_folder_copy_to_deps(data, file_path) when not is_nil(file_path) and is_binary(file_path) do
     file = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{Path.basename(file_path, ".zip")}"])
     new_name = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{data.app}"])
     File.rename!(file, new_name)
+    File.cp_r!(new_name, Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{data.app}"]))
     data
   end
 
-  defp rename_folder_to_appname(data, _file_path), do: data
+  defp rename_folder_copy_to_deps(data, _file_path), do: data
 
   defp sync_app_with_database(data) do
     if compare_version_with_installed_app(data.app, data.version) do

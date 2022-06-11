@@ -12,6 +12,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   def do_runtime(app, :add) when is_atom(app) do
     get_build_path()
     |> File.ls!()
+    |> Enum.reject(& &1 == ".DS_Store")
     |> compare_dependencies()
     |> prepend_compiled_apps()
     |> application_ensure(app, :add)
