@@ -92,19 +92,25 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   def handle_event("save", %{"select_form" => "upload"} = _params, socket) do
     uploaded_files =
       consume_uploaded_entries(socket, :dep, fn %{path: path}, entry ->
-        IO.inspect(entry)
         dest = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", entry.client_name])
         File.cp!(path, dest)
         {:ok, dest}
       end)
 
-    res = DepHandler.run(:upload, uploaded_files)
     new_socket =
-      socket
-      |> assign(:app_name, res["app_name"])
-      |> assign(:status_message, {res["status_message_type"], res["message"]})
-      |> assign(:selected_form, res["selected_form"])
-    {:noreply, update(new_socket, :uploaded_files, &(&1 ++ uploaded_files))}
+      if uploaded_files != [] do
+        res = DepHandler.run(:upload, uploaded_files)
+        socket
+        |> assign(:app_name, res["app_name"])
+        |> assign(:status_message, {res["status_message_type"], res["message"]})
+        |> assign(:selected_form, res["selected_form"])
+        |> update(:uploaded_files, &(&1 ++ uploaded_files))
+      else
+        socket
+        |> assign(:status_message, {:danger, "You should select a file."})
+      end
+
+    {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
@@ -166,7 +172,11 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           <br>
         <% end %>
         <input type="hidden" id="hidden_type" name="select_form" value="upload">
-        <button type="submit" class="btn btn-outline-secondary mt-4 mb-4">Upload .Zip file</button>
+        <%= if @uploads.dep.entries != [] do %>
+          <button type="submit" class="btn btn-outline-secondary mt-4 mb-4">Upload .Zip file</button>
+        <% else %>
+          <button type="submit" class="btn btn-outline-secondary mt-4 mb-4" disabled>Upload .Zip file</button>
+        <% end %>
         <br>
         <span class="mt-4 mb-4">
           <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Get from Hex</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git">Or from Git</a>
