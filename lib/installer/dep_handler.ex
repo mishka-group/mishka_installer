@@ -93,9 +93,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> run_request_handler(type)
   end
 
+  @spec create_mix_file_and_start_compile(String.t() | atom()) :: :ok
   def create_mix_file_and_start_compile(app_name) do
-    create_deps_json_file(MishkaInstaller.get_config(:project_path))
     mix_path = MishkaInstaller.get_config(:mix_path)
+    MixCreator.backup_mix(mix_path)
+    create_deps_json_file(MishkaInstaller.get_config(:project_path))
     list_json_dpes =
       Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
       |> Enum.any?(& !&1)
