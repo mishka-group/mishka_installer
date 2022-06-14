@@ -53,15 +53,15 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @spec do_deps_compile(String.t()) :: {:ok, :do_deps_compile, String.t()}| {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
-  def do_deps_compile(app) do
+  def do_deps_compile(app, type \\ :cmd) do
     # I delete the File.cwd!() as a default path because we need to back again, and it needs many conditions especially in DDD project
     with _cd_path <- File.cd(MishkaInstaller.get_config(:project_path)),
-         %{operation: "deps.get", output: _stream, status: 0} <- cmd("deps.get"),
+         %{operation: "deps.get", output: _stream, status: 0} <- exec("deps.get", type),
          deps_path <- Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{app}"]),
          {:change_dir, :ok} <- {:change_dir, File.cd(deps_path)},
-         {:inside_app, %{operation: "deps.get", output: _stream, status: 0}} <- {:inside_app, cmd("deps.get")},
-         %{operation: "deps.compile", output: _stream, status: 0} <- cmd("deps.compile"),
-         {:compile_main_app, %{operation: "compile", output: _stream, status: 0}} <- {:compile_main_app, cmd("compile")} do
+         {:inside_app, %{operation: "deps.get", output: _stream, status: 0}} <- {:inside_app, exec("deps.get", type)},
+         %{operation: "deps.compile", output: _stream, status: 0} <- exec("deps.compile", type),
+         {:compile_main_app, %{operation: "compile", output: _stream, status: 0}} <- {:compile_main_app, exec("compile", type)} do
       {:ok, :do_deps_compile, app}
     else
       %{operation: "deps.get", output: stream, status: 1} -> {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
@@ -111,14 +111,14 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
-  @spec cmd(binary, String.t()) :: %{operation: String.t(), output: Collectable.t, status: non_neg_integer()}
-  def cmd(command, operation \\ "mix") do
+  defp exec(command, type, operation \\ "mix")
+
+  defp exec(command, :cmd, operation) do
     {stream, status} = System.cmd(operation, [command], into: IO.stream(), stderr_to_stdout: true, env: [{"MIX_ENV", "#{Mix.env()}"}])
     %{operation: command, output: stream, status: status}
   end
 
-  @spec exec(binary, String.t()) :: %{operation: String.t(), output: list(), status: non_neg_integer()}
-  def exec(command, operation \\ "mix") do
+  defp exec(command, :port, operation) do
     path = System.find_executable("#{operation}")
     port = Port.open({:spawn_executable, path}, [:binary, :exit_status, args: [command], line: 1000, env: [{'MIX_ENV', '#{Mix.env()}'}]])
     start_exec_satet([])
