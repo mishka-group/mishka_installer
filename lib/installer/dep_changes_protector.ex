@@ -15,26 +15,32 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
+  @spec push(map(), String.t() | atom()) :: map()
   def push(app, status) do
     GenServer.call(__MODULE__, {:push, app: app, status: status})
   end
 
+  @spec get(String.t()) :: map()
   def get(app) do
     GenServer.call(__MODULE__, {:get, app})
   end
 
+  @spec get :: map()
   def get() do
     GenServer.call(__MODULE__, :get)
   end
 
+  @spec pop(String.t()) :: map()
   def pop(app) do
     GenServer.call(__MODULE__, {:pop, app})
   end
 
+  @spec clean :: :ok
   def clean() do
     GenServer.cast(__MODULE__, :clean)
   end
 
+  @spec deps(String.t(), atom()) :: :ok
   def deps(app, type \\ :port) do
     GenServer.cast(__MODULE__, {:deps, app, type})
   end
