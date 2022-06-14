@@ -37,3 +37,5 @@ mix.lock
 /deployment/
 /priv/repo/
 /config/
+
+.iex.exs
