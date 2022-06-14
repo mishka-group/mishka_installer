@@ -54,7 +54,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   @impl Phoenix.LiveView
   def handle_event("update_app", %{"type" => type} = _params, socket) when type in ["force_update", "soft_update"] do
     if type == "force_update" do
-      DepHandler.create_mix_file_and_start_compile(socket.assigns.app_name)
+      DepHandler.create_mix_file_and_start_compile(socket.assigns.app_name, :port)
     else
       Hook.call(event: @event, state: %OnChangeDependency{app: socket.assigns.app_name, status: :force_update}, operation: :no_return)
     end
@@ -68,7 +68,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "git", "url" => url, "git_tag" => tag}, socket) do
-    res = DepHandler.run(:git, %{url: url, tag: tag})
+    res = DepHandler.run(:git, %{url: url, tag: tag}, :port)
     new_socket =
       socket
       |> assign(:app_name, res["app_name"])
@@ -79,7 +79,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => app} = _params, socket) do
-    res = DepHandler.run(:hex, app)
+    res = DepHandler.run(:hex, app, :port)
     new_socket =
       socket
       |> assign(:app_name, res["app_name"])
@@ -99,7 +99,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
     new_socket =
       if uploaded_files != [] do
-        res = DepHandler.run(:upload, uploaded_files)
+        res = DepHandler.run(:upload, uploaded_files, :port)
         socket
         |> assign(:app_name, res["app_name"])
         |> assign(:status_message, {res["status_message_type"], res["message"]})

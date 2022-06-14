@@ -72,29 +72,30 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
+  def run(type, app, output_type \\ :cmd)
 
   @spec run(run(), app_name() | map() | list()) :: map()
-  def run(:hex = type, app) do
+  def run(:hex = type, app, output_type) do
     MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
     |> check_app_status(type, nil)
-    |> run_request_handler(type)
+    |> run_request_handler(type, output_type)
   end
 
-  def run(:git = type, app) do
+  def run(:git = type, app, output_type) do
     MishkaInstaller.Helper.Sender.package("github", %{"url" => app.url, "tag" => app.tag})
     |> check_app_status(type, nil)
-    |> run_request_handler(type)
+    |> run_request_handler(type, output_type)
   end
 
-  def run(:upload = type, [file_path]) do
+  def run(:upload = type, [file_path], output_type) do
     unzip_dep_folder(file_path)
     |> check_mix_file_and_get_ast(file_path)
     |> check_app_status(:upload, file_path)
-    |> run_request_handler(type)
+    |> run_request_handler(type, output_type)
   end
 
-  @spec create_mix_file_and_start_compile(String.t() | atom()) :: :ok
-  def create_mix_file_and_start_compile(app_name) do
+  @spec create_mix_file_and_start_compile(String.t() | atom(), atom()) :: :ok
+  def create_mix_file_and_start_compile(app_name, output_type) do
     mix_path = MishkaInstaller.get_config(:mix_path)
     MixCreator.backup_mix(mix_path)
     create_deps_json_file(MishkaInstaller.get_config(:project_path))
@@ -105,9 +106,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
     MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
     if list_json_dpes do
       Logger.warn("Try to re-create Mix file")
-      create_mix_file_and_start_compile(app_name)
+      create_mix_file_and_start_compile(app_name, output_type)
     else
-      DepChangesProtector.deps(app_name)
+      DepChangesProtector.deps(app_name, output_type)
     end
   end
 
@@ -481,10 +482,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  defp run_request_handler(status, type) do
+  defp run_request_handler(status, type, output_type) do
     case status do
       {:ok, :no_state, msg, app_name} ->
-        create_mix_file_and_start_compile(app_name)
+        create_mix_file_and_start_compile(app_name, output_type)
         %{"app_name" => app_name, "status_message_type" => :success, "message" => msg, "selected_form" => type}
       {:ok, :registered_app, msg, app_name} ->
         %{"app_name" => app_name, "status_message_type" => :info, "message" => msg, "selected_form" => :registered_app}
