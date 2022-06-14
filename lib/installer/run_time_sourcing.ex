@@ -3,6 +3,8 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   This module is created just for compiling and sourcing, hence if you want to work with Json file and the other compiling dependencies
   please see the `MishkaInstaller.Installer.DepHandler` module.
   """
+  use Agent
+  @module "run_time_sourcing"
 
   @type ensure() :: :bad_directory | :load | :no_directory | :sure_all_started
   @type do_runtime() :: :application_ensure | :prepend_compiled_apps
@@ -31,14 +33,9 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> delete_app_dir()
   end
 
-  defp delete_app_dir(false), do: {:error, :prepend_compiled_apps, :no_directory, []}
-  defp delete_app_dir(dir) do
-    Path.join(get_build_path(), ["#{dir}"])
-    |> File.rm_rf()
-    |> case do
-      {:ok, files_and_directories} -> {:ok, :delete_app_dir, files_and_directories}
-      {:error, reason, file} -> {:error, :delete_app_dir, reason, file}
-    end
+  @spec subscribe :: :ok | {:error, {:already_registered, pid}}
+  def subscribe do
+    Phoenix.PubSub.subscribe(MishkaInstaller.PubSub, @module)
   end
 
   @spec compare_dependencies([tuple()], [String.t()]) :: [String.t()]
@@ -114,6 +111,20 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
+  @spec cmd(binary, String.t()) :: %{operation: String.t(), output: Collectable.t, status: non_neg_integer()}
+  def cmd(command, operation \\ "mix") do
+    {stream, status} = System.cmd(operation, [command], into: IO.stream(), stderr_to_stdout: true, env: [{"MIX_ENV", "#{Mix.env()}"}])
+    %{operation: command, output: stream, status: status}
+  end
+
+  @spec exec(binary, String.t()) :: %{operation: String.t(), output: list(), status: non_neg_integer()}
+  def exec(command, operation \\ "mix") do
+    path = System.find_executable("#{operation}")
+    port = Port.open({:spawn_executable, path}, [:binary, :exit_status, args: [command], line: 1000, env: [{'MIX_ENV', '#{Mix.env()}'}]])
+    start_exec_satet([])
+    loop(port, command)
+  end
+
   defp application_ensure({:ok, :prepend_compiled_apps}, app, :add) do
     with {:load, :ok} <- {:load, Application.load(app)},
          {:sure_all_started, {:ok, _apps}} <- {:sure_all_started, Application.ensure_all_started(app)} do
@@ -141,8 +152,42 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   defp application_ensure(error, _app, _status), do: error
 
-  defp cmd(command, operation \\ "mix") do
-    {stream, status} = System.cmd(operation, [command], into: IO.stream(), stderr_to_stdout: true, env: [{"MIX_ENV", "#{Mix.env()}"}])
-    %{operation: command, output: stream, status: status}
+  defp loop(port, command) do
+    receive do
+      {^port, {:data, {:eol, msg}}} when is_binary(msg) ->
+        update_exec_satet([msg])
+        notify_subscribers(msg)
+        loop(port, command)
+      {^port, {:data, data}} ->
+        update_exec_satet([data])
+        notify_subscribers(data)
+        loop(port, command)
+      {^port, {:exit_status, exit_status}} ->
+        output = get_exec_state()
+        stop_exec_state()
+        %{operation: command, output: output, status: exit_status}
+    end
+  end
+
+  defp start_exec_satet(initial_value), do: Agent.start_link(fn -> initial_value end, name: __MODULE__)
+
+  defp update_exec_satet(new_value), do: Agent.get_and_update(__MODULE__, fn state -> {state, state ++ new_value} end)
+
+  defp get_exec_state(), do: Agent.get(__MODULE__, & &1)
+
+  defp stop_exec_state(), do: Agent.stop(__MODULE__)
+
+  defp notify_subscribers(answer) do
+    Phoenix.PubSub.broadcast(MishkaInstaller.PubSub, @module , {String.to_atom(@module), answer})
+  end
+
+  defp delete_app_dir(false), do: {:error, :prepend_compiled_apps, :no_directory, []}
+  defp delete_app_dir(dir) do
+    Path.join(get_build_path(), ["#{dir}"])
+    |> File.rm_rf()
+    |> case do
+      {:ok, files_and_directories} -> {:ok, :delete_app_dir, files_and_directories}
+      {:error, reason, file} -> {:error, :delete_app_dir, reason, file}
+    end
   end
 end
