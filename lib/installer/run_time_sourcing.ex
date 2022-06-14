@@ -52,7 +52,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> Enum.reject(& is_nil(&1))
   end
 
-  @spec do_deps_compile(String.t()) :: {:ok, :do_deps_compile, String.t()}| {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
+  @spec do_deps_compile(String.t() | :cmd | :port) :: {:ok, :do_deps_compile, String.t()}| {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
   def do_deps_compile(app, type \\ :cmd) do
     # I delete the File.cwd!() as a default path because we need to back again, and it needs many conditions especially in DDD project
     with _cd_path <- File.cd(MishkaInstaller.get_config(:project_path)),
@@ -118,6 +118,8 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     %{operation: command, output: stream, status: status}
   end
 
+  # Ref: https://hexdocs.pm/elixir/Port.html#module-spawn_executable
+  # Ref: https://elixirforum.com/t/how-to-send-line-by-line-of-system-cmd-to-liveview-when-a-task-is-running/48336/
   defp exec(command, :port, operation) do
     path = System.find_executable("#{operation}")
     port = Port.open({:spawn_executable, path}, [:binary, :exit_status, args: [command], line: 1000, env: [{'MIX_ENV', '#{Mix.env()}'}]])

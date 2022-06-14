@@ -35,8 +35,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     GenServer.cast(__MODULE__, :clean)
   end
 
-  def deps(app) do
-    GenServer.cast(__MODULE__, {:deps, app})
+  def deps(app, type \\ :port) do
+    GenServer.cast(__MODULE__, {:deps, app, type})
   end
 
   @impl true
@@ -101,13 +101,13 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_info({:do_compile, app}, state) do
+  def handle_info({:do_compile, app, type}, state) do
     # TODO: Can be replaced with oban, Build queues for compiling and installing dependencies
     new_state =
       if is_nil(state.ref) do
         task =
           Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-            MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile(app)
+            MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile(app, type)
           end)
         {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
       else
@@ -160,8 +160,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
-  def handle_cast({:deps, app}, state) do
-    Process.send_after(self(), {:do_compile, app}, 100)
+  def handle_cast({:deps, app, type}, state) do
+    Process.send_after(self(), {:do_compile, app, type}, 100)
     {:noreply, state}
   end
 
