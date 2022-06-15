@@ -1,4 +1,40 @@
 defmodule MishkaInstaller.Hook do
+    @moduledoc """
+
+    ## ETS part to optimization state instead of dynamic supervisor and Genserver
+    `public` — Read/Write available to all processes.
+    `protected` — Read available to all processes. Only writable by owner process. This is the default.
+    `private` — Read/Write limited to owner process.
+
+    #### Essential functions in ETS
+    1.  :ets.new
+    ```elixir
+      :ets.new(@tab, [:set, :named_table, :public, read_concurrency: true, write_concurrency: true])
+    ```
+    2.  :ets.insert
+    3.  :ets.insert_new
+    4.  :ets.lookup
+    5.  :ets.match
+    6.  :ets.match_object
+    7.  :ets.select
+    8.  :ets.fun2ms
+    9.  :ets.delete
+    10. :dets.open_file
+    11. :ets.update_counter
+    12. :ets.delete_all_objects
+    13. :ets.tab2list - to spy on the data in the table
+    14. :ets.update_counter
+    15. :ets.all
+    16. :ets.info
+
+    ### Refs
+    * https://www.erlang.org/doc/man/ets.html
+    * https://dockyard.com/blog/2017/05/19/optimizing-elixir-and-phoenix-with-ets
+    * https://learnyousomeerlang.com/ets
+    * https://elixir-lang.org/getting-started/mix-otp/ets.html
+    * https://elixirschool.com/en/lessons/storage/ets
+    * https://github.com/TheFirstAvenger/ets
+  """
   alias MishkaInstaller.PluginState
   alias MishkaInstaller.PluginStateDynamicSupervisor, as: PSupervisor
   alias MishkaInstaller.Plugin
