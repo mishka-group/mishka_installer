@@ -19,6 +19,7 @@ defmodule MishkaInstaller.Application do
     end
 
     children = [
+      MishkaInstaller.PluginETS,
       {Finch, name: HexClientApi},
       {Registry, keys: :unique, name: PluginStateRegistry},
       {DynamicSupervisor, plugin_runner_config},

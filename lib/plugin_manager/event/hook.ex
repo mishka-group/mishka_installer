@@ -1,43 +1,8 @@
 defmodule MishkaInstaller.Hook do
-    @moduledoc """
-
-    ## ETS part to optimization state instead of dynamic supervisor and Genserver
-    `public` — Read/Write available to all processes.
-    `protected` — Read available to all processes. Only writable by owner process. This is the default.
-    `private` — Read/Write limited to owner process.
-
-    #### Essential functions in ETS
-    1.  :ets.new
-    ```elixir
-      :ets.new(@tab, [:set, :named_table, :public, read_concurrency: true, write_concurrency: true])
-    ```
-    2.  :ets.insert
-    3.  :ets.insert_new
-    4.  :ets.lookup
-    5.  :ets.match
-    6.  :ets.match_object
-    7.  :ets.select
-    8.  :ets.fun2ms
-    9.  :ets.delete
-    10. :dets.open_file
-    11. :ets.update_counter
-    12. :ets.delete_all_objects
-    13. :ets.tab2list - to spy on the data in the table
-    14. :ets.update_counter
-    15. :ets.all
-    16. :ets.info
-
-    ### Refs
-    * https://www.erlang.org/doc/man/ets.html
-    * https://dockyard.com/blog/2017/05/19/optimizing-elixir-and-phoenix-with-ets
-    * https://learnyousomeerlang.com/ets
-    * https://elixir-lang.org/getting-started/mix-otp/ets.html
-    * https://elixirschool.com/en/lessons/storage/ets
-    * https://github.com/TheFirstAvenger/ets
-  """
   alias MishkaInstaller.PluginState
   alias MishkaInstaller.PluginStateDynamicSupervisor, as: PSupervisor
   alias MishkaInstaller.Plugin
+  alias MishkaInstaller.PluginETS
   @allowed_fields [:name, :event, :priority, :status, :depend_type, :depends, :extra, :id]
 
   @type event() :: String.t()
@@ -51,14 +16,16 @@ defmodule MishkaInstaller.Hook do
       with {:ok, :ensure_event, _msg} <- ensure_event(event, :debug),
            {:error, :get_record_by_field, :plugin} <- Plugin.show_by_name("#{event.name}"),
            {:ok, :add, :plugin, _record_info} <- Plugin.create(event, @allowed_fields) do
-            PluginState.push_call(event)
+            PluginState.push_call(event) # Create a Genserver with DynamicSupervisor
+            PluginETS.push(event) # Save all event info into ETS, Existed-key is overwritten
             {:ok, :register, :activated}
       else
         {:error, :ensure_event, %{errors: check_data}} ->
           MishkaInstaller.plugin_activity("add", Map.merge(event, %{extra: extra}) , "high", "error")
           {:error, :register, check_data}
         {:ok, :get_record_by_field, :plugin, record_info} ->
-          PluginState.push_call(plugin_state_struct(record_info))
+          PluginState.push_call(plugin_state_struct(record_info)) # Create a Genserver with DynamicSupervisor
+          PluginETS.push(plugin_state_struct(record_info)) # Save all event info into ETS, Existed-key is overwritten
           {:ok, :register, :activated}
         {:error, :add, :plugin, repo_error} ->
           MishkaInstaller.plugin_activity("add", Map.merge(event, %{extra: extra}) , "high", "error")
@@ -68,7 +35,8 @@ defmodule MishkaInstaller.Hook do
   end
 
   def register(event: %PluginState{} = event, depends: :force) do
-    PluginState.push_call(event)
+    PluginState.push_call(event) # Create a Genserver with DynamicSupervisor
+    PluginETS.push(event) # Save all event info into ETS
     {:ok, :register, :force}
   end
 
@@ -77,7 +45,8 @@ defmodule MishkaInstaller.Hook do
   def start(module: module_name) do
     with {:ok, :get_record_by_field, :plugin, record_info} <- Plugin.show_by_name("#{module_name}"),
          {:ok, :ensure_event, _msg} <- ensure_event(plugin_state_struct(record_info), :debug) do
-          PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
+          PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started})) # Create a Genserver with DynamicSupervisor
+          PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started})) # Save all event info into ETS, Existed-key is overwritten
           {:ok, :start, "The module's status was changed"}
     else
       {:error, :get_record_by_field, :plugin} -> {:error, :start, "The module concerned doesn't exist in the database."}
@@ -87,7 +56,8 @@ defmodule MishkaInstaller.Hook do
 
   def start(module: module_name, depends: :force) do
     with {:ok, :get_record_by_field, :plugin, record_info} <- Plugin.show_by_name("#{module_name}") do
-      PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
+      PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started})) # Create a Genserver with DynamicSupervisor
+      PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started})) # Save all event info into ETS, Existed-key is overwritten
       {:ok, :start, :force}
     else
       {:error, :get_record_by_field, :plugin} -> {:error, :start, "The module concerned doesn't exist in the database."}
@@ -110,7 +80,8 @@ defmodule MishkaInstaller.Hook do
     with {:ok, :delete} <- PluginState.delete(module: module_name),
          {:ok, :get_record_by_field, :plugin, record_info} <- Plugin.show_by_name("#{module_name}"),
          {:ok, :ensure_event, _msg} <- ensure_event(plugin_state_struct(record_info), :debug) do
-          PluginState.push_call(plugin_state_struct(record_info))
+          PluginState.push_call(plugin_state_struct(record_info)) # Create a Genserver with DynamicSupervisor
+          PluginETS.push(plugin_state_struct(record_info)) # Save all event info into ETS, Existed-key is overwritten
           {:ok, :restart, "The module concerned was restarted"}
     else
       {:error, :delete, :not_found} -> {:error, :restart, "The module concerned doesn't exist in the state."}
@@ -122,7 +93,8 @@ defmodule MishkaInstaller.Hook do
   def restart(module: module_name, depends: :force) do
     with {:ok, :delete} <- PluginState.delete(module: module_name),
          {:ok, :get_record_by_field, :plugin, record_info} <- Plugin.show_by_name("#{module_name}") do
-          PluginState.push_call(plugin_state_struct(record_info))
+          PluginState.push_call(plugin_state_struct(record_info)) # Create a Genserver with DynamicSupervisor
+          PluginETS.push(plugin_state_struct(record_info)) # Save all event info into ETS, Existed-key is overwritten
           {:ok, :restart, "The module concerned was restarted"}
     else
       {:error, :delete, :not_found} -> {:error, :restart, "The module concerned doesn't exist in the state."}
