@@ -450,7 +450,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
           {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
 
         {:ok, :edit, :dependency, repo_data} ->
-          if MishkaInstaller.PluginState.get_all(event: @event) == [] do
+          if MishkaInstaller.PluginETS.get_all(event: @event) == [] do
             {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
           else
             {:ok, :registered_app,
