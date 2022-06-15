@@ -25,6 +25,7 @@ defmodule MishkaInstaller.Application do
       {DynamicSupervisor, plugin_runner_config},
       {Task.Supervisor, name: MishkaInstaller.Activity},
       {Task.Supervisor, name: DepChangesProtectorTask},
+      {Task.Supervisor, name: PluginEtsTask},
       {Phoenix.PubSub, name: MishkaInstaller.PubSub},
       MishkaInstaller.Installer.DepChangesProtector,
       MishkaInstaller.Installer.UpdateChecker,

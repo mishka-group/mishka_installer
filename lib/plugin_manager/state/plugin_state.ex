@@ -184,6 +184,7 @@ defmodule MishkaInstaller.PluginState do
   def terminate(reason, %PluginState{} = state) do
     MishkaInstaller.plugin_activity("read", state, "high", "throw")
     if reason != :normal do
+      Task.Supervisor.start_child(PluginEtsTask, fn -> MishkaInstaller.PluginETS.sync_with_database() end)
       Logger.warn(
         "#{Map.get(state, :name)} from #{Map.get(state, :event)} event of Plugins manager was Terminated,
         Reason of Terminate #{inspect(reason)}"

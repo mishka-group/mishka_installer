@@ -2,7 +2,7 @@
 
 - [x] Create run time updating dependencies
 - [x] Prepare a structure to add developer extensions
-- [ ] Call extensions from ETS
+- [x] Call extensions from ETS
 - [ ] Add non-use of Call Hook
 - [ ] Add private information into state, read only data
 - [x] Accept developer `git` for installing an extension

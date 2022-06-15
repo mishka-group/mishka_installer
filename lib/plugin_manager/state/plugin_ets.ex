@@ -38,19 +38,30 @@ defmodule MishkaInstaller.PluginETS do
   use GenServer
   require Logger
   @ets_table :plugin_ets_state
+  @sync_with_database 100_000
+
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
   @impl true
   def init(_state) do
-    Logger.warn("The ETS state of plugin was staretd")
+    Logger.info("The ETS state of plugin was staretd")
+    Process.send_after(self(), :sync_with_database, @sync_with_database)
     {:ok, %{set: ETS.Set.new!(name: @ets_table, protection: :public, read_concurrency: true, write_concurrency: true)}}
   end
 
   @impl true
   def terminate(_reason, _state) do
     Logger.warn("Your ETS state of plugin was restarted by a problem")
+    sync_with_database()
+  end
+
+  @impl true
+  def handle_info(:sync_with_database, state) do
+    Logger.info("Plugin ETS state was synced with database")
+    Process.send_after(self(), :sync_with_database, @sync_with_database)
+    {:noreply, state}
   end
 
   def push(%MishkaInstaller.PluginState{name: name, event: event} = state) do
@@ -84,5 +95,11 @@ defmodule MishkaInstaller.PluginETS do
         start_link([])
         table()
     end
+  end
+
+  def sync_with_database() do
+    MishkaInstaller.Plugin.plugins()
+    |> Enum.reject(& (&1.status in [:stopped]))
+    |> Enum.map(&push/1)
   end
 end
