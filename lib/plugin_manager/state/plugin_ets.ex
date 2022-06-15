@@ -57,12 +57,16 @@ defmodule MishkaInstaller.PluginETS do
     ETS.Set.put!(table(), {String.to_atom(name), event, state})
   end
 
-  def get(name) do
-    ETS.Set.get(table(), String.to_atom(name))
+  def get(module: name) do
+    case ETS.Set.get(table(), String.to_atom(name)) do
+      {:ok, {_key, _event, data}} -> data
+      _ -> {:error, :get, :not_found}
+    end
   end
 
   def get_all(event: event_name) do
-    ETS.Set.match(table(), {:"$1", event_name, :"$3"})
+    ETS.Set.match!(table(), {:_, event_name, :"$3"})
+    |> Enum.map(&List.first/1)
   end
 
   def delete(module: module_name) do

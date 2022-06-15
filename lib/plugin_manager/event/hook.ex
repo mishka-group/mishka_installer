@@ -126,7 +126,9 @@ defmodule MishkaInstaller.Hook do
           list | {:error, :stop, String.t()} | {:ok, :stop, String.t()}
   def stop(module: module_name) do
     case PluginState.stop(module: module_name) do
-      {:ok, :stop} -> {:ok, :stop, "The module concerned was stopped"}
+      {:ok, :stop} ->
+        PluginETS.delete(module: module_name)
+        {:ok, :stop, "The module concerned was stopped"}
       {:error, :stop, :not_found} -> {:error, :stop, "The module concerned doesn't exist in database."}
     end
   end
@@ -140,7 +142,9 @@ defmodule MishkaInstaller.Hook do
           list | {:error, :delete, String.t()} | {:ok, :delete, String.t()}
   def delete(module: module_name) do
     case PluginState.delete(module: module_name) do
-      {:ok, :delete} -> {:ok, :delete, "The module's state (#{module_name}) was deleted"}
+      {:ok, :delete} ->
+        PluginETS.delete(module: module_name)
+        {:ok, :delete, "The module's state (#{module_name}) was deleted"}
       {:error, :delete, :not_found} -> {:error, :delete, "The module concerned (#{module_name}) doesn't exist in the state."}
     end
   end
@@ -180,7 +184,7 @@ defmodule MishkaInstaller.Hook do
   end
 
   def call(event: event_name, state: state) do
-    PluginState.get_all(event: event_name)
+    PluginETS.get_all(event: event_name)
     |> sorted_plugins()
     |> run_plugin_state({:reply, state})
   rescue
@@ -241,7 +245,7 @@ defmodule MishkaInstaller.Hook do
   defp check_dependencies(depends, event_name) do
     Enum.map(depends, fn evn ->
       with {:ensure_loaded, true} <- {:ensure_loaded, Code.ensure_loaded?(String.to_atom("Elixir.#{evn}"))},
-           plugin_state <- PluginState.get(module: evn),
+           plugin_state <- PluginETS.get(module: evn),
            {:plugin_state?, true, _state} <- {:plugin_state?, is_struct(plugin_state), plugin_state},
            {:activated_plugin, true, _state} <- {:activated_plugin, Map.get(plugin_state, :status) == :started, plugin_state} do
 
