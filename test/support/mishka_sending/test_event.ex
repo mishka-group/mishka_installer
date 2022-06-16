@@ -5,7 +5,7 @@ defmodule MsihkaSendingEmailPlugin.TestEvent do
     It should be noted; This process does not interfere with the main operation of the system.
     It is just a sender and is active for both side endpoints.
   """
-  defstruct [:user_info, :ip, :endpoint]
+  defstruct [:user_info, :ip, :endpoint, private: %{}]
 
   @type user_info() :: map()
   @type conn() :: Plug.Conn.t()
@@ -14,8 +14,9 @@ defmodule MsihkaSendingEmailPlugin.TestEvent do
   @type endpoint() :: :html | :api # API, HTML
   @type ref() :: :on_test_event # Name of this event
   @type reason() :: map() | String.t() # output of state for this event
+  @type private() :: map()
   @type registerd_info() :: MishkaInstaller.PluginState.t() # information about this plugin on state which was saved
-  @type state() :: %__MODULE__{user_info: user_info(), ip: ip(), endpoint: endpoint()}
+  @type state() :: %__MODULE__{user_info: user_info(), ip: ip(), endpoint: endpoint(), private: private()}
   @type t :: state() # help developers to keep elixir style
   @type optional_callbacks :: {:ok, ref(), registerd_info()} | {:error, ref(), reason()}
 

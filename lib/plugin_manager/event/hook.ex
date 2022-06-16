@@ -184,9 +184,12 @@ defmodule MishkaInstaller.Hook do
   end
 
   def call(event: event_name, state: state) do
-    PluginETS.get_all(event: event_name)
-    |> sorted_plugins()
-    |> run_plugin_state({:reply, state})
+    call_output =
+      PluginETS.get_all(event: event_name)
+      |> sorted_plugins()
+      |> run_plugin_state({:reply, state})
+
+    if !is_nil(Map.get(state, :private)), do: Map.merge(call_output, %{private: state.private}), else: call_output
   rescue
     _e -> state
   end

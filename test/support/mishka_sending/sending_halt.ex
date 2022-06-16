@@ -15,7 +15,7 @@ defmodule MsihkaSendingEmailPlugin.SendingHalt do
   end
 
   def call(%TestEvent{} = state) do
-    new_state = if state.ip == "128.0.1.1", do: Map.merge(state, %{ip: "129.0.1.1"}), else: state
+    new_state = if state.ip == "128.0.1.1", do: Map.merge(state, %{ip: "129.0.1.1", private: %{acl: 1}}), else: state
     {:reply, :halt, new_state}
   end
 end

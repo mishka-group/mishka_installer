@@ -25,5 +25,6 @@
 - [x] Mix deps creator
 - [x] Add run function for adding a new dep
 - [ ] Use fixed-issue of deletion from MishkaDeveloperTools [#9](https://github.com/mishka-group/mishka_developer_tools/issues/9)
+- [x] Create a simple setting `ets`[#4](https://github.com/mishka-group/mishka_installer/issues/4)
 
 > Accepting zip file of release is not supported in this version

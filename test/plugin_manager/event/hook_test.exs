@@ -159,7 +159,8 @@ defmodule MishkaInstallerTest.Event.HookTest do
     sample_of_login_state = %MsihkaSendingEmailPlugin.TestEvent{
       user_info: %{name: "shahryar"},
       ip: "127.0.1.1",
-      endpoint: :admin
+      endpoint: :admin,
+      private: %{acl: 0}
     }
 
     [
