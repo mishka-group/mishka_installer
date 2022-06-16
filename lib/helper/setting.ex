@@ -67,6 +67,7 @@ defmodule MishkaInstaller.Helper.Setting do
 
   @impl true
   def handle_info({:setting, :ok, action, repo_data}, state) do
+    Logger.warn("Your ETS state of setting is going to be updated")
     case action do
       :delete -> delete(repo_data.name)
       _ -> push(repo_data)
@@ -81,7 +82,7 @@ defmodule MishkaInstaller.Helper.Setting do
 
   def sync_with_database() do
     DBSetting.settings()
-    |> push()
+    |> Enum.map(&push/1)
   end
 
   defp check_custom_pubsub_loaded(state) do
