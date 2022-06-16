@@ -124,6 +124,13 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
+  def handle_info(:start_oban, state) do
+    Logger.info("We sent a request to start oban")
+    MishkaInstaller.Job.start_oban_in_runtime()
+    {:noreply, state}
+  end
+
+  @impl true
   def handle_info(:timeout, state) do
     Logger.info("We are waiting for your custom pubsub is loaded")
     check_custom_pubsub_loaded(state)
@@ -225,6 +232,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
       !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) -> {:noreply, state, 100}
       true ->
         Process.send_after(self(), :check_json, @re_check_json_time)
+        Process.send_after(self(), :start_oban, @re_check_json_time)
         MishkaInstaller.Dependency.subscribe()
         {:noreply, state}
     end

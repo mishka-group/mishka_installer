@@ -4,6 +4,7 @@
 - [x] Prepare a structure to add developer extensions
 - [x] Call extensions from ETS
 - [x] Add private information into state, read only data
+- [x] Add private parameters to event hooks
 - [x] Accept developer `git` for installing an extension
 - [x] Accept developer `hex` for installing an extension
 - [x] Accept admin `upload` file for installing an extension
@@ -16,14 +17,13 @@
 - [x] Add run function for adding a new dep
 - [x] Mix deps creator
 - [x] Create a simple setting `ets`[#4](https://github.com/mishka-group/mishka_installer/issues/4)
+- [x] Make behavior optional in plugin hook
 - [ ] Compatible MishkaCms with this version
 - [ ] Document improved and Wiki added
 - [ ] Compatible Docker shell with this version
-- [ ] Disable and make behavior optional in plugin hook
 - [ ] Make the lib comfortable with external Gettext [#12](https://github.com/mishka-group/mishka_installer/issues/12)
 - [ ] Create a GUI dashboard to install plugin and component [#5](https://github.com/mishka-group/mishka_installer/issues/5)
 - [ ] Update MishkaCms docker package for this version(volume `extensions.json`)
-- [ ] Add private parameters to event hooks
 - [ ] Use fixed-issue of deletion from MishkaDeveloperTools [#9](https://github.com/mishka-group/mishka_developer_tools/issues/9)
 
 > Accepting zip file of release is not supported in this version

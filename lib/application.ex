@@ -26,10 +26,11 @@ defmodule MishkaInstaller.Application do
       {Task.Supervisor, name: DepChangesProtectorTask},
       {Task.Supervisor, name: PluginEtsTask},
       {Phoenix.PubSub, name: MishkaInstaller.PubSub},
+      {Task.Supervisor, name: ObanSender},
       MishkaInstaller.PluginETS,
       MishkaInstaller.Installer.DepChangesProtector,
       MishkaInstaller.Installer.UpdateChecker,
-      MishkaInstaller.Helper.Setting,
+      MishkaInstaller.Helper.Setting
     ] ++ test_plugin
 
     opts = [strategy: :one_for_one, name: MishkaInstaller.Supervisor]
