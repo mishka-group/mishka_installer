@@ -6,9 +6,10 @@ defmodule MishkaInstaller.Job do
       plugins: [Oban.Plugins.Pruner],
       queues: [default: 10]
     )
-    Supervisor.start_link(
-      [{Oban, Application.fetch_env!(:mishka_installer, Oban)}],
-      [strategy: :one_for_one, name: MishkaInstaller.RunTimeObanSupervisor]
+    # Ref: https://elixirforum.com/t/how-to-start-oban-out-of-application-ex/48417/6
+    DynamicSupervisor.start_child(
+      MishkaInstaller.RunTimeObanSupervisor,
+      {Oban, Application.fetch_env!(:mishka_installer, Oban)}
     )
   end
 end

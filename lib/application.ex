@@ -3,11 +3,6 @@ defmodule MishkaInstaller.Application do
   alias MsihkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
   @impl true
   def start(_type, _args) do
-    plugin_runner_config = [
-      strategy: :one_for_one,
-      name: PluginStateOtpRunner
-    ]
-
     test_plugin = if Mix.env in [:test] do
       [
         %{id: SendingEmail, start: {SendingEmail, :start_link, [[]]}},
@@ -21,7 +16,8 @@ defmodule MishkaInstaller.Application do
     children = [
       {Finch, name: HexClientApi},
       {Registry, keys: :unique, name: PluginStateRegistry},
-      {DynamicSupervisor, plugin_runner_config},
+      {DynamicSupervisor, [ strategy: :one_for_one, name: PluginStateOtpRunner]},
+      {DynamicSupervisor, [strategy: :one_for_one, name: MishkaInstaller.RunTimeObanSupervisor]},
       {Task.Supervisor, name: MishkaInstaller.Activity},
       {Task.Supervisor, name: DepChangesProtectorTask},
       {Task.Supervisor, name: PluginEtsTask},
