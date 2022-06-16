@@ -10,7 +10,7 @@ defmodule <%= module_prefix %>.Repo.Migrations.CreateMishkaInistrallerSettingTab
       timestamps()
     end
     create(
-      index(:name, [:name],
+      index(:settings, [:name],
         name: :index_name_on_settings,
         unique: true
       )
