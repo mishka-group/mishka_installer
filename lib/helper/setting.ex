@@ -22,8 +22,7 @@ defmodule MishkaInstaller.Helper.Setting do
   end
 
   def get_all() do
-    ETS.Set.match!(table(), {:"$1", :"$2"})
-    |> Enum.map(&List.first/1)
+    ETS.Set.to_list!(table())
   end
 
   def delete(config_name) do
@@ -61,6 +60,7 @@ defmodule MishkaInstaller.Helper.Setting do
   @impl true
   def handle_info(:sync_with_database, state) do
     Logger.info("Setting ETS state was synced with database")
+    sync_with_database()
     Process.send_after(self(), :sync_with_database, @sync_with_database)
     {:noreply, state}
   end
