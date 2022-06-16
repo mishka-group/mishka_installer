@@ -29,4 +29,7 @@ Code.require_file("test_plugin_table.exs", __DIR__)
 Code.require_file("test_dep_table.exs", __DIR__)
 :ok = Ecto.Migrator.up(TestRepo, 2, MishkaInstaller.Repo.Migrations.TestDepTable, log: false)
 
+Code.require_file("test_setting_table.exs", __DIR__)
+:ok = Ecto.Migrator.up(TestRepo, 3, MishkaInstaller.Repo.Migrations.TestSettingTable, log: false)
+
 Process.flag(:trap_exit, true)

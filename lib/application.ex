@@ -19,7 +19,6 @@ defmodule MishkaInstaller.Application do
     end
 
     children = [
-      MishkaInstaller.PluginETS,
       {Finch, name: HexClientApi},
       {Registry, keys: :unique, name: PluginStateRegistry},
       {DynamicSupervisor, plugin_runner_config},
@@ -27,8 +26,10 @@ defmodule MishkaInstaller.Application do
       {Task.Supervisor, name: DepChangesProtectorTask},
       {Task.Supervisor, name: PluginEtsTask},
       {Phoenix.PubSub, name: MishkaInstaller.PubSub},
+      MishkaInstaller.PluginETS,
       MishkaInstaller.Installer.DepChangesProtector,
       MishkaInstaller.Installer.UpdateChecker,
+      MishkaInstaller.Helper.Setting,
     ] ++ test_plugin
 
     opts = [strategy: :one_for_one, name: MishkaInstaller.Supervisor]

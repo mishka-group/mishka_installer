@@ -44,6 +44,15 @@ defmodule MishkaInstaller.PluginETS do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
+  def child_spec(process_name) do
+    %{
+      id: __MODULE__,
+      start: {__MODULE__, :start_link, [process_name]},
+      restart: :transient,
+      max_restarts: 4
+    }
+  end
+
   @impl true
   def init(_state) do
     Logger.info("The ETS state of plugin was staretd")
@@ -88,7 +97,7 @@ defmodule MishkaInstaller.PluginETS do
     ETS.Set.match_delete(table(), {:_, event_name, :_})
   end
 
-  def table() do
+  defp table() do
     case ETS.Set.wrap_existing(@ets_table) do
       {:ok, set} -> set
       _ ->
