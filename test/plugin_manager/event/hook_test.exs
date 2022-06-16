@@ -8,6 +8,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     start_supervised(SendingEmail)
     start_supervised(SendingSMS)
     start_supervised(SendingHalt)
+    start_supervised(MishkaInstaller.PluginETS)
 
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
     # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
@@ -79,7 +80,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     Map.merge(@new_soft_plugin, %{name: "ensure_event_plugin", depend_type: :hard, depends: ["test1", "test2"]})
     |> Map.from_struct()
     |> MishkaInstaller.Plugin.create()
-    :timer.sleep(3000)
+
     {:error, :restart, _msg} = assert Hook.restart(module: "ensure_event_plugin")
     {:error, :restart, _msg} = assert Hook.restart(module: "none_plugin")
   end
@@ -91,7 +92,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     Map.merge(@new_soft_plugin, %{name: "ensure_event_plugin", depend_type: :hard, depends: ["test1", "test2"]})
     |> Map.from_struct()
     |> MishkaInstaller.Plugin.create()
-    :timer.sleep(3000)
+
     {:ok, :restart, _msg} = assert Hook.restart(module: @new_soft_plugin.name, depends: :force)
     {:error, :restart, _msg} = assert Hook.restart(module: "none_plugin", depends: :force)
   end
