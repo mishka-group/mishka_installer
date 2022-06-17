@@ -8,4 +8,11 @@ defmodule MishkaInstaller.DepCompileJob do
     Oban.pause_queue(queue: :compile_events)
     :ok
   end
+
+  @spec add_job(String.t(), atom()) :: {:error, any} | {:ok, Oban.Job.t()}
+  def add_job(app, type) do
+    %{app: app, type: type}
+    |> MishkaInstaller.DepCompileJob.new(queue: :compile_events)
+    |> Oban.insert()
+  end
 end

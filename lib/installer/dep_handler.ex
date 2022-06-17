@@ -516,7 +516,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp run_request_handler(status, type, output_type) do
     case status do
       {:ok, :no_state, msg, app_name} ->
-        create_mix_file_and_start_compile(app_name, output_type)
+        MishkaInstaller.DepCompileJob.add_job(app_name, output_type)
         %{"app_name" => app_name, "status_message_type" => :success, "message" => msg, "selected_form" => type}
       {:ok, :registered_app, msg, app_name} ->
         %{"app_name" => app_name, "status_message_type" => :info, "message" => msg, "selected_form" => :registered_app}

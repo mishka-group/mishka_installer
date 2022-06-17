@@ -92,6 +92,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
         notify_subscribers({:error, app_res, app_name})
         MishkaInstaller.dependency_activity(%{state: [{:error, do_runtime, app_name, operation: ensure, output: output}]}, "high")
     end
+    Oban.resume_queue(queue: :compile_events)
     {:noreply, state}
   end
 

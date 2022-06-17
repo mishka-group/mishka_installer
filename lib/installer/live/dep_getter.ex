@@ -54,7 +54,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   @impl Phoenix.LiveView
   def handle_event("update_app", %{"type" => type} = _params, socket) when type in ["force_update", "soft_update"] do
     if type == "force_update" do
-      DepHandler.create_mix_file_and_start_compile(socket.assigns.app_name, :port)
+      MishkaInstaller.DepCompileJob.add_job(socket.assigns.app_name, :port)
     else
       Hook.call(event: @event, state: %OnChangeDependency{app: socket.assigns.app_name, status: :force_update}, operation: :no_return)
     end
