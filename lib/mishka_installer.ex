@@ -62,7 +62,7 @@ defmodule MishkaInstaller do
     def start_oban_in_runtime() do
       opts = [repo: MishkaInstaller.repo, plugins: [Oban.Plugins.Pruner],
       queues: [
-        compile_events: [limit: 1, paused: true]
+        compile_events: [limit: 1]
         ]
       ]
       DynamicSupervisor.start_child(MishkaInstaller.RunTimeObanSupervisor, {Oban, opts})
