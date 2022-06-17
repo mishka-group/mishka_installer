@@ -109,19 +109,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info({:do_compile, app, type}, state) do
-    # TODO: Can be replaced with oban, Build queues for compiling and installing dependencies
-    new_state =
-      if is_nil(state.ref) do
-        task =
-          Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-            MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile(app, type)
-          end)
-        {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
-      else
-        Process.send_after(self(), {:do_compile, app}, @re_check_json_time)
-        {:noreply, state}
-      end
-      new_state
+    task =
+      Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
+        MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile(app, type)
+      end)
+    {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
   end
 
   @impl true
