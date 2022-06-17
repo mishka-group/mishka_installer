@@ -57,6 +57,17 @@ defmodule MishkaInstaller do
     end
   end
 
+    # Ref: https://elixirforum.com/t/how-to-start-oban-out-of-application-ex/48417/6
+    @spec start_oban_in_runtime :: {:error, any} | {:ok, pid}
+    def start_oban_in_runtime() do
+      opts = [repo: MishkaInstaller.repo, plugins: [Oban.Plugins.Pruner],
+      queues: [
+        compile_events: [limit: 1, paused: true]
+        ]
+      ]
+      DynamicSupervisor.start_child(MishkaInstaller.RunTimeObanSupervisor, {Oban, opts})
+    end
+
   defp activity_required_map(type, section, action, priority, status) do
     %{
       type: type,

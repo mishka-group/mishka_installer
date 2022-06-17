@@ -126,7 +126,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_info(:start_oban, state) do
     Logger.info("We sent a request to start oban")
-    MishkaInstaller.Job.start_oban_in_runtime()
+    MishkaInstaller.start_oban_in_runtime()
     {:noreply, state}
   end
 
