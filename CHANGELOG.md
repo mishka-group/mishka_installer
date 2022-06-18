@@ -18,6 +18,7 @@
 - [x] Mix deps creator
 - [x] Create a simple setting `ets`[#4](https://github.com/mishka-group/mishka_installer/issues/4)
 - [x] Make behavior optional in plugin hook
+- [x] Queue to install extensions with `Oban`
 - [ ] Compatible MishkaCms with this version
 - [ ] Document improved and Wiki added
 - [ ] Compatible Docker shell with this version
