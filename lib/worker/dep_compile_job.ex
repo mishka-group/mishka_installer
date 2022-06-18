@@ -6,6 +6,7 @@ defmodule MishkaInstaller.DepCompileJob do
   @spec perform(Oban.Job.t()) :: :ok
   def perform(%Oban.Job{args: %{"app" => app, "type" => type}}) when is_atom(type), do: run_compile(app, type)
   def perform(%Oban.Job{args: %{"app" => app, "type" => type}}) when is_binary(type), do: run_compile(app, String.to_atom(type))
+  def perform(%Oban.Job{args: %{"app" => app, "type" => _type}}), do: run_compile(app, :cmd)
 
   @spec add_job(String.t(), atom()) :: {:error, any} | {:ok, Oban.Job.t()}
   def add_job(app, type) do
