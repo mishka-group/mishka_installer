@@ -468,11 +468,17 @@ defmodule MishkaInstaller.Installer.DepHandler do
     if compare_version_with_installed_app(data.app, data.version) do
       case Dependency.create_or_update(data) do
         {:ok, :add, :dependency, repo_data} ->
-          {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
+          {:ok, :no_state,
+          "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue.",
+          repo_data.app
+        }
 
         {:ok, :edit, :dependency, repo_data} ->
           if MishkaInstaller.PluginETS.get_all(event: @event) == [] do
-            {:ok, :no_state,  "We could not find any registered-app that has important state, hence you can update safely.", repo_data.app}
+            {:ok, :no_state,
+            "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue.",
+            repo_data.app
+          }
           else
             {:ok, :registered_app,
             "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
