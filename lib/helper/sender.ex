@@ -21,6 +21,11 @@ defmodule MishkaInstaller.Helper.Sender do
     |> get_basic_information_form_github(String.trim(tag))
   end
 
+  def package("github_latest_release", url) do
+    new_url = String.replace(String.trim(url), "https://github.com/", "https://api.github.com/repos/") <> "/releases/latest"
+    send_build(:get, new_url)
+  end
+
   def package(_status, _app), do: {:error, :package, :not_tag}
 
   defp send_build(:get, url, request \\ :json) do

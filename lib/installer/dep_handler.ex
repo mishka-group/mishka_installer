@@ -287,16 +287,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     Path.join(path, ["deployment/", "extensions/", "extensions.json"])
   end
 
-  @spec is_there_update? :: boolean
-  def is_there_update?() do
-    if length(MishkaInstaller.Installer.UpdateChecker.get()) == 0, do: false, else: true
-  end
-
-  @spec is_there_update?(String.t()) :: boolean
-  def is_there_update?(app) do
-    if is_nil(MishkaInstaller.Installer.UpdateChecker.get(app)), do: false, else: true
-  end
-
   @spec create_deps_json_file(binary()) :: {:error, :check_or_create_deps_json, binary} | {:ok, :check_or_create_deps_json, binary}
   def create_deps_json_file(project_path) do
     case File.open(extensions_json_path(), [:write]) do

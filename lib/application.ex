@@ -25,7 +25,6 @@ defmodule MishkaInstaller.Application do
       {Task.Supervisor, name: ObanSender},
       MishkaInstaller.PluginETS,
       MishkaInstaller.Installer.DepChangesProtector,
-      MishkaInstaller.Installer.UpdateChecker,
       MishkaInstaller.Helper.Setting
     ] ++ test_plugin
 

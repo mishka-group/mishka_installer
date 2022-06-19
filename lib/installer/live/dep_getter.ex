@@ -294,7 +294,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:compiling_activities, assigns) do
     ~H"""
-    <section id="dep-getter" class="col-md-6 mx-auto text-center">
+    <section id="dep-compiling-activities" class="col-md-6 mx-auto text-center">
+      <h3 class="mb-3 text-start">Real-time activities of compiling output:</h3>
+      <hr class="mb-5 mt-5">
       <%= if @log == [], do: raw("<div class=\"alert alert-warning\">No activity is running</div>") %>
       <section id="mishka-log-show" class="container mx-auto text-start" style="max-height: 200px; overflow-x: hidden; overflow-y: scroll;" phx-update="append">
         <%= for l <- @log do %>
@@ -311,9 +313,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:installed_plugins, assigns) do
     ~H"""
-    <section id="dep-getter" class="col-md-6 mx-auto">
+    <section id="dep-installed-plugins" class="col-md-6 mx-auto">
       <div class="bd-callout bd-callout-info mb-5">
-        <h3 class="mb-3" id="using-embedded-svg">Installed Apps</h3>
+        <h3 class="mb-3">Installed Apps:</h3>
         <p>
           It should be noted the <span class="text-primary">blue</span> apps exist in JSON file, and it is added by administrator and another apps exist in core, or they are sub-dependencies.
           Each time a new update comes in for one of the plugins, the <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down text-warning" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/><path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/></svg> image comes next to it
@@ -342,6 +344,47 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     """
   end
 
+  defp dep_form(:install_tools, assigns) do
+    ~H"""
+    <section id="dep-install-tools" class="col-md-6 mx-auto">
+      <h3 class="mb-3">Tools to manage extensions:</h3>
+      <hr class="mb-5 mt-5">
+      <div class="row">
+        <div class="col-sm-4 mb-3">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Backup <code>Mix.exs</code> file</h5>
+              <p class="card-text">With supporting text below as a natural lead-in to additional content.</p>
+              <a href="#" class="btn btn-outline-primary">Backup</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-4 mb-3">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Restore <code>Mix.exs</code> file</h5>
+              <p class="card-text">With supporting text below as a natural lead-in to additional content.</p>
+              <a href="#" class="btn btn-outline-primary">Restore</a>
+            </div>
+          </div>
+        </div>
+        <div class="col-sm-4 mb-3">
+          <div class="card">
+            <div class="card-body">
+              <h5 class="card-title">Count <code>Compile</code> Tasks</h5>
+              <p class="card-text">With supporting text below as a natural lead-in to additional content.</p>
+              <a href="#" class="btn btn-outline-primary">Recalculate</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <p class="mt-4 mb-4 text-center">
+        <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload">Upload</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Get from Hex</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git">Or from Git</a>
+      </p>
+    </section>
+    """
+  end
+
   defp icon(assigns) do
     ~H"""
     <p id="dep-icon-getter" class="col-md-6 mx-auto text-end">
@@ -355,7 +398,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           <path d="M6 0a.5.5 0 0 1 .5.5V3h3V.5a.5.5 0 0 1 1 0V3h1a.5.5 0 0 1 .5.5v3A3.5 3.5 0 0 1 8.5 10c-.002.434-.01.845-.04 1.22-.041.514-.126 1.003-.317 1.424a2.083 2.083 0 0 1-.97 1.028C6.725 13.9 6.169 14 5.5 14c-.998 0-1.61.33-1.974.718A1.922 1.922 0 0 0 3 16H2c0-.616.232-1.367.797-1.968C3.374 13.42 4.261 13 5.5 13c.581 0 .962-.088 1.218-.219.241-.123.4-.3.514-.55.121-.266.193-.621.23-1.09.027-.34.035-.718.037-1.141A3.5 3.5 0 0 1 4 6.5v-3a.5.5 0 0 1 .5-.5h1V.5A.5.5 0 0 1 6 0zM5 4v2.5A2.5 2.5 0 0 0 7.5 9h1A2.5 2.5 0 0 0 11 6.5V4H5z"/>
         </svg>
       </span>
-      <span phx-click="form_select" phx-value-type="update_list">
+      <span phx-click="form_select" phx-value-type="install_tools">
         <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" class="bi bi-braces" viewBox="0 0 16 16">
           <path d="M2.114 8.063V7.9c1.005-.102 1.497-.615 1.497-1.6V4.503c0-1.094.39-1.538 1.354-1.538h.273V2h-.376C3.25 2 2.49 2.759 2.49 4.352v1.524c0 1.094-.376 1.456-1.49 1.456v1.299c1.114 0 1.49.362 1.49 1.456v1.524c0 1.593.759 2.352 2.372 2.352h.376v-.964h-.273c-.964 0-1.354-.444-1.354-1.538V9.663c0-.984-.492-1.497-1.497-1.6zM13.886 7.9v.163c-1.005.103-1.497.616-1.497 1.6v1.798c0 1.094-.39 1.538-1.354 1.538h-.273v.964h.376c1.613 0 2.372-.759 2.372-2.352v-1.524c0-1.094.376-1.456 1.49-1.456V7.332c-1.114 0-1.49-.362-1.49-1.456V4.352C13.51 2.759 12.75 2 11.138 2h-.376v.964h.273c.964 0 1.354.444 1.354 1.538V6.3c0 .984.492 1.497 1.497 1.6z"/>
         </svg>
