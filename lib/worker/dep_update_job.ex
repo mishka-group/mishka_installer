@@ -19,6 +19,7 @@ defmodule MishkaInstaller.DepUpdateJob do
   end
 
   defp check_added_dependencies_update() do
+    Logger.warn("DepUpdateJob request was sent")
     MishkaInstaller.Installer.DepHandler.read_dep_json()
     |> send_update_request_based_on_type()
     |> store_update_information_into_ets(ets())
@@ -54,15 +55,8 @@ defmodule MishkaInstaller.DepUpdateJob do
   end
 
   defp create_update_request(%{"type" => "git", "git_tag" => _tag} = json_data) do
-    case Sender.package("github_latest_release", json_data["url"]) do
-      {:ok, :package, %{"name" => "", "tag_name" => version}} ->
-        {:ok, {String.to_atom(json_data["app"]), :git, json_data["url"], version}, version_compare(version, json_data["version"], :git, json_data["app"])}
-      {:ok, :package, %{"name" => version}} ->
-        {:ok, {String.to_atom(json_data["app"]), :git, json_data["url"], version}, version_compare(version, json_data["version"], :git, json_data["app"])}
-      {:error, :package, error_status} ->
-        MishkaInstaller.update_activity(%{app: json_data["app"], type: :git, status: error_status}, "high")
-        {:error, :git, json_data, error_status}
-    end
+    Sender.package("github_latest_tag", json_data["url"])
+    |> github_tag(json_data)
   end
 
   defp create_update_request(%{"type" => "hex"} = json_data) do
@@ -73,6 +67,18 @@ defmodule MishkaInstaller.DepUpdateJob do
         MishkaInstaller.update_activity(%{app: json_data["app"], type: :hex, status: error_status}, "high")
         {:error, :hex, json_data, error_status}
     end
+  end
+
+  defp github_tag({:ok, :package, []}, json_data), do: {:error, :git, json_data, :empty_tag_list}
+
+  defp github_tag({:ok, :package, pkg}, json_data) do
+    version = List.first(pkg)["name"]
+    {:ok, {String.to_atom(json_data["app"]), :git, json_data["url"], version}, version_compare(version, json_data["version"], :git, json_data["app"])}
+  end
+
+  defp github_tag({:error, :package, error_status}, json_data) do
+    MishkaInstaller.update_activity(%{app: json_data["app"], type: :hex, status: error_status}, "high")
+    {:error, :git, json_data, error_status}
   end
 
   defp notify_subscribers(_answer) do
@@ -100,7 +106,9 @@ defmodule MishkaInstaller.DepUpdateJob do
 
   def ets() do
     case ETS.Set.new(name: @ets_table, protection: :public, read_concurrency: true, write_concurrency: true) do
-      {:ok, set} -> set
+      {:ok, set} ->
+        Logger.info("Dependency Update ETS storage was started")
+        set
       {:error, :table_already_exists} -> ETS.Set.wrap_existing!(@ets_table)
     end
   end

@@ -48,7 +48,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def init(_state) do
     Logger.info("OTP Dependencies changes protector server was started")
-    MishkaInstaller.DepUpdateJob.ets() # Start update ers
+    MishkaInstaller.DepUpdateJob.ets() # Start update ets
     {:ok, %{data: nil, ref: nil}, {:continue, :check_json}}
   end
 

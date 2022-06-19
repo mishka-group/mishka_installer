@@ -4,8 +4,6 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
   alias MishkaInstaller.Installer.DepHandler
 
   # These are the sample dependencies we are using in MishkaCms
-  # We do not test is_there_update and is_there_update/1 function, because this function is a normal get state from a genserver
-  # We do not test dependency_changes_notifier/2, because this function is a normal get state from a genserver and the event hook was tested
   @old_ueberauth %DepHandler{
     app: "ueberauth",
     version: "0.6.3",

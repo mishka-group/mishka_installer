@@ -60,11 +60,19 @@ defmodule MishkaInstaller do
     # Ref: https://elixirforum.com/t/how-to-start-oban-out-of-application-ex/48417/6
     @spec start_oban_in_runtime :: {:error, any} | {:ok, pid}
     def start_oban_in_runtime() do
-      opts = [repo: MishkaInstaller.repo, plugins: [Oban.Plugins.Pruner],
-      queues: [
-        compile_events: [limit: 1]
+      opts =
+        [
+          repo: MishkaInstaller.repo,
+          queues: [compile_events: [limit: 1], update_events: [limit: 1]],
+          plugins: [
+            Oban.Plugins.Pruner,
+            {Oban.Plugins.Cron,
+              crontab: [
+                {"* * * * *", MishkaInstaller.DepUpdateJob}
+              ]
+            }
+          ]
         ]
-      ]
       DynamicSupervisor.start_child(MishkaInstaller.RunTimeObanSupervisor, {Oban, opts})
     end
 

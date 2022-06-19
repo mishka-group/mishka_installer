@@ -22,7 +22,6 @@ defmodule MishkaInstaller.Application do
       {Task.Supervisor, name: DepChangesProtectorTask},
       {Task.Supervisor, name: PluginEtsTask},
       {Phoenix.PubSub, name: MishkaInstaller.PubSub},
-      {Task.Supervisor, name: ObanSender},
       MishkaInstaller.PluginETS,
       MishkaInstaller.Installer.DepChangesProtector,
       MishkaInstaller.Helper.Setting
