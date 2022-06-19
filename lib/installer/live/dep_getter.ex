@@ -129,6 +129,49 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   end
 
   @impl Phoenix.LiveView
+  def handle_event("tools", %{"type" => "restore"}, socket) do
+    mix_path = MishkaInstaller.get_config(:mix_path)
+    new_socket =
+      case MishkaInstaller.Installer.MixCreator.restore_mix(mix_path) do
+        {:ok, _output} ->
+          socket
+          |> assign(:status_message, {:info, "Your request was done"})
+        _ ->
+          socket
+          |> assign(:status_message, {:danger,
+            "Your request wasn't done, there is a problem, maybe you did not create backup before, or you have no access to this operation."
+          })
+      end
+    {:noreply, new_socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("tools", %{"type" => "backup"}, socket) do
+    mix_path = MishkaInstaller.get_config(:mix_path)
+    new_socket =
+      case MishkaInstaller.Installer.MixCreator.backup_mix(mix_path) do
+        {:ok, _output} ->
+          socket
+          |> assign(:status_message, {:info, "Your request was done"})
+        _ ->
+          socket
+          |> assign(:status_message, {:danger,
+            "Your request wasn't done, there is a problem, maybe you have no access to this operation."
+          })
+      end
+    {:noreply, new_socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("tools", %{"type" => "task"}, socket) do
+    list_app = length(MishkaInstaller.DepUpdateJob.get_all())
+    new_socket =
+      socket
+      |> assign(:status_message, {:info, "#{list_app} apps need to be updated"})
+    {:noreply, new_socket}
+  end
+
+  @impl Phoenix.LiveView
   def handle_info({:error, :dep_changes_protector, _answer, _app}, socket) do
     {:noreply, socket}
   end
@@ -326,10 +369,12 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <%= if app in Enum.map(DepHandler.compare_dependencies_with_json(), & &1.app) do %>
           <small id={Ecto.UUID.generate} class="d-inline-flex mb-3 px-2 py-1 fw-semibold text-primary bg-primary bg-opacity-10 border border-success border-opacity-10 rounded-2">
             <%= "#{app}" %> in v<%= "#{ver}" %> &nbsp;
+            <%= if app in Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, :git, _url, _ver} -> app end) do %>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down" viewBox="0 0 16 16">
               <path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/>
               <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/>
             </svg>
+            <% end %>
           </small>
         <% else %>
           <small id={Ecto.UUID.generate} class="d-inline-flex mb-3 px-2 py-1 fw-semibold text-success bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">
@@ -347,6 +392,13 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   defp dep_form(:install_tools, assigns) do
     ~H"""
     <section id="dep-install-tools" class="col-md-6 mx-auto">
+      <% {status, message} = @status_message %>
+        <%= if !is_nil(message) do %>
+          <div class="container" id="dep-status-msg">
+            <div class={"alert alert-#{status}"} role="alert" phx-click="clean_error"><%= message %></div>
+            <div class="container h-25 d-inline-block"></div>
+          </div>
+      <% end %>
       <h3 class="mb-3">Tools to manage extensions:</h3>
       <hr class="mb-5 mt-5">
       <div class="row">
@@ -354,8 +406,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           <div class="card">
             <div class="card-body">
               <h5 class="card-title">Backup <code>Mix.exs</code> file</h5>
-              <p class="card-text">With supporting text below as a natural lead-in to additional content.</p>
-              <a href="#" class="btn btn-outline-primary">Backup</a>
+              <p class="card-text">With this option, you can create a backup of your <code>Mix.exs</code> file.</p>
+              <a phx-click="tools" phx-value-type="backup" class="btn btn-outline-primary">Backup</a>
             </div>
           </div>
         </div>
@@ -363,17 +415,17 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           <div class="card">
             <div class="card-body">
               <h5 class="card-title">Restore <code>Mix.exs</code> file</h5>
-              <p class="card-text">With supporting text below as a natural lead-in to additional content.</p>
-              <a href="#" class="btn btn-outline-primary">Restore</a>
+              <p class="card-text">With this option, you can restore your backup of your <code>Mix.exs</code> file.</p>
+              <a phx-click="tools" phx-value-type="restore" class="btn btn-outline-primary">Restore</a>
             </div>
           </div>
         </div>
         <div class="col-sm-4 mb-3">
           <div class="card">
             <div class="card-body">
-              <h5 class="card-title">Count <code>Compile</code> Tasks</h5>
-              <p class="card-text">With supporting text below as a natural lead-in to additional content.</p>
-              <a href="#" class="btn btn-outline-primary">Recalculate</a>
+              <h5 class="card-title">Number of required update apps</h5>
+              <p class="card-text">With this option you can count apps update</p>
+              <a phx-click="tools" phx-value-type="task" class="btn btn-outline-primary">Recalculate</a>
             </div>
           </div>
         </div>

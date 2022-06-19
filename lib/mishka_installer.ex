@@ -68,7 +68,7 @@ defmodule MishkaInstaller do
             Oban.Plugins.Pruner,
             {Oban.Plugins.Cron,
               crontab: [
-                {"* * * * *", MishkaInstaller.DepUpdateJob}
+                {"*/5 * * * *", MishkaInstaller.DepUpdateJob}
               ]
             }
           ]
