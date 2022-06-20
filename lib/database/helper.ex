@@ -24,7 +24,7 @@ defmodule MishkaInstaller.Database.Helper do
     validate_change(changeset, field, fn _, uuid ->
       case uuid(uuid) do
         {:ok, :uuid, _record_id} -> []
-        {:error, :uuid} -> [{field, options[:message] || "ID should be as a UUID type."}]
+        {:error, :uuid} -> [{field, options[:message] || Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "ID should be as a UUID type.")}]
       end
     end)
   end

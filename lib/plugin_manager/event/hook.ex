@@ -47,9 +47,9 @@ defmodule MishkaInstaller.Hook do
          {:ok, :ensure_event, _msg} <- ensure_event(plugin_state_struct(record_info), :debug) do
           PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started})) # Create a Genserver with DynamicSupervisor
           PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started})) # Save all event info into ETS, Existed-key is overwritten
-          {:ok, :start, "The module's status was changed"}
+          {:ok, :start, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module's status was changed")}
     else
-      {:error, :get_record_by_field, :plugin} -> {:error, :start, "The module concerned doesn't exist in the database."}
+      {:error, :get_record_by_field, :plugin} -> {:error, :start, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist in the database.")}
       {:error, :ensure_event, %{errors: check_data}} -> {:error, :start, check_data}
     end
   end
@@ -60,7 +60,7 @@ defmodule MishkaInstaller.Hook do
       PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started})) # Save all event info into ETS, Existed-key is overwritten
       {:ok, :start, :force}
     else
-      {:error, :get_record_by_field, :plugin} -> {:error, :start, "The module concerned doesn't exist in the database."}
+      {:error, :get_record_by_field, :plugin} -> {:error, :start, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist in the database.")}
     end
   end
 
@@ -82,11 +82,11 @@ defmodule MishkaInstaller.Hook do
          {:ok, :ensure_event, _msg} <- ensure_event(plugin_state_struct(record_info), :debug) do
           PluginState.push_call(plugin_state_struct(record_info)) # Create a Genserver with DynamicSupervisor
           PluginETS.push(plugin_state_struct(record_info)) # Save all event info into ETS, Existed-key is overwritten
-          {:ok, :restart, "The module concerned was restarted"}
+          {:ok, :restart, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned was restarted")}
     else
-      {:error, :delete, :not_found} -> {:error, :restart, "The module concerned doesn't exist in the state."}
+      {:error, :delete, :not_found} -> {:error, :restart, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist in the state.")}
       {:error, :ensure_event, %{errors: check_data}} -> {:error, :restart, check_data}
-      {:error, :get_record_by_field, :plugin} -> {:error, :restart, "The module concerned doesn't exist in the database."}
+      {:error, :get_record_by_field, :plugin} -> {:error, :restart, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist in the database.")}
     end
   end
 
@@ -95,10 +95,10 @@ defmodule MishkaInstaller.Hook do
          {:ok, :get_record_by_field, :plugin, record_info} <- Plugin.show_by_name("#{module_name}") do
           PluginState.push_call(plugin_state_struct(record_info)) # Create a Genserver with DynamicSupervisor
           PluginETS.push(plugin_state_struct(record_info)) # Save all event info into ETS, Existed-key is overwritten
-          {:ok, :restart, "The module concerned was restarted"}
+          {:ok, :restart, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned was restarted")}
     else
-      {:error, :delete, :not_found} -> {:error, :restart, "The module concerned doesn't exist in the state."}
-      {:error, :get_record_by_field, :plugin} -> {:error, :restart, "The module concerned doesn't exist in the database."}
+      {:error, :delete, :not_found} -> {:error, :restart, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist in the state.")}
+      {:error, :get_record_by_field, :plugin} -> {:error, :restart, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist in the database.")}
     end
   end
 
@@ -128,8 +128,8 @@ defmodule MishkaInstaller.Hook do
     case PluginState.stop(module: module_name) do
       {:ok, :stop} ->
         PluginETS.delete(module: module_name)
-        {:ok, :stop, "The module concerned was stopped"}
-      {:error, :stop, :not_found} -> {:error, :stop, "The module concerned doesn't exist in database."}
+        {:ok, :stop, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned was stopped")}
+      {:error, :stop, :not_found} -> {:error, :stop, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist in database.")}
     end
   end
 
@@ -144,8 +144,8 @@ defmodule MishkaInstaller.Hook do
     case PluginState.delete(module: module_name) do
       {:ok, :delete} ->
         PluginETS.delete(module: module_name)
-        {:ok, :delete, "The module's state (#{module_name}) was deleted"}
-      {:error, :delete, :not_found} -> {:error, :delete, "The module concerned (#{module_name}) doesn't exist in the state."}
+        {:ok, :delete, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module's state (%{name}) was deleted", name: module_name)}
+      {:error, :delete, :not_found} -> {:error, :delete, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned (%{name}) doesn't exist in the state.", name: module_name)}
     end
   end
 
@@ -162,12 +162,12 @@ defmodule MishkaInstaller.Hook do
          {:ok, :delete, :plugin, _} <- Plugin.delete(record_info.id) do
 
           Plugin.delete_plugins(module_name)
-         {:ok, :unregister, "The module concerned (#{module_name}) and its dependencies were unregister"}
+         {:ok, :unregister, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned (%{name}) and its dependencies were unregister", name: module_name)}
     else
       {:error, :delete, msg} -> {:error, :unregister, msg}
-      {:error, :get_record_by_field, :plugin} -> {:error, :unregister, "The #{module_name} module doesn't exist in the database."}
+      {:error, :get_record_by_field, :plugin} -> {:error, :unregister, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The %{name} module doesn't exist in the database.", name: module_name)}
       {:error, :delete, status, _error_tag} when status in [:uuid, :get_record_by_id, :forced_to_delete] ->
-        {:error, :unregister, "There is a problem to find or delete the record in the database #{status}, module: #{module_name}"}
+        {:error, :unregister, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "There is a problem to find or delete the record in the database %{status}, module: %{name}", status: status, name: module_name)}
       {:error, :delete, :plugin, repo_error} -> {:error, :unregister, repo_error}
     end
   end
@@ -238,11 +238,11 @@ defmodule MishkaInstaller.Hook do
     Enum.any?(check_data, fn {status, _error_atom, _event, _msg} -> status == :error end)
     |> case do
       true ->  {:error, :ensure_event, %{errors: check_data}}
-      false -> {:ok, :ensure_event, "The modules concerned are activated"}
+      false -> {:ok, :ensure_event, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The modules concerned are activated")}
     end
   end
 
-  def ensure_event(%PluginState{depend_type: :hard} = _event, :debug), do: {:ok, :ensure_event, "The modules concerned are activated"}
+  def ensure_event(%PluginState{depend_type: :hard} = _event, :debug), do: {:ok, :ensure_event, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The modules concerned are activated")}
   def ensure_event(%PluginState{} = _event, :debug), do: {:ok, :ensure_event, "The modules concerned are activated"}
 
   defp check_dependencies(depends, event_name) do
@@ -254,9 +254,9 @@ defmodule MishkaInstaller.Hook do
 
           {:ok, :ensure_event, evn, "The module concerned is activated"}
       else
-        {:ensure_loaded, false} -> {:error, :ensure_loaded, evn, "The module concerned doesn't exist."}
-        {:plugin_state?, false, _state} -> {:error, :plugin_state?, evn, "The event concerned doesn't exist in state."}
-        {:activated_plugin, false, _state} -> {:error, :activated_plugin, evn, "The event concerned is not activated."}
+        {:ensure_loaded, false} -> {:error, :ensure_loaded, evn, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist.")}
+        {:plugin_state?, false, _state} -> {:error, :plugin_state?, evn, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The event concerned doesn't exist in state.")}
+        {:activated_plugin, false, _state} -> {:error, :activated_plugin, evn, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The event concerned is not activated.")}
       end
     end)
     ++ [string_ensure_loaded(event_name)]
@@ -264,8 +264,8 @@ defmodule MishkaInstaller.Hook do
 
   defp string_ensure_loaded(event_name) do
     case Code.ensure_loaded?(String.to_atom("Elixir.#{event_name}")) do
-      true -> {:ok, :ensure_event, event_name, "The module concerned is activated"}
-      false -> {:error, :ensure_loaded, event_name, "The module concerned doesn't exist."}
+      true -> {:ok, :ensure_event, event_name, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned is activated")}
+      false -> {:error, :ensure_loaded, event_name, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The module concerned doesn't exist.")}
     end
   end
 

@@ -26,7 +26,7 @@ defmodule MishkaInstaller.Database.DependencySchema do
   def changeset(struct, params \\ %{}) do
     struct
     |> cast(params, @all_fields)
-    |> validate_required(@required_fields, message: "You should fill all the required fields.")
-    |> unique_constraint(:name, name: :index_dependencies_on_app, message: "Each dependency should have a unique app name, this name existed before.")
+    |> validate_required(@required_fields, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You should fill all the required fields."))
+    |> unique_constraint(:name, name: :index_dependencies_on_app, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Each dependency should have a unique app name, this name existed before."))
   end
 end

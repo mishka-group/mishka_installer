@@ -24,7 +24,7 @@ defmodule MishkaInstaller.Database.ActivitySchema do
   def changeset(struct, params \\ %{}) do
     struct
     |> cast(params, @all_fields)
-    |> validate_required(@all_required, message: "You should fill all the required fields.")
+    |> validate_required(@all_required, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You should fill all the required fields."))
     |> MishkaInstaller.Database.Helper.validate_binary_id(:section_id)
   end
 

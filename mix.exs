@@ -36,7 +36,8 @@ defmodule MishkaInstaller.MixProject do
       {:phoenix_live_view, "~> 0.17.9"},
       {:sourceror, "~> 0.11.1"},
       {:ets, "~> 0.9.0"},
-      {:oban, "~> 2.12"}
+      {:oban, "~> 2.12"},
+      {:gettext, "~> 0.19.1"}
     ]
   end
 

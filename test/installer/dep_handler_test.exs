@@ -91,7 +91,8 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
         %{app: :phoenix_live_view, version: "~> 0.17.9"},
         %{app: :sourceror, version: "~> 0.11.1"},
         %{app: :ets, version: "~> 0.9.0"},
-        %{app: :oban, version: "~> 2.12"}
+        %{app: :oban, version: "~> 2.12"},
+        %{app: :gettext, version: "~> 0.19.1"}
       ] = assert DepHandler.get_deps_from_mix(MishkaInstaller.MixProject)
     end
 

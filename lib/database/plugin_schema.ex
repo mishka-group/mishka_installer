@@ -24,8 +24,8 @@ defmodule MishkaInstaller.Database.PluginSchema do
   def changeset(struct, params \\ %{}) do
     struct
     |> cast(params, @all_fields)
-    |> validate_required(@required_fields, message: "You should fill all the required fields.")
-    |> unique_constraint(:name, name: :index_plugins_on_name, message: "Each plugin should have a unique name, this name existed before.")
+    |> validate_required(@required_fields, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You should fill all the required fields."))
+    |> unique_constraint(:name, name: :index_plugins_on_name, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Each plugin should have a unique name, this name existed before."))
   end
 
 end

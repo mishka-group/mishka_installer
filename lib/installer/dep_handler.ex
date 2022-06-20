@@ -176,7 +176,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def read_dep_json(json \\ File.read!(extensions_json_path())) do
     {:ok, :read_dep_json, json |> Jason.decode!()}
   rescue
-    _e -> {:error, :read_dep_json, "You do not have access to read this file or maybe the file does not exist or even has syntax error"}
+    _e -> {:error, :read_dep_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You do not have access to read this file or maybe the file does not exist or even has syntax error")}
   end
 
   @spec mix_read_from_json :: list
@@ -311,7 +311,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         IO.binwrite(file, Jason.encode!(MishkaInstaller.Dependency.dependencies()))
         File.close(file)
         check_or_create_deps_json(project_path)
-      _error -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this file. Please add it manually."}
+      _error -> {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You do not have sufficient access to create this file. Please add it manually.")}
     end
   end
 
@@ -334,7 +334,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
         |> Enum.reject(& is_nil(&1))
       {:ok, :compare_installed_deps_with_app_file, apps_list}
     else
-      {:error, :compare_installed_deps_with_app_file, "App folder or its _build does not exist"}
+      {:error, :compare_installed_deps_with_app_file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "App folder or its _build does not exist")}
     end
   end
 
@@ -353,10 +353,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
       :ok -> check_or_create_deps_json(project_path)
-      {:error, :eacces} -> {:error, :check_or_create_deps_json, "You do not have sufficient access to create this directory. Please add it manually."}
-      {:error, :enospc} -> {:error, :check_or_create_deps_json, "there is no space left on the device."}
+      {:error, :eacces} -> {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You do not have sufficient access to create this directory. Please add it manually.")}
+      {:error, :enospc} -> {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "there is no space left on the device.")}
       {:error, e} when e in [:eexist, :enoent, :enotdir] ->
-        {:error, :check_or_create_deps_json, "Please contact plugin support when you encounter this error."}
+        {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Please contact plugin support when you encounter this error.")}
     end
   end
 
@@ -379,17 +379,18 @@ defmodule MishkaInstaller.Installer.DepHandler do
           {:ok, :add_new_app, repo_data}
     else
       {:decode, {:error, _error}} ->
-        {:error, :add_new_app, :file, "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it"}
+        {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it")}
       {:duplicate_app, true} ->
-        {:error, :add_new_app, :file, "You can not insert new app which is duplicate, if you want to update it please use another function."}
-      {:encode, {:error, _error}} -> {:error, :add_new_app, :file, "We can not encode your new app data, please check your data."}
+        {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You can not insert new app which is duplicate, if you want to update it please use another function.")}
+      {:encode, {:error, _error}} -> {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "We can not encode your new app data, please check your data.")}
       {:error, :add, :dependency, repo_error} -> {:error, :add_new_app, :changeset, repo_error}
     end
   end
 
   defp insert_new_ap({:open_file, {:error, _posix}}, _app_info, _exist_json), do:
-                  {:error, :add_new_app, :file, "Unfortunately, the JSON concerned file either does not exist or we do not have access to it.
-                  You can delete or create it in your panel, but before that please check you have enough access to edit it."}
+                  {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+                    "Unfortunately, the JSON concerned file either does not exist or we do not have access to it. You can delete or create it in your panel, but before that please check you have enough access to edit it.")
+                  }
 
   defp mix_creator("hex", data) do
     {String.to_atom(data["app"]), "~> #{String.trim(data["version"])}"}
@@ -452,10 +453,11 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp check_app_status(result, type, file_path) when type in [:git, :upload] do
     case result do
       {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
-        {:error, "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is #{result}"}
+        {:error, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+          "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is %{result}", result: result)}
       data ->
         if Enum.any?(data, & (&1 == {:error, :package, :convert_ast_output})) do
-          {:error, "Your mix.exs file must contain the app, version and source_url parameters"}
+          {:error, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your mix.exs file must contain the app, version and source_url parameters")}
         else
           create_app_info(data, if(type == :git, do: type, else: :path))
           |> Map.from_struct()
@@ -466,8 +468,12 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   defp check_app_status({:error, :package, status}, type, _) do
-    msg = if status == :not_found, do: "Are you sure you have entered the package name or url correctly?",
-          else: "Unfortunately, we cannot connect to #{type} server now, please try other time! or make it correct"
+    msg =
+      if status == :not_found do
+        Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Are you sure you have entered the package name or url correctly?")
+      else
+        Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Unfortunately, we cannot connect to %{type} server now, please try other time! or make it correct", type: type)
+      end
     {:error, msg}
   end
 
@@ -486,43 +492,48 @@ defmodule MishkaInstaller.Installer.DepHandler do
       case Dependency.create_or_update(data) do
         {:ok, :add, :dependency, repo_data} ->
           {:ok, :no_state,
-          "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue.",
+            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+            "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue."),
           repo_data.app
         }
 
         {:ok, :edit, :dependency, repo_data} ->
           if MishkaInstaller.PluginETS.get_all(event: @event) == [] do
             {:ok, :no_state,
-            "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue.",
+              Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+              "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue."),
             repo_data.app
           }
           else
             {:ok, :registered_app,
-            "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue.
-            After their response, we will change the #{repo_data.app} dependency and let you know about its latest news.", repo_data.app}
+              Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+              "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue. After their response, we will change the %{app} dependency and let you know about its latest news.", app: repo_data.app),
+            repo_data.app}
           end
         {:error, action, :dependency, _repo_error} when action in [:add, :edit] ->
           # TODO: save it in activities
           {:error,
-            "Unfortunately, an error occurred while storing the data in the database.
-            To check for errors, see the Activities section, and if this error persists, report it to support."
+            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+            "Unfortunately, an error occurred while storing the data in the database. To check for errors, see the Activities section, and if this error persists, report it to support.")
           }
 
         {:error, action, :uuid, _error_tag} when action in [:uuid, :get_record_by_id] ->
           # TODO: save it in activities
           {:error,
-            "Unfortunately, an error occurred while storing the data in the database.
-            To check for errors, see the Activities section, and if this error persists, report it to support."
+            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+            "Unfortunately, an error occurred while storing the data in the database. To check for errors, see the Activities section, and if this error persists, report it to support.")
           }
         {:error, :update_app_version, :older_version} ->
           {:error,
-            "You have already installed this library and the installed version is the same as the latest version of the Hex site.
-            Please take action when a new version of this app is released"}
+            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+            "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released")
+          }
       end
     else
       {:error,
-            "You have already installed this library and the installed version is the same as the latest version of the Hex site.
-            Please take action when a new version of this app is released"}
+        Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
+        "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released")
+      }
     end
   end
 

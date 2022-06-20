@@ -69,7 +69,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     end
     socket =
       socket
-      |> assign(:status_message, {:info, "Your request was sent, after receiving any changes we send you a notification"})
+      |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request was sent, after receiving any changes we send you a notification")})
       |> assign(:app_name, nil)
       |> assign(:selected_form, :upload)
     {:noreply, socket}
@@ -119,7 +119,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         |> update(:uploaded_files, &(&1 ++ uploaded_files))
       else
         socket
-        |> assign(:status_message, {:danger, "You should select a file."})
+        |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You should select a file.")})
       end
 
     {:noreply, new_socket}
@@ -140,11 +140,11 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       case MishkaInstaller.Installer.MixCreator.restore_mix(mix_path) do
         {:ok, _output} ->
           socket
-          |> assign(:status_message, {:info, "Your request was done"})
+          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request was done")})
         _ ->
           socket
           |> assign(:status_message, {:danger,
-            "Your request wasn't done, there is a problem, maybe you did not create backup before, or you have no access to this operation."
+          Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request wasn't done, there is a problem, maybe you did not create backup before, or you have no access to this operation.")
           })
       end
     {:noreply, new_socket}
@@ -157,11 +157,11 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       case MishkaInstaller.Installer.MixCreator.backup_mix(mix_path) do
         {:ok, _output} ->
           socket
-          |> assign(:status_message, {:info, "Your request was done"})
+          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request was done")})
         _ ->
           socket
           |> assign(:status_message, {:danger,
-            "Your request wasn't done, there is a problem, maybe you have no access to this operation."
+          Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request wasn't done, there is a problem, maybe you have no access to this operation.")
           })
       end
     {:noreply, new_socket}
@@ -172,7 +172,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     list_app = length(MishkaInstaller.DepUpdateJob.get_all())
     new_socket =
       socket
-      |> assign(:status_message, {:info, "#{list_app} apps need to be updated"})
+      |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "%{count} apps need to be updated", count: list_app)})
     {:noreply, new_socket}
   end
 
@@ -190,7 +190,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     end
     new_socket =
       socket
-      |> assign(:status_message, {:info, "The #{app} app was deleted"})
+      |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The %{app} app was deleted", app: app)})
       |> update_app_list()
     {:noreply, new_socket}
   end
@@ -201,16 +201,15 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       case Application.start(String.to_atom(app)) do
         :ok ->
           socket
-          |> assign(:status_message, {:info, "The #{app} app was started successfully, it should be noted if app terminates, it is reported but no other
-          applications are terminated."})
+          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The %{app} app was started successfully, it should be noted if app terminates, it is reported but no other applications are terminated.", app: app)})
           |> assign(:loaded_apps, Application.loaded_applications())
           |> update_app_list()
         {:error, {:already_started, _app}}->
           socket
-          |> assign(:status_message, {:warning, "Then #{app} apps is already started"})
+          |> assign(:status_message, {:warning, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Then %{app} apps is already started", app: app)})
         {:error, _output} ->
           socket
-          |> assign(:status_message, {:danger, "An unspecified error has occurred"})
+          |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "An unspecified error has occurred")})
       end
     {:noreply, new_socket}
   end
@@ -221,14 +220,14 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       case Application.stop(String.to_atom(app)) do
         :ok ->
           socket
-          |> assign(:status_message, {:info, "The #{app} app was stopped successfully, it should be noted when stopped, the application is still loaded."})
+          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The %{app} app was stopped successfully, it should be noted when stopped, the application is still loaded.", app: app)})
           |> update_app_list()
         {:error, {:not_started, _app}}->
           socket
-          |> assign(:status_message, {:warning, "Then #{app} apps is not started"})
+          |> assign(:status_message, {:warning, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Then %{app} apps is not started", app: app)})
         {:error, _output} ->
           socket
-          |> assign(:status_message, {:danger, "An unspecified error has occurred"})
+          |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "An unspecified error has occurred")})
       end
     {:noreply, new_socket}
   end
@@ -253,7 +252,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           |> assign(:log, [])
         _ ->
           socket
-          |> assign(:status_message, {:danger, "We couldn't find any update for the app you requested, unfortunately."})
+          |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "We couldn't find any update for the app you requested, unfortunately.")})
           |> update_app_list()
       end
     {:noreply, new_socket}
@@ -289,9 +288,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   end
 
   @spec error_to_string(:not_accepted | :too_large | :too_many_files) :: String.t()
-  def error_to_string(:too_large), do: "Too large"
-  def error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
-  def error_to_string(:too_many_files), do: "You have selected too many files"
+  def error_to_string(:too_large), do: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Too large")
+  def error_to_string(:not_accepted), do: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You have selected an unacceptable file type")
+  def error_to_string(:too_many_files), do: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You have selected too many files")
 
   defp update_app_list(socket) do
     socket
@@ -368,10 +367,10 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           <div class="container h-25 d-inline-block"></div>
           <input name="app" class="form-control form-control-lg mb-3 w-50 p-3 mx-auto" type="text" placeholder="Input app name like: mishka_installer" required>
           <input type="hidden" id="hidden_type" name="select_form" value="hex">
-          <button type="submit" class="btn btn-outline-secondary mt-4 mb-4">Download/Update from hex</button>
+          <button type="submit" class="btn btn-outline-secondary mt-4 mb-4"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Download/Update from hex") %></button>
           <div class="container h-25 d-inline-block"></div>
           <span class="mt-4 mb-4">
-            <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload">Upload</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git">Or get from Git</a>
+            <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Upload") %></a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Or get from Git") %></a>
           </span>
         </form>
       </section>
@@ -398,10 +397,10 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           <input name="git_tag" class="form-control form-control-lg mb-3 w-75 p-3 mx-auto" type="text" placeholder="Git tag, Ex: 0.0.2 or master">
           <div class="container h-25 d-inline-block"></div>
           <input type="hidden" id="hidden_type" name="select_form" value="git">
-          <button type="submit" class="btn btn-outline-secondary mt-4 mb-4">Download/Update from Git</button>
+          <button type="submit" class="btn btn-outline-secondary mt-4 mb-4"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Download/Update from Git") %></button>
           <div class="container h-25 d-inline-block"></div>
           <span class="mt-4 mb-4">
-            <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload">Upload</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Or get from hex</a>
+            <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Upload") %></a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Or get from hex") %></a>
           </span>
         </form>
       </section>
@@ -424,15 +423,15 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
             </div>
           <% end %>
           <div class="alert alert-secondary text-center prefer-alert">
-            We really recommend you to <b>wait for the app concerned response</b>, because maybe there is an important state that you need after updating!!
+            <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "We really recommend you to <b>wait for the app concerned response</b>, because maybe there is an important state that you need after updating!!") %>
           </div>
           <div class="container h-25 d-inline-block"></div>
           <button type="button" class="btn btn-outline-success" phx-click="update_app" phx-value-type="soft_update">
             <span class="spinner-grow spinner-grow-sm" role="status" aria-hidden="true"></span>
-            Wait for the app response!
+            <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Wait for the app response!") %>
           </button>
           <button type="button" class="btn btn-outline-danger" phx-click="update_app" phx-value-type="force_update">
-           Do Force Update now!
+          <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Do Force Update now!") %>
           </button>
         </form>
       </section>
@@ -442,9 +441,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   defp dep_form(:compiling_activities, assigns) do
     ~H"""
     <section id="dep-compiling-activities" class="col-md-6 mx-auto text-center">
-      <h3 class="mb-3 text-start">Real-time activities of compiling output:</h3>
+      <h3 class="mb-3 text-start"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Real-time activities of compiling output:") %></h3>
       <hr class="mb-5 mt-5">
-      <%= if @log == [], do: raw("<div class=\"alert alert-warning\">No activity is running</div>") %>
+      <%= if @log == [], do: raw("<div class=\"alert alert-warning\">#{Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "No activity is running")}</div>") %>
       <section id="mishka-log-show" class="container mx-auto text-start" style="max-height: 200px; overflow-x: hidden; overflow-y: scroll;" phx-update="append">
         <%= for l <- @log do %>
           <p id={Ecto.UUID.generate} class="mishka-log-p"><%= l %></p>
@@ -452,7 +451,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       </section>
       <div class="container h-25 d-inline-block"></div>
       <span class="mt-4 mb-4">
-        <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload">Upload</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Get from Hex</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git">Or from Git</a>
+        <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Upload") %></a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Get from Hex") %></a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Or from Git") %></a>
       </span>
     </section>
     """
@@ -469,10 +468,10 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           </div>
       <% end %>
       <div class="bd-callout bd-callout-info mb-5">
-        <h3 class="mb-3">Installed Apps:</h3>
+        <h3 class="mb-3"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Installed Apps:") %></h3>
         <p>
-          It should be noted the <span class="text-primary">blue</span> apps exist in JSON file, and it is added by administrator and another apps exist in core, or they are sub-dependencies.
-          Each time a new update comes in for one of the plugins, the <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down text-warning" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/><path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/></svg> image comes next to it
+          <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "It should be noted the <span class=\"text-primary\">blue</span> apps exist in JSON file, and it is added by administrator and another apps exist in core, or they are sub-dependencies.") %>
+          <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Each time a new update comes in for one of the plugins, the") %> <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down text-warning" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/><path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/></svg> <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "image comes next to it") %>
         </p>
       </div>
       <hr class="mb-5 mt-5">
@@ -509,7 +508,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         <% end %>
       </div>
       <p class="mt-4 mb-4 text-center">
-        <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload">Upload</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Get from Hex</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git">Or from Git</a>
+        <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Upload") %></a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Get from Hex") %></a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Or from Git") %></a>
       </p>
     </section>
     """
@@ -525,39 +524,39 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
             <div class="container h-25 d-inline-block"></div>
           </div>
       <% end %>
-      <h3 class="mb-3">Tools to manage extensions:</h3>
+      <h3 class="mb-3"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Tools to manage extensions:") %></h3>
       <hr class="mb-5 mt-5">
       <div class="row">
         <div class="col-sm-4 mb-3">
           <div class="card">
             <div class="card-body">
-              <h5 class="card-title">Backup <code>Mix.exs</code> file</h5>
-              <p class="card-text">With this option, you can create a backup of your <code>Mix.exs</code> file.</p>
-              <a phx-click="tools" phx-value-type="backup" class="btn btn-outline-primary">Backup</a>
+              <h5 class="card-title"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Backup") %> <code>Mix.exs</code> <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "file") %></h5>
+              <p class="card-text"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "With this option, you can create a backup of your") %> <code>Mix.exs</code> <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "file") %></p>
+              <a phx-click="tools" phx-value-type="backup" class="btn btn-outline-primary"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Backup") %></a>
             </div>
           </div>
         </div>
         <div class="col-sm-4 mb-3">
           <div class="card">
             <div class="card-body">
-              <h5 class="card-title">Restore <code>Mix.exs</code> file</h5>
-              <p class="card-text">With this option, you can restore your backup of your <code>Mix.exs</code> file.</p>
-              <a phx-click="tools" phx-value-type="restore" class="btn btn-outline-primary">Restore</a>
+              <h5 class="card-title"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Restore") %> <code>Mix.exs</code> <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "file") %></h5>
+              <p class="card-text"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "With this option, you can restore your backup of your") %> <code>Mix.exs</code> <%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "file") %></p>
+              <a phx-click="tools" phx-value-type="restore" class="btn btn-outline-primary"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Restore") %></a>
             </div>
           </div>
         </div>
         <div class="col-sm-4 mb-3">
           <div class="card">
             <div class="card-body">
-              <h5 class="card-title">Number of required update apps</h5>
-              <p class="card-text">With this option you can count apps update</p>
-              <a phx-click="tools" phx-value-type="task" class="btn btn-outline-primary">Recalculate</a>
+              <h5 class="card-title"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Number of required update apps") %></h5>
+              <p class="card-text"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "With this option you can count apps update") %></p>
+              <a phx-click="tools" phx-value-type="task" class="btn btn-outline-primary"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Recalculate") %></a>
             </div>
           </div>
         </div>
       </div>
       <p class="mt-4 mb-4 text-center">
-        <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload">Upload</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Get from Hex</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git">Or from Git</a>
+        <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Upload") %></a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Get from Hex</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Or from Git") %></a>
       </p>
     </section>
     """

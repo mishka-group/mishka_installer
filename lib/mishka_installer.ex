@@ -50,6 +50,15 @@ defmodule MishkaInstaller do
     end
   end
 
+  def gettext() do
+    case MishkaInstaller.get_config(:gettext) do
+      nil -> MishkaInstaller.Gettext
+      value -> value
+    end
+  rescue
+    _ -> MishkaInstaller.Gettext
+  end
+
   def ensure_compiled(module) do
     case Code.ensure_compiled(module) do
       {:module, _} -> module
