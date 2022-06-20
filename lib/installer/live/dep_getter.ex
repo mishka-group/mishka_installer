@@ -24,6 +24,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   def mount(_params, _session, socket) do
     DepChangesProtector.subscribe()
     MishkaInstaller.Installer.RunTimeSourcing.subscribe()
+    MishkaInstaller.DepUpdateJob.subscribe()
     socket =
       socket
       |> assign(:selected_form, :upload)
@@ -32,9 +33,10 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       |> assign(:log, [])
       |> assign(:loaded_apps, Application.loaded_applications())
       |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+      |> assign(:update_list, Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, _type, _url, _ver} -> app end))
       |> assign(:uploaded_files, [])
       |> allow_upload(:dep, accept: ~w(.zip), max_entries: 1)
-    {:ok, socket, temporary_assigns: [log: []]}
+    {:ok, socket, temporary_assigns: [log: [], update_list: [], loaded_apps: [], started_applications: []]}
   end
 
   @impl Phoenix.LiveView
@@ -190,8 +192,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     new_socket =
       socket
       |> assign(:status_message, {:info, "The #{app} app was deleted"})
-      |> assign(:loaded_apps, Application.loaded_applications())
-      |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+      |> update_app_list()
     {:noreply, new_socket}
   end
 
@@ -204,7 +205,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           |> assign(:status_message, {:info, "The #{app} app was started successfully, it should be noted if app terminates, it is reported but no other
           applications are terminated."})
           |> assign(:loaded_apps, Application.loaded_applications())
-          |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+          |> update_app_list()
         {:error, {:already_started, _app}}->
           socket
           |> assign(:status_message, {:warning, "Then #{app} apps is already started"})
@@ -222,8 +223,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         :ok ->
           socket
           |> assign(:status_message, {:info, "The #{app} app was stopped successfully, it should be noted when stopped, the application is still loaded."})
-          |> assign(:loaded_apps, Application.loaded_applications())
-          |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+          |> update_app_list()
         {:error, {:not_started, _app}}->
           socket
           |> assign(:status_message, {:warning, "Then #{app} apps is not started"})
@@ -235,13 +235,43 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   end
 
   @impl Phoenix.LiveView
+  def handle_event("app_action", %{"operation" => "update", "app" => app}, socket) do
+    new_socket =
+      case MishkaInstaller.DepUpdateJob.get(app) do
+        {_app, :hex, _url, _version} ->
+          res = DepHandler.run(:hex, app, :port)
+          socket
+          |> assign(:app_name, res["app_name"])
+          |> assign(:status_message, {res["status_message_type"], res["message"]})
+          |> assign(:selected_form, res["selected_form"])
+          |> assign(:log, [])
+        {_app, :git, url, tag} ->
+          res = DepHandler.run(:git, %{url: url, tag: tag}, :port)
+          socket
+          |> assign(:app_name, res["app_name"])
+          |> assign(:status_message, {res["status_message_type"], res["message"]})
+          |> assign(:selected_form, res["selected_form"])
+          |> assign(:log, [])
+        _ ->
+          socket
+          |> assign(:status_message, {:danger, "We couldn't find any update for the app you requested, unfortunately."})
+          |> update_app_list()
+      end
+    {:noreply, new_socket}
+  end
+
+  @impl Phoenix.LiveView
   def handle_info({:error, :dep_changes_protector, _answer, _app}, socket) do
     {:noreply, socket}
   end
 
   @impl Phoenix.LiveView
   def handle_info({:ok, :dep_changes_protector, _answer, _app}, socket) do
-    {:noreply, socket}
+    Task.Supervisor.start_child(MishkaInstaller.Installer.DepHandler, fn ->
+      MishkaInstaller.DepUpdateJob.check_added_dependencies_update()
+    end)
+    Process.send_after(self(), {:dependency_update_check}, 5000)
+    {:noreply, update_app_list(socket)}
   end
 
   @impl Phoenix.LiveView
@@ -254,10 +284,22 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     {:noreply, update(socket, :log, fn messages -> [messages | ["====> Unknown string <===="]] end)}
   end
 
+  @impl Phoenix.LiveView
+  def handle_info({:dependency_update_check}, socket) do
+    {:noreply, update_app_list(socket)}
+  end
+
   @spec error_to_string(:not_accepted | :too_large | :too_many_files) :: String.t()
   def error_to_string(:too_large), do: "Too large"
   def error_to_string(:not_accepted), do: "You have selected an unacceptable file type"
   def error_to_string(:too_many_files), do: "You have selected too many files"
+
+  defp update_app_list(socket) do
+    socket
+    |> assign(:loaded_apps, Application.loaded_applications())
+    |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+    |> assign(:update_list, Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, _type, _url, _ver} -> app end))
+  end
 
   defp dep_form(:upload, assigns) do
     ~H"""
@@ -441,7 +483,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
               <span id={"#{app}" <> "dropdown-class"} class="dropdown">
                 <small id={app} class="d-inline-flex mb-2 px-2 py-1 fw-semibold text-primary bg-primary bg-opacity-10 border border-success border-opacity-10 rounded-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
                   <%= "#{app}" %> in v<%= "#{ver}" %> &nbsp;
-                  <%= if app in Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, :git, _url, _ver} -> app end) do %>
+                  <%= if app in @update_list do %>
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down" viewBox="0 0 16 16">
                       <path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/>
                       <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/>
@@ -454,7 +496,10 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
                   <% else %>
                     <li><a id={"#{app}" <> "start-stop"} class="dropdown-item" phx-click="app_action" phx-value-operation="start" phx-value-app={app}>Start app</a></li>
                   <% end %>
-                  <li phx-click={JS.hide(to: "#faker")}><a id={"#{app}" <> "drop-delete"} class="dropdown-item" phx-click="app_action" phx-value-operation="delete" phx-value-app={app}>Delete app</a></li>
+                  <li phx-click={JS.hide(to: "#" <> "#{app}")}><a id={"#{app}" <> "drop-delete"} class="dropdown-item" phx-click="app_action" phx-value-operation="delete" phx-value-app={app}>Delete app</a></li>
+                  <%= if app in @update_list do %>
+                    <li><a id={"#{app}" <> "start-update"} class="dropdown-item" phx-click="app_action" phx-value-operation="update" phx-value-app={app}>Update app</a></li>
+                  <% end %>
                 </ul>
               </span>
           <% else %>
