@@ -13,6 +13,14 @@ defmodule MishkaInstaller.DepUpdateJob do
     Phoenix.PubSub.subscribe(MishkaInstaller.PubSub, @module)
   end
 
+  @spec get(binary) :: nil | tuple
+  def get(app) do
+    case ETS.Set.get(ets(), String.to_atom(app)) do
+      {:ok, data} -> data
+      _ -> nil
+    end
+  end
+
   @spec get_all :: [tuple]
   def get_all() do
     ETS.Set.to_list!(ets())

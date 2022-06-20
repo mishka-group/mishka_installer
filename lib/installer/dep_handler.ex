@@ -151,7 +151,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
       Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
       |> Enum.any?(& !&1)
 
-    MishkaInstaller.Installer.MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
+    MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
     if list_json_dpes do
       Logger.warn("Try to re-create Mix file")
       create_mix_file()
