@@ -54,6 +54,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       |> assign(:status_message, {:nil, nil})
       |> assign(:app_name, nil)
       |> assign(:selected_form, String.to_atom(type))
+      |> assign(:loaded_apps, Application.loaded_applications())
+      |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
     {:noreply, socket}
   end
 
@@ -175,8 +177,22 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("app_action", %{"operation" => "delete", "app" => app}, socket) do
-    IO.inspect(app)
-    {:noreply, socket}
+    MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(app), :uninstall)
+    case MishkaInstaller.Dependency.show_by_name(app) do
+      {:error, :get_record_by_field, :dependency} -> nil
+      {:ok, :get_record_by_field, :dependency, record_info} ->
+        Task.Supervisor.start_child(MishkaInstaller.Installer.DepHandler, fn ->
+          :timer.sleep(1000)
+          MishkaInstaller.Installer.DepHandler.create_mix_file()
+        end)
+        MishkaInstaller.Dependency.delete(record_info.id)
+    end
+    new_socket =
+      socket
+      |> assign(:status_message, {:info, "The #{app} app was deleted"})
+      |> assign(:loaded_apps, Application.loaded_applications())
+      |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+    {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
@@ -419,7 +435,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         </p>
       </div>
       <hr class="mb-5 mt-5">
-      <div id="all_loaded_app" phx-update="append">
+      <div id="all_loaded_app">
         <%= for {app, _des, ver} <- @loaded_apps do %>
           <%= if app in Enum.map(DepHandler.compare_dependencies_with_json(), & &1.app) do %>
               <span id={"#{app}" <> "dropdown-class"} class="dropdown">
@@ -438,7 +454,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
                   <% else %>
                     <li><a id={"#{app}" <> "start-stop"} class="dropdown-item" phx-click="app_action" phx-value-operation="start" phx-value-app={app}>Start app</a></li>
                   <% end %>
-                  <li><a id={"#{app}" <> "drop-delete"} class="dropdown-item" phx-click="app_action" phx-value-operation="delete" phx-value-app={app}>Delete app</a></li>
+                  <li phx-click={JS.hide(to: "#faker")}><a id={"#{app}" <> "drop-delete"} class="dropdown-item" phx-click="app_action" phx-value-operation="delete" phx-value-app={app}>Delete app</a></li>
                 </ul>
               </span>
           <% else %>

@@ -20,6 +20,7 @@ defmodule MishkaInstaller.Application do
       {DynamicSupervisor, [strategy: :one_for_one, name: MishkaInstaller.RunTimeObanSupervisor]},
       {Task.Supervisor, name: MishkaInstaller.Activity},
       {Task.Supervisor, name: DepChangesProtectorTask},
+      {Task.Supervisor, name: MishkaInstaller.Installer.DepHandler},
       {Task.Supervisor, name: PluginEtsTask},
       {Phoenix.PubSub, name: MishkaInstaller.PubSub},
       MishkaInstaller.PluginETS,
