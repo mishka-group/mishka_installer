@@ -56,8 +56,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       |> assign(:status_message, {:nil, nil})
       |> assign(:app_name, nil)
       |> assign(:selected_form, String.to_atom(type))
-      |> assign(:loaded_apps, Application.loaded_applications())
-      |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+      |> update_app_list()
     {:noreply, socket}
   end
 
