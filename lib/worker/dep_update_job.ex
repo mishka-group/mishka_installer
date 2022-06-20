@@ -26,7 +26,7 @@ defmodule MishkaInstaller.DepUpdateJob do
     ETS.Set.to_list!(ets())
   end
 
-  defp check_added_dependencies_update() do
+  def check_added_dependencies_update() do
     Logger.warn("DepUpdateJob request was sent")
     MishkaInstaller.Installer.DepHandler.read_dep_json()
     |> send_update_request_based_on_type()
