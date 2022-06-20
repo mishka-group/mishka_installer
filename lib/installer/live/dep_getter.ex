@@ -30,6 +30,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       |> assign(:app_name, nil)
       |> assign(:status_message, {nil, nil})
       |> assign(:log, [])
+      |> assign(:loaded_apps, Application.loaded_applications())
+      |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
       |> assign(:uploaded_files, [])
       |> allow_upload(:dep, accept: ~w(.zip), max_entries: 1)
     {:ok, socket, temporary_assigns: [log: []]}
@@ -168,6 +170,51 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     new_socket =
       socket
       |> assign(:status_message, {:info, "#{list_app} apps need to be updated"})
+    {:noreply, new_socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("app_action", %{"operation" => "delete", "app" => app}, socket) do
+    IO.inspect(app)
+    {:noreply, socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("app_action", %{"operation" => "start", "app" => app}, socket) do
+    new_socket =
+      case Application.start(String.to_atom(app)) do
+        :ok ->
+          socket
+          |> assign(:status_message, {:info, "The #{app} app was started successfully, it should be noted if app terminates, it is reported but no other
+          applications are terminated."})
+          |> assign(:loaded_apps, Application.loaded_applications())
+          |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+        {:error, {:already_started, _app}}->
+          socket
+          |> assign(:status_message, {:warning, "Then #{app} apps is already started"})
+        {:error, _output} ->
+          socket
+          |> assign(:status_message, {:danger, "An unspecified error has occurred"})
+      end
+    {:noreply, new_socket}
+  end
+
+  @impl Phoenix.LiveView
+  def handle_event("app_action", %{"operation" => "stop", "app" => app}, socket) do
+    new_socket =
+      case Application.stop(String.to_atom(app)) do
+        :ok ->
+          socket
+          |> assign(:status_message, {:info, "The #{app} app was stopped successfully, it should be noted when stopped, the application is still loaded."})
+          |> assign(:loaded_apps, Application.loaded_applications())
+          |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
+        {:error, {:not_started, _app}}->
+          socket
+          |> assign(:status_message, {:warning, "Then #{app} apps is not started"})
+        {:error, _output} ->
+          socket
+          |> assign(:status_message, {:danger, "An unspecified error has occurred"})
+      end
     {:noreply, new_socket}
   end
 
@@ -357,6 +404,13 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   defp dep_form(:installed_plugins, assigns) do
     ~H"""
     <section id="dep-installed-plugins" class="col-md-6 mx-auto">
+      <% {status, message} = @status_message %>
+        <%= if !is_nil(message) do %>
+          <div class="container" id="dep-status-msg">
+            <div class={"alert alert-#{status}"} role="alert" phx-click="clean_error"><%= message %></div>
+            <div class="container h-25 d-inline-block"></div>
+          </div>
+      <% end %>
       <div class="bd-callout bd-callout-info mb-5">
         <h3 class="mb-3">Installed Apps:</h3>
         <p>
@@ -365,23 +419,35 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         </p>
       </div>
       <hr class="mb-5 mt-5">
-      <%= for {app, _des, ver} <- Application.loaded_applications do %>
-        <%= if app in Enum.map(DepHandler.compare_dependencies_with_json(), & &1.app) do %>
-          <small id={Ecto.UUID.generate} class="d-inline-flex mb-3 px-2 py-1 fw-semibold text-primary bg-primary bg-opacity-10 border border-success border-opacity-10 rounded-2">
-            <%= "#{app}" %> in v<%= "#{ver}" %> &nbsp;
-            <%= if app in Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, :git, _url, _ver} -> app end) do %>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down" viewBox="0 0 16 16">
-              <path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/>
-              <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/>
-            </svg>
-            <% end %>
-          </small>
-        <% else %>
-          <small id={Ecto.UUID.generate} class="d-inline-flex mb-3 px-2 py-1 fw-semibold text-success bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">
-            <%= "#{app}" %> in v<%= "#{ver}" %>
-          </small>
+      <div id="all_loaded_app" phx-update="append">
+        <%= for {app, _des, ver} <- @loaded_apps do %>
+          <%= if app in Enum.map(DepHandler.compare_dependencies_with_json(), & &1.app) do %>
+              <span id={"#{app}" <> "dropdown-class"} class="dropdown">
+                <small id={app} class="d-inline-flex mb-2 px-2 py-1 fw-semibold text-primary bg-primary bg-opacity-10 border border-success border-opacity-10 rounded-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  <%= "#{app}" %> in v<%= "#{ver}" %> &nbsp;
+                  <%= if app in Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, :git, _url, _ver} -> app end) do %>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-cloud-arrow-down" viewBox="0 0 16 16">
+                      <path fill-rule="evenodd" d="M7.646 10.854a.5.5 0 0 0 .708 0l2-2a.5.5 0 0 0-.708-.708L8.5 9.293V5.5a.5.5 0 0 0-1 0v3.793L6.354 8.146a.5.5 0 1 0-.708.708l2 2z"/>
+                      <path d="M4.406 3.342A5.53 5.53 0 0 1 8 2c2.69 0 4.923 2 5.166 4.579C14.758 6.804 16 8.137 16 9.773 16 11.569 14.502 13 12.687 13H3.781C1.708 13 0 11.366 0 9.318c0-1.763 1.266-3.223 2.942-3.593.143-.863.698-1.723 1.464-2.383zm.653.757c-.757.653-1.153 1.44-1.153 2.056v.448l-.445.049C2.064 6.805 1 7.952 1 9.318 1 10.785 2.23 12 3.781 12h8.906C13.98 12 15 10.988 15 9.773c0-1.216-1.02-2.228-2.313-2.228h-.5v-.5C12.188 4.825 10.328 3 8 3a4.53 4.53 0 0 0-2.941 1.1z"/>
+                    </svg>
+                  <% end %>
+                </small>
+                <ul id={"#{app}" <> "drop"} class="dropdown-menu" aria-labelledby={app}>
+                  <%= if app in @started_applications do %>
+                    <li><a id={"#{app}" <> "drop-stop"} class="dropdown-item" phx-click="app_action" phx-value-operation="stop" phx-value-app={app}>Stop app</a></li>
+                  <% else %>
+                    <li><a id={"#{app}" <> "start-stop"} class="dropdown-item" phx-click="app_action" phx-value-operation="start" phx-value-app={app}>Start app</a></li>
+                  <% end %>
+                  <li><a id={"#{app}" <> "drop-delete"} class="dropdown-item" phx-click="app_action" phx-value-operation="delete" phx-value-app={app}>Delete app</a></li>
+                </ul>
+              </span>
+          <% else %>
+            <small id={app} class="d-inline-flex mx-1 mb-2 px-2 py-1 fw-semibold text-success bg-success bg-opacity-10 border border-success border-opacity-10 rounded-2">
+              <%= "#{app}" %> in v<%= "#{ver}" %>
+            </small>
+          <% end %>
         <% end %>
-      <% end %>
+      </div>
       <p class="mt-4 mb-4 text-center">
         <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="upload">Upload</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="hex">Get from Hex</a> - <a class="dep-link text-decoration-none" phx-click="form_select" phx-value-type="git">Or from Git</a>
       </p>

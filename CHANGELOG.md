@@ -19,12 +19,13 @@
 - [x] Create a simple setting `ets`[#4](https://github.com/mishka-group/mishka_installer/issues/4)
 - [x] Make behavior optional in plugin hook
 - [x] Queue to install extensions with `Oban`
+- [x] Compatible Docker shell with this version
 - [ ] Compatible MishkaCms with this version
 - [ ] Document improved and Wiki added
-- [ ] Compatible Docker shell with this version
 - [ ] Make the lib comfortable with external Gettext [#12](https://github.com/mishka-group/mishka_installer/issues/12)
 - [ ] Create a GUI dashboard to install plugin and component [#5](https://github.com/mishka-group/mishka_installer/issues/5)
 - [ ] Update MishkaCms docker package for this version(volume `extensions.json`)
 - [ ] Use fixed-issue of deletion from MishkaDeveloperTools [#9](https://github.com/mishka-group/mishka_developer_tools/issues/9)
+- [ ] Add Plugin router behavior [#16](https://github.com/mishka-group/mishka_installer/issues/16)
 
 > Accepting zip file of release is not supported in this version
