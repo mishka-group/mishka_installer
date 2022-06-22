@@ -1,4 +1,4 @@
-defmodule MsihkaSendingEmailPlugin.TestEvent do
+defmodule MishkaSendingEmailPlugin.TestEvent do
   @moduledoc """
     This event is triggered whenever a user is successfully logged in. if there is any active module in this section on state,
     this module sends a request as a Task tool to the developer call function that includes `user_info()`, `ip()`, `endpoint()`.

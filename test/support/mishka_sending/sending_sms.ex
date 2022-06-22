@@ -1,6 +1,6 @@
-defmodule MsihkaSendingEmailPlugin.SendingSMS do
+defmodule MishkaSendingEmailPlugin.SendingSMS do
   # This module was just made for testing
-  alias MsihkaSendingEmailPlugin.TestEvent
+  alias MishkaSendingEmailPlugin.TestEvent
   use MishkaInstaller.Hook,
       module: __MODULE__,
       behaviour: TestEvent,
@@ -9,7 +9,7 @@ defmodule MsihkaSendingEmailPlugin.SendingSMS do
 
   def initial(args) do
     Logger.warn("SendingSMS plugin was started")
-    event = %PluginState{name: "MsihkaSendingEmailPlugin.SendingSMS", event: Atom.to_string(@ref), priority: 1}
+    event = %PluginState{name: "MishkaSendingEmailPlugin.SendingSMS", event: Atom.to_string(@ref), priority: 1}
     Hook.register(event: event)
     {:ok, @ref, args}
   end

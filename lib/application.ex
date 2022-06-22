@@ -1,6 +1,6 @@
 defmodule MishkaInstaller.Application do
   use Application
-  alias MsihkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
+  alias MishkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
   @impl true
   def start(_type, _args) do
     test_plugin = if Mix.env in [:test] do

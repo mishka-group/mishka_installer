@@ -2,7 +2,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
   use ExUnit.Case, async: true
   doctest MishkaInstaller
   alias MishkaInstaller.Hook
-  alias MsihkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
+  alias MishkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
 
   setup_all _tags do
     start_supervised(SendingEmail)
@@ -157,7 +157,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
   end
 
   test "call event and plugins with halt response" do
-    sample_of_login_state = %MsihkaSendingEmailPlugin.TestEvent{
+    sample_of_login_state = %MishkaSendingEmailPlugin.TestEvent{
       user_info: %{name: "shahryar"},
       ip: "127.0.1.1",
       endpoint: :admin,
@@ -165,9 +165,9 @@ defmodule MishkaInstallerTest.Event.HookTest do
     }
 
     [
-      %MishkaInstaller.PluginState{name: "MsihkaSendingEmailPlugin.SendingEmail", event: :on_test_event, priority: 100},
-      %MishkaInstaller.PluginState{name: "MsihkaSendingEmailPlugin.SendingHalt", event: :on_test_event, priority: 2},
-      %MishkaInstaller.PluginState{name: "MsihkaSendingEmailPlugin.SendingSMS", event: :on_test_event, priority: 1},
+      %MishkaInstaller.PluginState{name: "MishkaSendingEmailPlugin.SendingEmail", event: :on_test_event, priority: 100},
+      %MishkaInstaller.PluginState{name: "MishkaSendingEmailPlugin.SendingHalt", event: :on_test_event, priority: 2},
+      %MishkaInstaller.PluginState{name: "MishkaSendingEmailPlugin.SendingSMS", event: :on_test_event, priority: 1},
     ]
     |> Enum.map(&Hook.register(event: &1))
 
