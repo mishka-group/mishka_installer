@@ -1,18 +1,7 @@
 defmodule MishkaInstaller.Application do
   use Application
-  alias MishkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
   @impl true
   def start(_type, _args) do
-    test_plugin = if Mix.env in [:test] do
-      [
-        %{id: SendingEmail, start: {SendingEmail, :start_link, [[]]}},
-        %{id: SendingSMS, start: {SendingSMS, :start_link, [[]]}},
-        %{id: SendingHalt, start: {SendingHalt, :start_link, [[]]}}
-      ]
-    else
-      []
-    end
-
     children = [
       {Finch, name: HexClientApi},
       {Registry, keys: :unique, name: PluginStateRegistry},
@@ -26,7 +15,7 @@ defmodule MishkaInstaller.Application do
       MishkaInstaller.PluginETS,
       MishkaInstaller.Installer.DepChangesProtector,
       MishkaInstaller.Helper.Setting
-    ] ++ test_plugin
+    ]
 
     opts = [strategy: :one_for_one, name: MishkaInstaller.Supervisor]
     Supervisor.start_link(children, opts)
