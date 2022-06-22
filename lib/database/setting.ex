@@ -60,10 +60,59 @@ defmodule MishkaInstaller.Setting do
     end
   end
 
+  @spec settings([{:conditions, {String.t() | integer(), String.t() | integer()}} | {:filters, map()}, ...]) :: any
+  def settings(conditions: {page, page_size}, filters: filters) do
+    try do
+      query = from(set in SettingSchema) |> convert_filters_to_where(filters)
+      from([set] in query,
+      order_by: [desc: set.inserted_at, desc: set.id],
+      select: %{
+        id: set.id,
+        name: set.name,
+        configs: set.configs,
+        updated_at: set.updated_at,
+        inserted_at: set.inserted_at,
+      })
+      |> MishkaInstaller.repo.paginate(page: page, page_size: page_size)
+    rescue
+      _db_error ->
+        case Code.ensure_compiled(module = Scrivener.Page) do
+          {:module, _} ->
+            struct(module, %{entries: [], page_number: 1, page_size: page_size, total_entries: 0,total_pages: 1})
+          {:error, _} ->
+            %{entries: [], page_number: 1, page_size: page_size, total_entries: 0,total_pages: 1}
+        end
+    end
+  end
+
+  def settings(filters: filters) do
+    try do
+      query = from(set in SettingSchema) |> convert_filters_to_where(filters)
+      from([set] in query,
+      order_by: [desc: set.inserted_at, desc: set.id],
+      select: %{
+        id: set.id,
+        name: set.name,
+        configs: set.configs,
+        updated_at: set.updated_at,
+        inserted_at: set.inserted_at,
+      })
+      |> MishkaInstaller.repo.all()
+    rescue
+      _db_error -> []
+    end
+  end
+
   def settings() do
     from(plg in SettingSchema)
     |> fields()
     |> MishkaInstaller.repo.all()
+  end
+
+  defp convert_filters_to_where(query, filters) do
+    Enum.reduce(filters, query, fn {key, value}, query ->
+      from set in query, where: field(set, ^key) == ^value
+    end)
   end
 
   defp fields(query) do

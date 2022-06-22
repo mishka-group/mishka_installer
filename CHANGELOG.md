@@ -25,5 +25,6 @@
 - [x] Create a GUI dashboard to install plugin and component [#5](https://github.com/mishka-group/mishka_installer/issues/5)
 - [x] Update MishkaCms docker package for this version(volume `extensions.json`)
 - [x] Add Plugin router behavior [#16](https://github.com/mishka-group/mishka_installer/issues/16)
+- [x] Support Elixir 1.13.4 and Erlang OTP 25 [#42](https://github.com/mishka-group/mishka_installer/issues/42)
 
 > Accepting zip file of release is not supported in this version
