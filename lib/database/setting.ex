@@ -134,4 +134,8 @@ defmodule MishkaInstaller.Setting do
 
     def notify_subscribers(params, _), do: params
   end
+
+  @spec allowed_fields(:atom | :string) :: nil | list
+  def allowed_fields(:atom), do: SettingSchema.__schema__(:fields)
+  def allowed_fields(:string), do: SettingSchema.__schema__(:fields) |> Enum.map(&Atom.to_string/1)
 end
