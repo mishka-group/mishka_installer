@@ -1,5 +1,6 @@
 defmodule MishkaInstaller.Repo.Migrations.TestDepTable do
   use Ecto.Migration
+
   def change do
     create table(:dependencies, primary_key: false) do
       add(:id, :uuid, primary_key: true)
@@ -15,6 +16,7 @@ defmodule MishkaInstaller.Repo.Migrations.TestDepTable do
 
       timestamps()
     end
+
     create(index(:dependencies, [:app], name: :index_dependencies_on_app, unique: true))
   end
 end

@@ -8,10 +8,11 @@ defmodule MishkaInstaller.Dependency do
   alias MishkaInstaller.Database.DependencySchema
   alias MishkaInstaller.Installer.DepHandler
   import Ecto.Query
+
   use MishkaDeveloperTools.DB.CRUD,
-          module: DependencySchema,
-          error_atom: :dependency,
-          repo: MishkaInstaller.repo
+    module: DependencySchema,
+    error_atom: :dependency,
+    repo: MishkaInstaller.repo()
 
   @behaviour MishkaDeveloperTools.DB.CRUD
 
@@ -56,13 +57,20 @@ defmodule MishkaInstaller.Dependency do
   end
 
   def update_app_version(id, data) do
-    crud_edit(Map.merge(convert_map_from_atom_to_string(data), %{"id" => id, "dependency_type" => "force_update"}))
+    crud_edit(
+      Map.merge(convert_map_from_atom_to_string(data), %{
+        "id" => id,
+        "dependency_type" => "force_update"
+      })
+    )
   end
 
   @spec create_or_update(map()) :: tuple()
   def create_or_update(data) do
     case show_by_name(data.app) do
-      {:error, :get_record_by_field, :dependency} -> create(data)
+      {:error, :get_record_by_field, :dependency} ->
+        create(data)
+
       {:ok, :get_record_by_field, :dependency, record_info} ->
         if Version.compare(data.version, record_info.version) == :gt do
           update_app_version(record_info.id, data)
@@ -75,7 +83,7 @@ defmodule MishkaInstaller.Dependency do
   def dependencies() do
     from(dep in DependencySchema)
     |> fields()
-    |> MishkaInstaller.repo.all()
+    |> MishkaInstaller.repo().all()
   end
 
   def dependencies(:struct) do
@@ -83,45 +91,63 @@ defmodule MishkaInstaller.Dependency do
     |> Enum.map(&struct(DepHandler, &1))
   end
 
-  @spec change_dependency_type_with_app(String.t(), String.t()) :: {:ok, :change_dependency_type_with_app, map()}
-       | {:error, :change_dependency_type_with_app, :dependency, atom() | map()}
+  @spec change_dependency_type_with_app(String.t(), String.t()) ::
+          {:ok, :change_dependency_type_with_app, map()}
+          | {:error, :change_dependency_type_with_app, :dependency, atom() | map()}
   def change_dependency_type_with_app(app, dependency_type) do
-    with {:ok, :get_record_by_field, :dependency, record_info} <- MishkaInstaller.Dependency.show_by_name(app),
-         {:ok, :edit, :dependency, repo_data} <- MishkaInstaller.Dependency.edit(%{"id" => record_info.id, "dependency_type" => dependency_type}) do
-          {:ok, :change_dependency_type_with_app, repo_data}
+    with {:ok, :get_record_by_field, :dependency, record_info} <-
+           MishkaInstaller.Dependency.show_by_name(app),
+         {:ok, :edit, :dependency, repo_data} <-
+           MishkaInstaller.Dependency.edit(%{
+             "id" => record_info.id,
+             "dependency_type" => dependency_type
+           }) do
+      {:ok, :change_dependency_type_with_app, repo_data}
     else
-      {:error, :get_record_by_field, :dependency} -> {:error, :change_dependency_type_with_app, :dependency, :not_found}
+      {:error, :get_record_by_field, :dependency} ->
+        {:error, :change_dependency_type_with_app, :dependency, :not_found}
+
       {:error, :edit, action, :dependency} when action in [:uuid, :get_record_by_id] ->
         {:error, :change_dependency_type_with_app, :dependency, :not_found}
+
       {:error, :edit, :dependency, repo_error} ->
         {:error, :change_dependency_type_with_app, :dependency, repo_error}
     end
   end
 
   defp fields(query) do
-    from [dep] in query,
-    order_by: [desc: dep.inserted_at, desc: dep.id],
-    select: %{
-      app: dep.app,
-      version: dep.version,
-      type: dep.type,
-      url: dep.url,
-      git_tag: dep.git_tag,
-      custom_command: dep.custom_command,
-      dependency_type: dep.dependency_type,
-      dependencies: dep.dependencies
-    }
+    from([dep] in query,
+      order_by: [desc: dep.inserted_at, desc: dep.id],
+      select: %{
+        app: dep.app,
+        version: dep.version,
+        type: dep.type,
+        url: dep.url,
+        git_tag: dep.git_tag,
+        custom_command: dep.custom_command,
+        dependency_type: dep.dependency_type,
+        dependencies: dep.dependencies
+      }
+    )
   end
 
   def subscribe do
-    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, "dependency")
+    Phoenix.PubSub.subscribe(
+      MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
+      "dependency"
+    )
   end
 
   if Mix.env() == :test do
     def notify_subscribers(params, _type_send), do: params
   else
     def notify_subscribers({:ok, action, :dependency, repo_data} = params, type_send) do
-      Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, "dependency", {:ok, type_send, action, repo_data})
+      Phoenix.PubSub.broadcast(
+        MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
+        "dependency",
+        {:ok, type_send, action, repo_data}
+      )
+
       params
     end
 

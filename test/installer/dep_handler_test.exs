@@ -25,17 +25,22 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
 
   setup _context do
     {:ok, :add_new_app, repo_data} = assert DepHandler.add_new_app(@old_ueberauth)
-    on_exit fn ->
+
+    on_exit(fn ->
       clean_json_file()
       MishkaInstaller.Dependency.delete(repo_data.id)
-    end
+    end)
+
     [repo_data: repo_data]
   end
 
   describe "Happy | DepHandler module (▰˘◡˘▰)" do
     test "Create mix deps list from json file", %{repo_data: _repo_data} do
       DepHandler.create_deps_json_file(File.cwd!())
-      {:ok, :check_or_create_deps_json, _json_data} = assert DepHandler.check_or_create_deps_json()
+
+      {:ok, :check_or_create_deps_json, _json_data} =
+        assert DepHandler.check_or_create_deps_json()
+
       [{:ueberauth, "~> 0.6.3"}] = assert DepHandler.mix_read_from_json()
     end
 
@@ -47,41 +52,107 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     test "Create mix deps in mix file", %{repo_data: _repo_data} do
       DepHandler.create_deps_json_file(File.cwd!())
       DepHandler.check_or_create_deps_json()
-      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.5.3"}]
-      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.3"}] = assert DepHandler.append_mix(list)
 
-      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.7"}]
-      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.7"}] = assert DepHandler.append_mix(list)
+      list = [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, "~> 0.5.3"}
+      ]
 
-      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url"}]
-      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url"}] = assert DepHandler.append_mix(list)
+      [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, "~> 0.6.3"}
+      ] = assert DepHandler.append_mix(list)
 
-      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.5.7"}]
-      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, "~> 0.6.3"}] = assert DepHandler.append_mix(list)
+      list = [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, "~> 0.6.7"}
+      ]
 
-      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.7"}]
-      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.7"}]= assert DepHandler.append_mix(list)
+      [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, "~> 0.6.7"}
+      ] = assert DepHandler.append_mix(list)
 
-      list = [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.3"}]
-      [{:finch, "~> 0.12.0"}, {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}, {:ueberauth, git: "url", tag: "0.6.3"}]= assert DepHandler.append_mix(list)
+      list = [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, git: "url"}
+      ]
+
+      [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, git: "url"}
+      ] = assert DepHandler.append_mix(list)
+
+      list = [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, git: "url", tag: "0.5.7"}
+      ]
+
+      [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, "~> 0.6.3"}
+      ] = assert DepHandler.append_mix(list)
+
+      list = [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, git: "url", tag: "0.6.7"}
+      ]
+
+      [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, git: "url", tag: "0.6.7"}
+      ] = assert DepHandler.append_mix(list)
+
+      list = [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, git: "url", tag: "0.6.3"}
+      ]
+
+      [
+        {:finch, "~> 0.12.0"},
+        {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+        {:ueberauth, git: "url", tag: "0.6.3"}
+      ] = assert DepHandler.append_mix(list)
     end
 
-    test "Compare dependencies with json", %{repo_data: _repo_data}  do
+    test "Compare dependencies with json", %{repo_data: _repo_data} do
       DepHandler.create_deps_json_file(File.cwd!())
       DepHandler.check_or_create_deps_json()
       [] = assert DepHandler.compare_dependencies_with_json()
       # TODO: Add a test consider installed app
     end
 
-    test "Compare sub dependencies with json", %{repo_data: _repo_data}  do
+    test "Compare sub dependencies with json", %{repo_data: _repo_data} do
       DepHandler.create_deps_json_file(File.cwd!())
       DepHandler.check_or_create_deps_json()
-      [%{app: :plug, installed_version: '1.13.6', json_max_version: nil, json_min_version: "1.5.0", max_status: nil, min_status: :lt}]
-      = assert DepHandler.compare_sub_dependencies_with_json()
+
+      [
+        %{
+          app: :plug,
+          installed_version: '1.13.6',
+          json_max_version: nil,
+          json_min_version: "1.5.0",
+          max_status: nil,
+          min_status: :lt
+        }
+      ] =
+        assert DepHandler.compare_sub_dependencies_with_json()
+
       # TODO: Add a test consider installed app with sub dependencies
     end
 
-    test "Get deps from mix", %{repo_data: _repo_data}  do
+    test "Get deps from mix", %{repo_data: _repo_data} do
       [
         %{app: :phoenix_pubsub, version: "~> 2.1"},
         %{app: :mishka_developer_tools, version: "~> 0.0.7"},
@@ -96,13 +167,14 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
       ] = assert DepHandler.get_deps_from_mix(MishkaInstaller.MixProject)
     end
 
-    test "Get deps from mix lock", %{repo_data: _repo_data}  do
+    test "Get deps from mix lock", %{repo_data: _repo_data} do
       true = assert is_list(DepHandler.get_deps_from_mix_lock())
     end
 
-    test "Get extensions json path", %{repo_data: _repo_data}  do
-      true = assert DepHandler.extensions_json_path()
-      |> is_binary()
+    test "Get extensions json path", %{repo_data: _repo_data} do
+      true =
+        assert DepHandler.extensions_json_path()
+               |> is_binary()
     end
   end
 

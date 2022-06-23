@@ -6,13 +6,13 @@ defmodule MishkaInstaller.Database.PluginSchema do
   @foreign_key_type :binary_id
 
   schema "plugins" do
-    field :name, :string
-    field :event, :string
-    field :priority, :integer
-    field :status, MishkaInstaller.PluginStatusEnum, default: :started
-    field :depend_type, MishkaInstaller.PluginDependTypeEnum, default: :soft
-    field :depends, {:array, :string}
-    field :extra, {:array, :map}
+    field(:name, :string)
+    field(:event, :string)
+    field(:priority, :integer)
+    field(:status, MishkaInstaller.PluginStatusEnum, default: :started)
+    field(:depend_type, MishkaInstaller.PluginDependTypeEnum, default: :soft)
+    field(:depends, {:array, :string})
+    field(:extra, {:array, :map})
 
     timestamps(type: :utc_datetime)
   end
@@ -24,8 +24,22 @@ defmodule MishkaInstaller.Database.PluginSchema do
   def changeset(struct, params \\ %{}) do
     struct
     |> cast(params, @all_fields)
-    |> validate_required(@required_fields, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You should fill all the required fields."))
-    |> unique_constraint(:name, name: :index_plugins_on_name, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Each plugin should have a unique name, this name existed before."))
+    |> validate_required(@required_fields,
+      message:
+        Gettext.dgettext(
+          MishkaInstaller.gettext(),
+          "mishka_installer",
+          "You should fill all the required fields."
+        )
+    )
+    |> unique_constraint(:name,
+      name: :index_plugins_on_name,
+      message:
+        Gettext.dgettext(
+          MishkaInstaller.gettext(),
+          "mishka_installer",
+          "Each plugin should have a unique name, this name existed before."
+        )
+    )
   end
-
 end

@@ -42,7 +42,15 @@ defmodule MishkaInstaller.Helper.Setting do
   def init(_state) do
     Logger.info("The ETS state of settings was staretd")
     Process.send_after(self(), :sync_with_database, @sync_with_database)
-    table = ETS.Set.new!(name: @ets_table, protection: :public, read_concurrency: true, write_concurrency: true)
+
+    table =
+      ETS.Set.new!(
+        name: @ets_table,
+        protection: :public,
+        read_concurrency: true,
+        write_concurrency: true
+      )
+
     {:ok, %{set: table}, {:continue, :sync_with_database}}
   end
 
@@ -68,10 +76,12 @@ defmodule MishkaInstaller.Helper.Setting do
   @impl true
   def handle_info({:setting, :ok, action, repo_data}, state) do
     Logger.warn("Your ETS state of setting is going to be updated")
+
     case action do
       :delete -> delete(repo_data.name)
       _ -> push(repo_data)
     end
+
     {:noreply, state}
   end
 
@@ -87,10 +97,13 @@ defmodule MishkaInstaller.Helper.Setting do
 
   defp check_custom_pubsub_loaded(state) do
     custom_pubsub = MishkaInstaller.get_config(:pubsub)
+
     cond do
-      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) -> {:noreply, state, 100}
+      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) ->
+        {:noreply, state, 100}
+
       true ->
-        Process.send_after(self(), :sync_with_database, @re_check_binding_db )
+        Process.send_after(self(), :sync_with_database, @re_check_binding_db)
         MishkaInstaller.Setting.subscribe()
         {:noreply, state}
     end
@@ -98,7 +111,9 @@ defmodule MishkaInstaller.Helper.Setting do
 
   defp table() do
     case ETS.Set.wrap_existing(@ets_table) do
-      {:ok, set} -> set
+      {:ok, set} ->
+        set
+
       _ ->
         start_link([])
         table()

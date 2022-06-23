@@ -1,15 +1,22 @@
 defmodule MishkaSendingEmailPlugin.SendingEmail do
   # This module was just made for testing
   alias MishkaSendingEmailPlugin.TestEvent
+
   use MishkaInstaller.Hook,
-      module: __MODULE__,
-      behaviour: TestEvent,
-      event: :on_test_event,
-      initial: []
+    module: __MODULE__,
+    behaviour: TestEvent,
+    event: :on_test_event,
+    initial: []
 
   def initial(args) do
     Logger.warn("SendingEmail plugin was started")
-    event = %PluginState{name: "MishkaSendingEmailPlugin.SendingEmail", event: Atom.to_string(@ref), priority: 100}
+
+    event = %PluginState{
+      name: "MishkaSendingEmailPlugin.SendingEmail",
+      event: Atom.to_string(@ref),
+      priority: 100
+    }
+
     Hook.register(event: event)
     {:ok, @ref, args}
   end

@@ -12,12 +12,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
     # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
-    on_exit fn ->
+    on_exit(fn ->
       :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
       # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
       clean_db()
       :ok
-    end
+    end)
+
     [this_is: "is"]
   end
 
@@ -26,26 +27,70 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
   @plugins [
     %MishkaInstaller.PluginState{name: "nested_plugin_one", event: "nested_event_one"},
-    %MishkaInstaller.PluginState{name: "nested_plugin_two", event: "nested_event_one", depend_type: :hard, depends: ["unnested_plugin_three"]},
-    %MishkaInstaller.PluginState{name: "unnested_plugin_three", event: "nested_event_one", depend_type: :hard, depends: ["nested_plugin_one"]},
+    %MishkaInstaller.PluginState{
+      name: "nested_plugin_two",
+      event: "nested_event_one",
+      depend_type: :hard,
+      depends: ["unnested_plugin_three"]
+    },
+    %MishkaInstaller.PluginState{
+      name: "unnested_plugin_three",
+      event: "nested_event_one",
+      depend_type: :hard,
+      depends: ["nested_plugin_one"]
+    },
     %MishkaInstaller.PluginState{name: "unnested_plugin_four", event: "nested_event_one"},
-    %MishkaInstaller.PluginState{name: "unnested_plugin_five", event: "nested_event_one", depend_type: :hard, depends: ["unnested_plugin_four"]
+    %MishkaInstaller.PluginState{
+      name: "unnested_plugin_five",
+      event: "nested_event_one",
+      depend_type: :hard,
+      depends: ["unnested_plugin_four"]
     }
   ]
 
   @plugins2 [
     %MishkaInstaller.PluginState{name: "one", event: "one", depend_type: :soft},
     %MishkaInstaller.PluginState{name: "two", event: "one", depend_type: :hard, depends: ["one"]},
-    %MishkaInstaller.PluginState{name: "three", event: "one", depend_type: :hard,depends: ["two"]},
-    %MishkaInstaller.PluginState{name: "four", event: "one", depend_type: :hard, depends: ["three"]},
-    %MishkaInstaller.PluginState{name: "five", event: "one", depend_type: :hard, depends: ["four"]}
+    %MishkaInstaller.PluginState{
+      name: "three",
+      event: "one",
+      depend_type: :hard,
+      depends: ["two"]
+    },
+    %MishkaInstaller.PluginState{
+      name: "four",
+      event: "one",
+      depend_type: :hard,
+      depends: ["three"]
+    },
+    %MishkaInstaller.PluginState{
+      name: "five",
+      event: "one",
+      depend_type: :hard,
+      depends: ["four"]
+    }
   ]
 
   @plugins3 [
     %MishkaInstaller.PluginState{name: "one", event: "one", depend_type: :hard, depends: ["two"]},
-    %MishkaInstaller.PluginState{name: "two", event: "one", depend_type: :hard, depends: ["four"]},
-    %MishkaInstaller.PluginState{name: "three", event: "one", depend_type: :hard,depends: ["five"]},
-    %MishkaInstaller.PluginState{name: "four", event: "one", depend_type: :hard, depends: ["three"]},
+    %MishkaInstaller.PluginState{
+      name: "two",
+      event: "one",
+      depend_type: :hard,
+      depends: ["four"]
+    },
+    %MishkaInstaller.PluginState{
+      name: "three",
+      event: "one",
+      depend_type: :hard,
+      depends: ["five"]
+    },
+    %MishkaInstaller.PluginState{
+      name: "four",
+      event: "one",
+      depend_type: :hard,
+      depends: ["three"]
+    },
     %MishkaInstaller.PluginState{name: "five", event: "one", depend_type: :hard, depends: ["one"]}
   ]
 
@@ -57,18 +102,33 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
   test "register plugin, hard depend_type", %{this_is: _this_is} do
     clean_db()
+
     # It is just not enough to set hard as depend_type, you should have some deps in depends list more than 0
     # I think the developer maybe create a mistake, so it let him start his app instead of stopping when we have no depends
-    {:error, :register, _check_data} = assert Hook.register(event: Map.merge(@new_soft_plugin, %{depend_type: :hard, depends: ["test1", "test2"]}))
-    {:error, :register, _check_data} = assert Hook.register(event: Map.merge(@new_soft_plugin, %{name: ""}))
-  end
+    {:error, :register, _check_data} =
+      assert Hook.register(
+               event:
+                 Map.merge(@new_soft_plugin, %{depend_type: :hard, depends: ["test1", "test2"]})
+             )
 
+    {:error, :register, _check_data} =
+      assert Hook.register(event: Map.merge(@new_soft_plugin, %{name: ""}))
+  end
 
   test "start a registerd plugin", %{this_is: _this_is} do
     clean_db()
     Hook.register(event: @new_soft_plugin)
     {:ok, :start, _msg} = assert Hook.start(module: @new_soft_plugin.name)
-    Hook.register(event: Map.merge(@new_soft_plugin, %{name: "ensure_event_plugin", depend_type: :hard, depends: ["test1", "test2"]}))
+
+    Hook.register(
+      event:
+        Map.merge(@new_soft_plugin, %{
+          name: "ensure_event_plugin",
+          depend_type: :hard,
+          depends: ["test1", "test2"]
+        })
+    )
+
     {:error, :start, _msg} = assert Hook.start(module: "ensure_event_plugin")
   end
 
@@ -77,7 +137,12 @@ defmodule MishkaInstallerTest.Event.HookTest do
     Hook.register(event: @new_soft_plugin)
     {:ok, :start, _msg} = assert Hook.start(module: @new_soft_plugin.name)
     {:ok, :restart, _msg} = assert Hook.restart(module: @new_soft_plugin.name)
-    Map.merge(@new_soft_plugin, %{name: "ensure_event_plugin", depend_type: :hard, depends: ["test1", "test2"]})
+
+    Map.merge(@new_soft_plugin, %{
+      name: "ensure_event_plugin",
+      depend_type: :hard,
+      depends: ["test1", "test2"]
+    })
     |> Map.from_struct()
     |> MishkaInstaller.Plugin.create()
 
@@ -89,7 +154,12 @@ defmodule MishkaInstallerTest.Event.HookTest do
     clean_db()
     Hook.register(event: @new_soft_plugin)
     {:ok, :start, _msg} = assert Hook.start(module: @new_soft_plugin.name)
-    Map.merge(@new_soft_plugin, %{name: "ensure_event_plugin", depend_type: :hard, depends: ["test1", "test2"]})
+
+    Map.merge(@new_soft_plugin, %{
+      name: "ensure_event_plugin",
+      depend_type: :hard,
+      depends: ["test1", "test2"]
+    })
     |> Map.from_struct()
     |> MishkaInstaller.Plugin.create()
 
@@ -113,6 +183,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
   test "delete plugins dependencies with dependencies which exist", %{this_is: _this_is} do
     clean_db()
+
     Enum.map(@depends, fn item ->
       Map.merge(@new_soft_plugin, %{name: item, depend_type: :hard})
       |> Map.from_struct()
@@ -120,7 +191,12 @@ defmodule MishkaInstallerTest.Event.HookTest do
     end)
 
     Enum.map(@depends, fn item ->
-      Map.merge(@new_soft_plugin, %{name: item, depend_type: :hard, depends: List.delete(@depends, item), parent_pid: self()})
+      Map.merge(@new_soft_plugin, %{
+        name: item,
+        depend_type: :hard,
+        depends: List.delete(@depends, item),
+        parent_pid: self()
+      })
       |> MishkaInstaller.PluginState.push_call()
     end)
 
@@ -129,7 +205,9 @@ defmodule MishkaInstallerTest.Event.HookTest do
     assert length(MishkaInstaller.Plugin.plugins()) == 0
   end
 
-  test "delete plugins dependencies with nested dependencies which exist, strategy one", %{this_is: _this_is} do
+  test "delete plugins dependencies with nested dependencies which exist, strategy one", %{
+    this_is: _this_is
+  } do
     clean_db()
     Enum.map(@plugins, fn x -> Map.from_struct(x) |> MishkaInstaller.Plugin.create() end)
     Enum.map(@plugins, fn item -> MishkaInstaller.PluginState.push_call(item) end)
@@ -138,7 +216,9 @@ defmodule MishkaInstallerTest.Event.HookTest do
     assert length(MishkaInstaller.Plugin.plugins()) == 2
   end
 
-  test "delete plugins dependencies with nested dependencies which exist, strategy two", %{this_is: _this_is} do
+  test "delete plugins dependencies with nested dependencies which exist, strategy two", %{
+    this_is: _this_is
+  } do
     clean_db()
     Enum.map(@plugins2, fn x -> Map.from_struct(x) |> MishkaInstaller.Plugin.create() end)
     Enum.map(@plugins2, fn item -> MishkaInstaller.PluginState.push_call(item) end)
@@ -147,7 +227,9 @@ defmodule MishkaInstallerTest.Event.HookTest do
     assert length(MishkaInstaller.Plugin.plugins()) == 0
   end
 
-  test "delete plugins dependencies with nested dependencies which exist, strategy three", %{this_is: _this_is} do
+  test "delete plugins dependencies with nested dependencies which exist, strategy three", %{
+    this_is: _this_is
+  } do
     clean_db()
     Enum.map(@plugins3, fn x -> Map.from_struct(x) |> MishkaInstaller.Plugin.create() end)
     Enum.map(@plugins3, fn item -> MishkaInstaller.PluginState.push_call(item) end)
@@ -165,21 +247,42 @@ defmodule MishkaInstallerTest.Event.HookTest do
     }
 
     [
-      %MishkaInstaller.PluginState{name: "MishkaSendingEmailPlugin.SendingEmail", event: :on_test_event, priority: 100},
-      %MishkaInstaller.PluginState{name: "MishkaSendingEmailPlugin.SendingHalt", event: :on_test_event, priority: 2},
-      %MishkaInstaller.PluginState{name: "MishkaSendingEmailPlugin.SendingSMS", event: :on_test_event, priority: 1},
+      %MishkaInstaller.PluginState{
+        name: "MishkaSendingEmailPlugin.SendingEmail",
+        event: :on_test_event,
+        priority: 100
+      },
+      %MishkaInstaller.PluginState{
+        name: "MishkaSendingEmailPlugin.SendingHalt",
+        event: :on_test_event,
+        priority: 2
+      },
+      %MishkaInstaller.PluginState{
+        name: "MishkaSendingEmailPlugin.SendingSMS",
+        event: :on_test_event,
+        priority: 1
+      }
     ]
     |> Enum.map(&Hook.register(event: &1))
 
     :timer.sleep(3000)
-    assert Hook.call(event: "on_test_event", state: sample_of_login_state) == Map.merge(sample_of_login_state, %{ip: "129.0.1.1"})
-    assert Hook.call(event: "return_first_state", state: sample_of_login_state) == sample_of_login_state
+
+    assert Hook.call(event: "on_test_event", state: sample_of_login_state) ==
+             Map.merge(sample_of_login_state, %{ip: "129.0.1.1"})
+
+    assert Hook.call(event: "return_first_state", state: sample_of_login_state) ==
+             sample_of_login_state
   end
 
   test "ensure_event?" do
     Hook.register(event: @new_soft_plugin |> Map.merge(%{name: "MishkaInstaller.PluginState"}))
-    test_plug =
-      %MishkaInstaller.PluginState{name: "MishkaInstaller.Hook", event: "event_one", depend_type: :hard, depends: ["MishkaInstaller.PluginState"]}
+
+    test_plug = %MishkaInstaller.PluginState{
+      name: "MishkaInstaller.Hook",
+      event: "event_one",
+      depend_type: :hard,
+      depends: ["MishkaInstaller.PluginState"]
+    }
 
     {:ok, :ensure_event, _msg} = assert Hook.ensure_event(test_plug, :debug)
     true = assert Hook.ensure_event?(test_plug)
@@ -188,7 +291,9 @@ defmodule MishkaInstallerTest.Event.HookTest do
   def clean_db() do
     MishkaInstaller.Plugin.plugins()
     |> Enum.map(fn x ->
-      {:ok, :get_record_by_field, :plugin, repo_data} = MishkaInstaller.Plugin.show_by_name("#{x.name}")
+      {:ok, :get_record_by_field, :plugin, repo_data} =
+        MishkaInstaller.Plugin.show_by_name("#{x.name}")
+
       MishkaInstaller.Plugin.delete(repo_data.id)
     end)
   end

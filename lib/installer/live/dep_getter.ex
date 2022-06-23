@@ -25,6 +25,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     DepChangesProtector.subscribe()
     MishkaInstaller.Installer.RunTimeSourcing.subscribe()
     MishkaInstaller.DepUpdateJob.subscribe()
+
     socket =
       socket
       |> assign(:selected_form, :upload)
@@ -32,11 +33,19 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       |> assign(:status_message, {nil, nil})
       |> assign(:log, [])
       |> assign(:loaded_apps, Application.loaded_applications())
-      |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
-      |> assign(:update_list, Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, _type, _url, _ver} -> app end))
+      |> assign(
+        :started_applications,
+        Enum.map(Application.started_applications(), fn {app, _, _} -> app end)
+      )
+      |> assign(
+        :update_list,
+        Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, _type, _url, _ver} -> app end)
+      )
       |> assign(:uploaded_files, [])
       |> allow_upload(:dep, accept: ~w(.zip), max_entries: 1)
-    {:ok, socket, temporary_assigns: [log: [], update_list: [], loaded_apps: [], started_applications: []]}
+
+    {:ok, socket,
+     temporary_assigns: [log: [], update_list: [], loaded_apps: [], started_applications: []]}
   end
 
   @impl Phoenix.LiveView
@@ -53,49 +62,69 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   def handle_event("form_select", %{"type" => type} = _params, socket) do
     socket =
       socket
-      |> assign(:status_message, {:nil, nil})
+      |> assign(:status_message, {nil, nil})
       |> assign(:app_name, nil)
       |> assign(:selected_form, String.to_atom(type))
       |> update_app_list()
+
     {:noreply, socket}
   end
 
   @impl Phoenix.LiveView
-  def handle_event("update_app", %{"type" => type} = _params, socket) when type in ["force_update", "soft_update"] do
+  def handle_event("update_app", %{"type" => type} = _params, socket)
+      when type in ["force_update", "soft_update"] do
     if type == "force_update" do
       MishkaInstaller.DepCompileJob.add_job(socket.assigns.app_name, :port)
     else
-      Hook.call(event: @event, state: %OnChangeDependency{app: socket.assigns.app_name, status: :force_update}, operation: :no_return)
+      Hook.call(
+        event: @event,
+        state: %OnChangeDependency{app: socket.assigns.app_name, status: :force_update},
+        operation: :no_return
+      )
     end
+
     socket =
       socket
-      |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request was sent, after receiving any changes we send you a notification")})
+      |> assign(
+        :status_message,
+        {:info,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "Your request was sent, after receiving any changes we send you a notification"
+         )}
+      )
       |> assign(:app_name, nil)
       |> assign(:selected_form, :upload)
+
     {:noreply, socket}
   end
 
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "git", "url" => url, "git_tag" => tag}, socket) do
     res = DepHandler.run(:git, %{url: url, tag: tag}, :port)
+
     new_socket =
       socket
       |> assign(:app_name, res["app_name"])
       |> assign(:status_message, {res["status_message_type"], res["message"]})
       |> assign(:selected_form, res["selected_form"])
       |> assign(:log, [])
+
     {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "hex", "app" => app} = _params, socket) do
     res = DepHandler.run(:hex, app, :port)
+
     new_socket =
       socket
       |> assign(:app_name, res["app_name"])
       |> assign(:status_message, {res["status_message_type"], res["message"]})
       |> assign(:selected_form, res["selected_form"])
       |> assign(:log, [])
+
     {:noreply, new_socket}
   end
 
@@ -103,7 +132,13 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   def handle_event("save", %{"select_form" => "upload"} = _params, socket) do
     uploaded_files =
       consume_uploaded_entries(socket, :dep, fn %{path: path}, entry ->
-        dest = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", entry.client_name])
+        dest =
+          Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+            "deployment/",
+            "extensions/",
+            entry.client_name
+          ])
+
         File.cp!(path, dest)
         {:ok, dest}
       end)
@@ -111,6 +146,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     new_socket =
       if uploaded_files != [] do
         res = DepHandler.run(:upload, uploaded_files, :port)
+
         socket
         |> assign(:app_name, res["app_name"])
         |> assign(:status_message, {res["status_message_type"], res["message"]})
@@ -119,7 +155,15 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         |> update(:uploaded_files, &(&1 ++ uploaded_files))
       else
         socket
-        |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You should select a file.")})
+        |> assign(
+          :status_message,
+          {:danger,
+           Gettext.dgettext(
+             MishkaInstaller.gettext(),
+             "mishka_installer",
+             "You should select a file."
+           )}
+        )
       end
 
     {:noreply, new_socket}
@@ -130,68 +174,129 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     new_socket =
       socket
       |> assign(:status_message, {nil, nil})
+
     {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
   def handle_event("tools", %{"type" => "restore"}, socket) do
     mix_path = MishkaInstaller.get_config(:mix_path)
+
     new_socket =
       case MishkaInstaller.Installer.MixCreator.restore_mix(mix_path) do
         {:ok, _output} ->
           socket
-          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request was done")})
+          |> assign(
+            :status_message,
+            {:info,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "Your request was done"
+             )}
+          )
+
         _ ->
           socket
-          |> assign(:status_message, {:danger,
-          Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request wasn't done, there is a problem, maybe you did not create backup before, or you have no access to this operation.")
-          })
+          |> assign(
+            :status_message,
+            {:danger,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "Your request wasn't done, there is a problem, maybe you did not create backup before, or you have no access to this operation."
+             )}
+          )
       end
+
     {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
   def handle_event("tools", %{"type" => "backup"}, socket) do
     mix_path = MishkaInstaller.get_config(:mix_path)
+
     new_socket =
       case MishkaInstaller.Installer.MixCreator.backup_mix(mix_path) do
         {:ok, _output} ->
           socket
-          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request was done")})
+          |> assign(
+            :status_message,
+            {:info,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "Your request was done"
+             )}
+          )
+
         _ ->
           socket
-          |> assign(:status_message, {:danger,
-          Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your request wasn't done, there is a problem, maybe you have no access to this operation.")
-          })
+          |> assign(
+            :status_message,
+            {:danger,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "Your request wasn't done, there is a problem, maybe you have no access to this operation."
+             )}
+          )
       end
+
     {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
   def handle_event("tools", %{"type" => "task"}, socket) do
     list_app = length(MishkaInstaller.DepUpdateJob.get_all())
+
     new_socket =
       socket
-      |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "%{count} apps need to be updated", count: list_app)})
+      |> assign(
+        :status_message,
+        {:info,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "%{count} apps need to be updated",
+           count: list_app
+         )}
+      )
+
     {:noreply, new_socket}
   end
 
   @impl Phoenix.LiveView
   def handle_event("app_action", %{"operation" => "delete", "app" => app}, socket) do
     MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(app), :uninstall)
+
     case MishkaInstaller.Dependency.show_by_name(app) do
-      {:error, :get_record_by_field, :dependency} -> nil
+      {:error, :get_record_by_field, :dependency} ->
+        nil
+
       {:ok, :get_record_by_field, :dependency, record_info} ->
         Task.Supervisor.start_child(MishkaInstaller.Installer.DepHandler, fn ->
           :timer.sleep(1000)
           MishkaInstaller.Installer.DepHandler.create_mix_file()
         end)
+
         MishkaInstaller.Dependency.delete(record_info.id)
     end
+
     new_socket =
       socket
-      |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The %{app} app was deleted", app: app)})
+      |> assign(
+        :status_message,
+        {:info,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "The %{app} app was deleted",
+           app: app
+         )}
+      )
       |> update_app_list()
+
     {:noreply, new_socket}
   end
 
@@ -201,16 +306,45 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       case Application.start(String.to_atom(app)) do
         :ok ->
           socket
-          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The %{app} app was started successfully, it should be noted if app terminates, it is reported but no other applications are terminated.", app: app)})
+          |> assign(
+            :status_message,
+            {:info,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "The %{app} app was started successfully, it should be noted if app terminates, it is reported but no other applications are terminated.",
+               app: app
+             )}
+          )
           |> assign(:loaded_apps, Application.loaded_applications())
           |> update_app_list()
-        {:error, {:already_started, _app}}->
+
+        {:error, {:already_started, _app}} ->
           socket
-          |> assign(:status_message, {:warning, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Then %{app} apps is already started", app: app)})
+          |> assign(
+            :status_message,
+            {:warning,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "Then %{app} apps is already started",
+               app: app
+             )}
+          )
+
         {:error, _output} ->
           socket
-          |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "An unspecified error has occurred")})
+          |> assign(
+            :status_message,
+            {:danger,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "An unspecified error has occurred"
+             )}
+          )
       end
+
     {:noreply, new_socket}
   end
 
@@ -220,15 +354,44 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       case Application.stop(String.to_atom(app)) do
         :ok ->
           socket
-          |> assign(:status_message, {:info, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "The %{app} app was stopped successfully, it should be noted when stopped, the application is still loaded.", app: app)})
+          |> assign(
+            :status_message,
+            {:info,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "The %{app} app was stopped successfully, it should be noted when stopped, the application is still loaded.",
+               app: app
+             )}
+          )
           |> update_app_list()
-        {:error, {:not_started, _app}}->
+
+        {:error, {:not_started, _app}} ->
           socket
-          |> assign(:status_message, {:warning, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Then %{app} apps is not started", app: app)})
+          |> assign(
+            :status_message,
+            {:warning,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "Then %{app} apps is not started",
+               app: app
+             )}
+          )
+
         {:error, _output} ->
           socket
-          |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "An unspecified error has occurred")})
+          |> assign(
+            :status_message,
+            {:danger,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "An unspecified error has occurred"
+             )}
+          )
       end
+
     {:noreply, new_socket}
   end
 
@@ -238,23 +401,36 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
       case MishkaInstaller.DepUpdateJob.get(app) do
         {_app, :hex, _url, _version} ->
           res = DepHandler.run(:hex, app, :port)
+
           socket
           |> assign(:app_name, res["app_name"])
           |> assign(:status_message, {res["status_message_type"], res["message"]})
           |> assign(:selected_form, res["selected_form"])
           |> assign(:log, [])
+
         {_app, :git, url, tag} ->
           res = DepHandler.run(:git, %{url: url, tag: tag}, :port)
+
           socket
           |> assign(:app_name, res["app_name"])
           |> assign(:status_message, {res["status_message_type"], res["message"]})
           |> assign(:selected_form, res["selected_form"])
           |> assign(:log, [])
+
         _ ->
           socket
-          |> assign(:status_message, {:danger, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "We couldn't find any update for the app you requested, unfortunately.")})
+          |> assign(
+            :status_message,
+            {:danger,
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "We couldn't find any update for the app you requested, unfortunately."
+             )}
+          )
           |> update_app_list()
       end
+
     {:noreply, new_socket}
   end
 
@@ -268,6 +444,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     Task.Supervisor.start_child(MishkaInstaller.Installer.DepHandler, fn ->
       MishkaInstaller.DepUpdateJob.check_added_dependencies_update()
     end)
+
     Process.send_after(self(), {:dependency_update_check}, 5000)
     {:noreply, update_app_list(socket)}
   end
@@ -279,7 +456,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_info({:run_time_sourcing, _answer}, socket) do
-    {:noreply, update(socket, :log, fn messages -> [messages | ["====> Unknown string <===="]] end)}
+    {:noreply,
+     update(socket, :log, fn messages -> [messages | ["====> Unknown string <===="]] end)}
   end
 
   @impl Phoenix.LiveView
@@ -288,15 +466,36 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
   end
 
   @spec error_to_string(:not_accepted | :too_large | :too_many_files) :: String.t()
-  def error_to_string(:too_large), do: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Too large")
-  def error_to_string(:not_accepted), do: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You have selected an unacceptable file type")
-  def error_to_string(:too_many_files), do: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You have selected too many files")
+  def error_to_string(:too_large),
+    do: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Too large")
+
+  def error_to_string(:not_accepted),
+    do:
+      Gettext.dgettext(
+        MishkaInstaller.gettext(),
+        "mishka_installer",
+        "You have selected an unacceptable file type"
+      )
+
+  def error_to_string(:too_many_files),
+    do:
+      Gettext.dgettext(
+        MishkaInstaller.gettext(),
+        "mishka_installer",
+        "You have selected too many files"
+      )
 
   defp update_app_list(socket) do
     socket
     |> assign(:loaded_apps, Application.loaded_applications())
-    |> assign(:started_applications, Enum.map(Application.started_applications, fn {app, _, _} -> app end))
-    |> assign(:update_list, Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, _type, _url, _ver} -> app end))
+    |> assign(
+      :started_applications,
+      Enum.map(Application.started_applications(), fn {app, _, _} -> app end)
+    )
+    |> assign(
+      :update_list,
+      Enum.map(MishkaInstaller.DepUpdateJob.get_all(), fn {app, _type, _url, _ver} -> app end)
+    )
   end
 
   defp dep_form(:upload, assigns) do
@@ -348,7 +547,6 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     </section>
     """
   end
-
 
   defp dep_form(:hex, assigns) do
     ~H"""

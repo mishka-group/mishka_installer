@@ -5,7 +5,7 @@ defmodule MishkaInstaller.Application do
     children = [
       {Finch, name: HexClientApi},
       {Registry, keys: :unique, name: PluginStateRegistry},
-      {DynamicSupervisor, [ strategy: :one_for_one, name: PluginStateOtpRunner]},
+      {DynamicSupervisor, [strategy: :one_for_one, name: PluginStateOtpRunner]},
       {DynamicSupervisor, [strategy: :one_for_one, name: MishkaInstaller.RunTimeObanSupervisor]},
       {Task.Supervisor, name: MishkaInstaller.Activity},
       {Task.Supervisor, name: DepChangesProtectorTask},

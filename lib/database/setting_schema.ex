@@ -15,8 +15,32 @@ defmodule MishkaInstaller.Database.SettingSchema do
   def changeset(struct, params \\ %{}) do
     struct
     |> cast(params, [:name, :configs])
-    |> validate_required([:name, :configs], message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You should fill all the required fields."))
-    |> validate_length(:name, min: 5, max: 50, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Follow the maximum and minimum number of characters allowed."))
-    |> unique_constraint(:section, name: :index_name_on_settings, message: Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Each setting should have a unique name, this name existed before."))
+    |> validate_required([:name, :configs],
+      message:
+        Gettext.dgettext(
+          MishkaInstaller.gettext(),
+          "mishka_installer",
+          "You should fill all the required fields."
+        )
+    )
+    |> validate_length(:name,
+      min: 5,
+      max: 50,
+      message:
+        Gettext.dgettext(
+          MishkaInstaller.gettext(),
+          "mishka_installer",
+          "Follow the maximum and minimum number of characters allowed."
+        )
+    )
+    |> unique_constraint(:section,
+      name: :index_name_on_settings,
+      message:
+        Gettext.dgettext(
+          MishkaInstaller.gettext(),
+          "mishka_installer",
+          "Each setting should have a unique name, this name existed before."
+        )
+    )
   end
 end

@@ -28,19 +28,36 @@ defmodule MishkaInstaller.Reference.OnRouter do
   @type path() :: String.t()
   @type type() :: atom()
   @type endpoint() :: module()
-  @type ref() :: :on_router # Name of this event
+  # Name of this event
+  @type ref() :: :on_router
   @type reason() :: map()
-  @type registerd_info() :: MishkaInstaller.PluginState.t() # information about this plugin on state which was saved
-  @type state() :: %__MODULE__{action: action(), path: path(), endpoint: endpoint(), type: type(), plug_opts: list()}
-  @type t :: state() # help developers to keep elixir style
+  # information about this plugin on state which was saved
+  @type registerd_info() :: MishkaInstaller.PluginState.t()
+  @type state() :: %__MODULE__{
+          action: action(),
+          path: path(),
+          endpoint: endpoint(),
+          type: type(),
+          plug_opts: list()
+        }
+  # help developers to keep elixir style
+  @type t :: state()
   @type optional_callbacks :: {:ok, ref(), registerd_info()} | {:error, ref(), reason()}
 
-  @callback initial(list()) :: {:ok, ref(), list()} | {:error, ref(), reason()} # Register hook
-  @callback call(state()) :: {:reply, state()} | {:reply, :halt, state()}  # Developer should decide what and Hook call function
-  @callback stop(registerd_info()) :: optional_callbacks() # Stop of hook module
-  @callback restart(registerd_info()) :: optional_callbacks() # Restart of hook module
-  @callback start(registerd_info()) :: optional_callbacks() # Start of hook module
-  @callback delete(registerd_info()) :: optional_callbacks() # Delete of hook module
-  @callback unregister(registerd_info()) :: optional_callbacks() # Unregister of hook module
-  @optional_callbacks stop: 1, restart: 1, start: 1, delete: 1, unregister: 1 # Developer can use this callbacks if he/she needs
+  # Register hook
+  @callback initial(list()) :: {:ok, ref(), list()} | {:error, ref(), reason()}
+  # Developer should decide what and Hook call function
+  @callback call(state()) :: {:reply, state()} | {:reply, :halt, state()}
+  # Stop of hook module
+  @callback stop(registerd_info()) :: optional_callbacks()
+  # Restart of hook module
+  @callback restart(registerd_info()) :: optional_callbacks()
+  # Start of hook module
+  @callback start(registerd_info()) :: optional_callbacks()
+  # Delete of hook module
+  @callback delete(registerd_info()) :: optional_callbacks()
+  # Unregister of hook module
+  @callback unregister(registerd_info()) :: optional_callbacks()
+  # Developer can use this callbacks if he/she needs
+  @optional_callbacks stop: 1, restart: 1, start: 1, delete: 1, unregister: 1
 end

@@ -5,9 +5,9 @@ defmodule MishkaInstaller.Database.Helper do
   @spec translate_errors(Ecto.Changeset.t()) :: %{optional(atom) => [binary | map]}
   def translate_errors(changeset) do
     Ecto.Changeset.traverse_errors(changeset, fn {msg, opts} ->
-        Enum.reduce(opts, msg, fn {key, value}, acc ->
-          String.replace(acc, "%{#{key}}", to_string(value))
-        end)
+      Enum.reduce(opts, msg, fn {key, value}, acc ->
+        String.replace(acc, "%{#{key}}", to_string(value))
+      end)
     end)
   end
 
@@ -15,7 +15,7 @@ defmodule MishkaInstaller.Database.Helper do
   def convert_string_map_to_atom_map(map) do
     map
     |> Map.new(fn {k, v} ->
-        {String.to_existing_atom(k), v}
+      {String.to_existing_atom(k), v}
     end)
   end
 
@@ -23,13 +23,24 @@ defmodule MishkaInstaller.Database.Helper do
   def validate_binary_id(changeset, field, options \\ []) do
     validate_change(changeset, field, fn _, uuid ->
       case uuid(uuid) do
-        {:ok, :uuid, _record_id} -> []
-        {:error, :uuid} -> [{field, options[:message] || Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "ID should be as a UUID type.")}]
+        {:ok, :uuid, _record_id} ->
+          []
+
+        {:error, :uuid} ->
+          [
+            {field,
+             options[:message] ||
+               Gettext.dgettext(
+                 MishkaInstaller.gettext(),
+                 "mishka_installer",
+                 "ID should be as a UUID type."
+               )}
+          ]
       end
     end)
   end
 
-  @spec uuid(any) :: {:error, :uuid} | {:ok, :uuid, Ecto.UUID.t}
+  @spec uuid(any) :: {:error, :uuid} | {:ok, :uuid, Ecto.UUID.t()}
   def uuid(id) do
     case Ecto.UUID.cast(id) do
       {:ok, record_id} -> {:ok, :uuid, record_id}
@@ -42,12 +53,12 @@ defmodule MishkaInstaller.Database.Helper do
     if sandbox_pool?() do
       monitor_parent(parent_pid, orphan_msg)
       # this addresses #1
-      Ecto.Adapters.SQL.Sandbox.allow(MishkaInstaller.repo, parent_pid, self())
+      Ecto.Adapters.SQL.Sandbox.allow(MishkaInstaller.repo(), parent_pid, self())
     end
   end
 
   def sandbox_pool?() do
-    MishkaInstaller.repo == Ecto.Integration.TestRepo
+    MishkaInstaller.repo() == Ecto.Integration.TestRepo
   end
 
   defp monitor_parent(parent_pid, orphan_msg) do
@@ -73,5 +84,4 @@ defmodule MishkaInstaller.Database.Helper do
       :ok
     end
   end
-
 end

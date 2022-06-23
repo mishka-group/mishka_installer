@@ -1,9 +1,26 @@
 defmodule MishkaInstaller.Installer.DepHandler do
   @event "on_change_dependency"
-  alias MishkaInstaller.{Dependency, Installer.MixCreator, Installer.DepChangesProtector, Installer.RunTimeSourcing}
+  alias MishkaInstaller.{
+    Dependency,
+    Installer.MixCreator,
+    Installer.DepChangesProtector,
+    Installer.RunTimeSourcing
+  }
+
   alias MishkaInstaller.Helper.Extra
   require Logger
-  defstruct [:app, :version, :type, :url, :git_tag, :custom_command, :dependency_type, dependencies: []]
+
+  defstruct [
+    :app,
+    :version,
+    :type,
+    :url,
+    :git_tag,
+    :custom_command,
+    :dependency_type,
+    dependencies: []
+  ]
+
   @moduledoc """
 
   A module that holds new dependencies' information, and add them into database or validating to implement in runtime
@@ -60,15 +77,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @type run() :: :hex | :git | :upload
   @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
   @type t() :: %__MODULE__{
-    app: String.t() | nil,
-    version: String.t() | nil,
-    type: String.t() | nil,
-    url: String.t() | nil,
-    git_tag: String.t() | nil,
-    custom_command: String.t() | nil,
-    dependency_type: String.t() | nil,
-    dependencies: [map()],
-  }
+          app: String.t() | nil,
+          version: String.t() | nil,
+          type: String.t() | nil,
+          url: String.t() | nil,
+          git_tag: String.t() | nil,
+          custom_command: String.t() | nil,
+          dependency_type: String.t() | nil,
+          dependencies: [map()]
+        }
 
   @doc """
     ## Run and Get a dependency
@@ -130,11 +147,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
     mix_path = MishkaInstaller.get_config(:mix_path)
     MixCreator.backup_mix(mix_path)
     create_deps_json_file(MishkaInstaller.get_config(:project_path))
+
     list_json_dpes =
-      Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
-      |> Enum.any?(& !&1)
+      Enum.map(mix_read_from_json(), fn {key, _v} ->
+        String.contains?(File.read!(mix_path), "#{key}")
+      end)
+      |> Enum.any?(&(!&1))
 
     MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
+
     if list_json_dpes do
       Logger.warn("Try to re-create Mix file")
       create_mix_file_and_start_compile(app_name, output_type)
@@ -147,11 +168,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def create_mix_file() do
     mix_path = MishkaInstaller.get_config(:mix_path)
     create_deps_json_file(MishkaInstaller.get_config(:project_path))
+
     list_json_dpes =
-      Enum.map(mix_read_from_json(), fn {key, _v} -> String.contains?(File.read!(mix_path), "#{key}") end)
-      |> Enum.any?(& !&1)
+      Enum.map(mix_read_from_json(), fn {key, _v} ->
+        String.contains?(File.read!(mix_path), "#{key}")
+      end)
+      |> Enum.any?(&(!&1))
 
     MixCreator.create_mix(MishkaInstaller.get_config(:mix).project[:deps], mix_path)
+
     if list_json_dpes do
       Logger.warn("Try to re-create Mix file")
       create_mix_file()
@@ -167,8 +192,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def add_new_app(%__MODULE__{} = app_info) do
     case check_or_create_deps_json() do
       {:ok, :check_or_create_deps_json, exist_json} ->
-        insert_new_ap({:open_file, File.open(extensions_json_path(), [:read, :write])}, app_info, exist_json)
-      {:error, :check_or_create_deps_json, msg} -> {:error, :add_new_app, :file, msg}
+        insert_new_ap(
+          {:open_file, File.open(extensions_json_path(), [:read, :write])},
+          app_info,
+          exist_json
+        )
+
+      {:error, :check_or_create_deps_json, msg} ->
+        {:error, :add_new_app, :file, msg}
     end
   end
 
@@ -176,7 +207,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def read_dep_json(json \\ File.read!(extensions_json_path())) do
     {:ok, :read_dep_json, json |> Jason.decode!()}
   rescue
-    _e -> {:error, :read_dep_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You do not have access to read this file or maybe the file does not exist or even has syntax error")}
+    _e ->
+      {:error, :read_dep_json,
+       Gettext.dgettext(
+         MishkaInstaller.gettext(),
+         "mishka_installer",
+         "You do not have access to read this file or maybe the file does not exist or even has syntax error"
+       )}
   end
 
   @spec mix_read_from_json :: list
@@ -184,6 +221,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     case read_dep_json() do
       {:ok, :read_dep_json, data} ->
         Enum.map(data, fn item -> mix_creator(item["type"], item) end)
+
       {:error, :read_dep_json, msg} ->
         raise msg <> ". To make sure, re-create the JSON file from scratch."
     end
@@ -191,88 +229,123 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   @spec append_mix([tuple()]) :: list
   def append_mix(list) do
-    new_list = Enum.map(list , &(&1 |> Tuple.to_list |> List.first()))
+    new_list = Enum.map(list, &(&1 |> Tuple.to_list() |> List.first()))
+
     json_mix =
-      Enum.map(mix_read_from_json(), & mix_item(&1, new_list, list))
-      |> Enum.reject(& is_nil(&1))
-      Enum.reject(list, fn item ->
-        (List.first(Tuple.to_list(item))) in Enum.map(json_mix, fn item -> List.first(Tuple.to_list(item)) end)
-      end) ++ json_mix
+      Enum.map(mix_read_from_json(), &mix_item(&1, new_list, list))
+      |> Enum.reject(&is_nil(&1))
+
+    Enum.reject(list, fn item ->
+      List.first(Tuple.to_list(item)) in Enum.map(json_mix, fn item ->
+        List.first(Tuple.to_list(item))
+      end)
+    end) ++ json_mix
   rescue
     _e -> list
   end
 
-  @spec compare_dependencies_with_json(installed_apps()| any()) :: list | {:error, :compare_dependencies_with_json, String.t()}
-  def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
+  @spec compare_dependencies_with_json(installed_apps() | any()) ::
+          list | {:error, :compare_dependencies_with_json, String.t()}
+  def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications()) do
     with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
          {:ok, :read_dep_json, json_data} <- read_dep_json(exist_json) do
+      installed_apps =
+        Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
 
-        installed_apps = Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
-        Enum.map(json_data, fn app ->
-          case Map.fetch(installed_apps, app["app"]) do
-            :error -> nil
-            {:ok, {installed_app, _des, installed_version}} ->
-              %{
-                app: installed_app,
-                json_version: app["version"],
-                installed_version: installed_version,
-                status: Version.compare(String.trim(app["version"]), "#{installed_version}")
-              }
-          end
-        end)
-        |> Enum.reject(& is_nil(&1))
+      Enum.map(json_data, fn app ->
+        case Map.fetch(installed_apps, app["app"]) do
+          :error ->
+            nil
+
+          {:ok, {installed_app, _des, installed_version}} ->
+            %{
+              app: installed_app,
+              json_version: app["version"],
+              installed_version: installed_version,
+              status: Version.compare(String.trim(app["version"]), "#{installed_version}")
+            }
+        end
+      end)
+      |> Enum.reject(&is_nil(&1))
     else
       {:error, :check_or_create_deps_json, msg} -> {:error, :compare_dependencies_with_json, msg}
       _ -> {:error, :compare_dependencies_with_json, "invalid Json file"}
     end
   end
 
-  @spec compare_sub_dependencies_with_json(any) :: list | {:error, :compare_sub_dependencies_with_json, String.t()}
-  def compare_sub_dependencies_with_json(installed_apps \\ Application.loaded_applications) do
+  @spec compare_sub_dependencies_with_json(any) ::
+          list | {:error, :compare_sub_dependencies_with_json, String.t()}
+  def compare_sub_dependencies_with_json(installed_apps \\ Application.loaded_applications()) do
     with {:ok, :check_or_create_deps_json, exist_json} <- check_or_create_deps_json(),
          {:ok, :read_dep_json, json_data} <- read_dep_json(exist_json) do
+      installed_apps =
+        Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
 
-      installed_apps = Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
       Enum.map(merge_json_by_min_version(json_data), fn app ->
         case Map.fetch(installed_apps, app["app"]) do
-          :error -> nil
+          :error ->
+            nil
+
           {:ok, {installed_app, _des, installed_version}} ->
             %{
               app: installed_app,
               json_min_version: app["min"],
               json_max_version: app["max"],
               installed_version: installed_version,
-              min_status: if(!is_nil(app["min"]), do: Version.compare(String.trim(app["min"]), "#{installed_version}"), else: nil),
-              max_status: if(!is_nil(app["max"]), do: Version.compare(String.trim(app["max"]), "#{installed_version}"), else: nil)
+              min_status:
+                if(!is_nil(app["min"]),
+                  do: Version.compare(String.trim(app["min"]), "#{installed_version}"),
+                  else: nil
+                ),
+              max_status:
+                if(!is_nil(app["max"]),
+                  do: Version.compare(String.trim(app["max"]), "#{installed_version}"),
+                  else: nil
+                )
             }
         end
       end)
-      |> Enum.reject(& is_nil(&1))
+      |> Enum.reject(&is_nil(&1))
     else
-      {:error, :check_or_create_deps_json, msg} -> {:error, :compare_sub_dependencies_with_json, msg}
-      _ -> {:error, :compare_sub_dependencies_with_json, "invalid Json file"}
+      {:error, :check_or_create_deps_json, msg} ->
+        {:error, :compare_sub_dependencies_with_json, msg}
+
+      _ ->
+        {:error, :compare_sub_dependencies_with_json, "invalid Json file"}
     end
   end
 
-  @spec check_or_create_deps_json(binary) :: {:ok, :check_or_create_deps_json, String.t()} | {:error, :check_or_create_deps_json, String.t()}
-  def check_or_create_deps_json(project_path \\ (MishkaInstaller.get_config(:project_path) || File.cwd!())) do
-    with {:deployment_path, true} <- {:deployment_path, File.exists?(Path.join(project_path, ["deployment"]))},
-         {:extensions_path, true} <- {:extensions_path, File.exists?(Path.join(project_path, ["deployment/", "extensions"]))},
+  @spec check_or_create_deps_json(binary) ::
+          {:ok, :check_or_create_deps_json, String.t()}
+          | {:error, :check_or_create_deps_json, String.t()}
+  def check_or_create_deps_json(
+        project_path \\ MishkaInstaller.get_config(:project_path) || File.cwd!()
+      ) do
+    with {:deployment_path, true} <-
+           {:deployment_path, File.exists?(Path.join(project_path, ["deployment"]))},
+         {:extensions_path, true} <-
+           {:extensions_path,
+            File.exists?(Path.join(project_path, ["deployment/", "extensions"]))},
          {:json_file, true} <- {:json_file, File.exists?(extensions_json_path())},
-         {:empty_json, true, json_data} <- {:empty_json, File.read!(extensions_json_path()) != "", File.read!(extensions_json_path())},
+         {:empty_json, true, json_data} <-
+           {:empty_json, File.read!(extensions_json_path()) != "",
+            File.read!(extensions_json_path())},
          {:ok, :read_dep_json, _converted_json} <- read_dep_json(json_data) do
-
-         {:ok, :check_or_create_deps_json, json_data}
+      {:ok, :check_or_create_deps_json, json_data}
     else
       {:deployment_path, false} ->
         create_deps_json_directory(project_path, "deployment")
+
       {:extensions_path, false} ->
         create_deps_json_directory(project_path, "deployment/extensions")
+
       {:json_file, false} ->
         create_deps_json_file(project_path)
+
       {:empty_json, false, _data} ->
         File.rm_rf(extensions_json_path())
         create_deps_json_file(project_path)
+
       {:error, :read_dep_json, _msg} ->
         File.rm_rf(extensions_json_path())
         create_deps_json_file(project_path)
@@ -281,7 +354,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   @spec get_deps_from_mix(module()) :: list
   def get_deps_from_mix(mix_module) do
-    [{:deps, app_info} | _t] = Keyword.filter(mix_module.project, fn {key, _value} -> key == :deps end)
+    [{:deps, app_info} | _t] =
+      Keyword.filter(mix_module.project, fn {key, _value} -> key == :deps end)
+
     Enum.map(app_info, fn app_info ->
       [app, version] = Tuple.to_list(app_info) |> Enum.take(2)
       %{app: app, version: version}
@@ -290,7 +365,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   @spec get_deps_from_mix_lock :: list
   def get_deps_from_mix_lock() do
-    Mix.Dep.Lock.read
+    Mix.Dep.Lock.read()
     |> Map.to_list()
     |> Enum.map(fn {key, list} ->
       [_h | [_app, version]] = Tuple.to_list(list) |> Enum.take(3)
@@ -304,37 +379,54 @@ defmodule MishkaInstaller.Installer.DepHandler do
     Path.join(path, ["deployment/", "extensions/", "extensions.json"])
   end
 
-  @spec create_deps_json_file(binary()) :: {:error, :check_or_create_deps_json, binary} | {:ok, :check_or_create_deps_json, binary}
+  @spec create_deps_json_file(binary()) ::
+          {:error, :check_or_create_deps_json, binary} | {:ok, :check_or_create_deps_json, binary}
   def create_deps_json_file(project_path) do
     case File.open(extensions_json_path(), [:write]) do
       {:ok, file} ->
         IO.binwrite(file, Jason.encode!(MishkaInstaller.Dependency.dependencies()))
         File.close(file)
         check_or_create_deps_json(project_path)
-      _error -> {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You do not have sufficient access to create this file. Please add it manually.")}
+
+      _error ->
+        {:error, :check_or_create_deps_json,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "You do not have sufficient access to create this file. Please add it manually."
+         )}
     end
   end
 
-  @spec compare_installed_deps_with_app_file(String.t()) :: {:error, :compare_installed_deps_with_app_file, String.t()} |
-        {:ok, :compare_installed_deps_with_app_file, list()}
+  @spec compare_installed_deps_with_app_file(String.t()) ::
+          {:error, :compare_installed_deps_with_app_file, String.t()}
+          | {:ok, :compare_installed_deps_with_app_file, list()}
   def compare_installed_deps_with_app_file(app) do
-    new_app_path = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
+    new_app_path =
+      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
+
     if File.dir?(new_app_path) and File.dir?(new_app_path <> "/_build/#{Mix.env()}/lib") do
       apps_list =
         File.ls!(new_app_path <> "/_build/#{Mix.env()}/lib")
         |> Enum.map(fn sub_app ->
-          with {:ok, bin} <- RunTimeSourcing.read_app(new_app_path, sub_app) ,
-              {:ok, {:application, _, properties}} <- RunTimeSourcing.consult_app_file(bin),
-              true <- compare_version_with_installed_app(sub_app, properties[:vsn]) do
-                {sub_app, new_app_path <> "/_build/#{Mix.env()}/lib/#{sub_app}"}
+          with {:ok, bin} <- RunTimeSourcing.read_app(new_app_path, sub_app),
+               {:ok, {:application, _, properties}} <- RunTimeSourcing.consult_app_file(bin),
+               true <- compare_version_with_installed_app(sub_app, properties[:vsn]) do
+            {sub_app, new_app_path <> "/_build/#{Mix.env()}/lib/#{sub_app}"}
           else
             _ -> nil
           end
         end)
-        |> Enum.reject(& is_nil(&1))
+        |> Enum.reject(&is_nil(&1))
+
       {:ok, :compare_installed_deps_with_app_file, apps_list}
     else
-      {:error, :compare_installed_deps_with_app_file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "App folder or its _build does not exist")}
+      {:error, :compare_installed_deps_with_app_file,
+       Gettext.dgettext(
+         MishkaInstaller.gettext(),
+         "mishka_installer",
+         "App folder or its _build does not exist"
+       )}
     end
   end
 
@@ -352,45 +444,96 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
-      :ok -> check_or_create_deps_json(project_path)
-      {:error, :eacces} -> {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You do not have sufficient access to create this directory. Please add it manually.")}
-      {:error, :enospc} -> {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "there is no space left on the device.")}
+      :ok ->
+        check_or_create_deps_json(project_path)
+
+      {:error, :eacces} ->
+        {:error, :check_or_create_deps_json,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "You do not have sufficient access to create this directory. Please add it manually."
+         )}
+
+      {:error, :enospc} ->
+        {:error, :check_or_create_deps_json,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "there is no space left on the device."
+         )}
+
       {:error, e} when e in [:eexist, :enoent, :enotdir] ->
-        {:error, :check_or_create_deps_json, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Please contact plugin support when you encounter this error.")}
+        {:error, :check_or_create_deps_json,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "Please contact plugin support when you encounter this error."
+         )}
     end
   end
 
   # Ref: https://elixirforum.com/t/how-to-improve-sort-of-maps-in-a-list-which-have-duplicate-key/47486
   defp merge_json_by_min_version(json_data) do
-    Enum.flat_map(json_data, &(&1["dependencies"]))
-    |> Enum.group_by(&(&1["app"]))
+    Enum.flat_map(json_data, & &1["dependencies"])
+    |> Enum.group_by(& &1["app"])
     |> Enum.map(fn {_key, list} ->
-      Enum.max_by(list, &(&1["min"]), Version)
+      Enum.max_by(list, & &1["min"], Version)
     end)
   end
 
   defp insert_new_ap({:open_file, {:ok, _file}}, app_info, exist_json) do
     with {:decode, {:ok, exist_json_data}} <- {:decode, Jason.decode(exist_json)},
-         {:duplicate_app, false} <- {:duplicate_app, Enum.any?(exist_json_data, &(&1["app"] == Map.get(app_info, :app) || Map.get(app_info, "app")))},
+         {:duplicate_app, false} <-
+           {:duplicate_app,
+            Enum.any?(
+              exist_json_data,
+              &(&1["app"] == Map.get(app_info, :app) || Map.get(app_info, "app"))
+            )},
          map_app_info <- [Map.from_struct(app_info)],
          {:encode, {:ok, _new_apps}} <- {:encode, Jason.encode(exist_json_data ++ map_app_info)},
-         {:ok, :add, :dependency, repo_data} <- MishkaInstaller.Dependency.create(Map.from_struct(app_info)) do
-          # after the new app added into the database, the DepChangesProtector module remove the json file and re-create it
-          {:ok, :add_new_app, repo_data}
+         {:ok, :add, :dependency, repo_data} <-
+           MishkaInstaller.Dependency.create(Map.from_struct(app_info)) do
+      # after the new app added into the database, the DepChangesProtector module remove the json file and re-create it
+      {:ok, :add_new_app, repo_data}
     else
       {:decode, {:error, _error}} ->
-        {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it")}
+        {:error, :add_new_app, :file,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "We can not decode the JSON file, because this file has syntax problems. Please delete this file or fix it"
+         )}
+
       {:duplicate_app, true} ->
-        {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "You can not insert new app which is duplicate, if you want to update it please use another function.")}
-      {:encode, {:error, _error}} -> {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "We can not encode your new app data, please check your data.")}
-      {:error, :add, :dependency, repo_error} -> {:error, :add_new_app, :changeset, repo_error}
+        {:error, :add_new_app, :file,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "You can not insert new app which is duplicate, if you want to update it please use another function."
+         )}
+
+      {:encode, {:error, _error}} ->
+        {:error, :add_new_app, :file,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "We can not encode your new app data, please check your data."
+         )}
+
+      {:error, :add, :dependency, repo_error} ->
+        {:error, :add_new_app, :changeset, repo_error}
     end
   end
 
-  defp insert_new_ap({:open_file, {:error, _posix}}, _app_info, _exist_json), do:
-                  {:error, :add_new_app, :file, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-                    "Unfortunately, the JSON concerned file either does not exist or we do not have access to it. You can delete or create it in your panel, but before that please check you have enough access to edit it.")
-                  }
+  defp insert_new_ap({:open_file, {:error, _posix}}, _app_info, _exist_json),
+    do:
+      {:error, :add_new_app, :file,
+       Gettext.dgettext(
+         MishkaInstaller.gettext(),
+         "mishka_installer",
+         "Unfortunately, the JSON concerned file either does not exist or we do not have access to it. You can delete or create it in your panel, but before that please check you have enough access to edit it."
+       )}
 
   defp mix_creator("hex", data) do
     {String.to_atom(data["app"]), "~> #{String.trim(data["version"])}"}
@@ -398,7 +541,12 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   defp mix_creator("path", data) do
     uploaded_extension =
-      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{data["app"]}"])
+      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+        "deployment/",
+        "extensions/",
+        "#{data["app"]}"
+      ])
+
     {String.to_atom(data["app"]), path: uploaded_extension}
   end
 
@@ -406,6 +554,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     case data["git_tag"] do
       nil ->
         {String.to_atom(data["app"]), git: data["url"]}
+
       _ ->
         {String.to_atom(data["app"]), git: data["url"], tag: data["git_tag"]}
     end
@@ -416,21 +565,40 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp mix_item({_app, git: _url} = value, _app_list, _deps_list), do: value
 
   defp mix_item({app, git: _url, tag: imporetd_version} = value, app_list, deps_list) do
-    if app in app_list, do: check_same_app_version(app, deps_list, imporetd_version, value), else: value
+    if app in app_list,
+      do: check_same_app_version(app, deps_list, imporetd_version, value),
+      else: value
   end
 
   defp mix_item({app, imporetd_version} = value, app_list, deps_list) do
-    if app in app_list, do: check_same_app_version(app, deps_list, imporetd_version, value), else: value
+    if app in app_list,
+      do: check_same_app_version(app, deps_list, imporetd_version, value),
+      else: value
   end
 
   defp check_same_app_version(app, deps_list, imporetd_version, value) do
-    founded_app = Enum.find(deps_list, fn item -> (Enum.take(Tuple.to_list(item), 1) |> List.first()) == app end)
-    case Enum.take(Tuple.to_list(founded_app), 3) |> List.to_tuple do
-      {_founded_app_name, git: _url} -> nil
+    founded_app =
+      Enum.find(deps_list, fn item -> Enum.take(Tuple.to_list(item), 1) |> List.first() == app end)
+
+    case Enum.take(Tuple.to_list(founded_app), 3) |> List.to_tuple() do
+      {_founded_app_name, git: _url} ->
+        nil
+
       {_founded_app_name, git: _url, tag: tag} ->
-        if Version.compare(clean_mix_version(imporetd_version), clean_mix_version(tag)) in [:eq, :lt], do: nil, else: value
+        if Version.compare(clean_mix_version(imporetd_version), clean_mix_version(tag)) in [
+             :eq,
+             :lt
+           ],
+           do: nil,
+           else: value
+
       {_founded_app_name, version} ->
-        if Version.compare(clean_mix_version(imporetd_version), clean_mix_version(version)) in [:eq, :lt], do: nil, else: value
+        if Version.compare(clean_mix_version(imporetd_version), clean_mix_version(version)) in [
+             :eq,
+             :lt
+           ],
+           do: nil,
+           else: value
     end
   rescue
     _e -> nil
@@ -453,11 +621,22 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp check_app_status(result, type, file_path) when type in [:git, :upload] do
     case result do
       {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
-        {:error, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-          "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is %{result}", result: result)}
+        {:error,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "Unfortunately, an error occurred while we were comparing your mix.exs file. The flag of erorr is %{result}",
+           result: result
+         )}
+
       data ->
-        if Enum.any?(data, & (&1 == {:error, :package, :convert_ast_output})) do
-          {:error, Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Your mix.exs file must contain the app, version and source_url parameters")}
+        if Enum.any?(data, &(&1 == {:error, :package, :convert_ast_output})) do
+          {:error,
+           Gettext.dgettext(
+             MishkaInstaller.gettext(),
+             "mishka_installer",
+             "Your mix.exs file must contain the app, version and source_url parameters"
+           )}
         else
           create_app_info(data, if(type == :git, do: type, else: :path))
           |> Map.from_struct()
@@ -470,18 +649,46 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp check_app_status({:error, :package, status}, type, _) do
     msg =
       if status == :not_found do
-        Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Are you sure you have entered the package name or url correctly?")
+        Gettext.dgettext(
+          MishkaInstaller.gettext(),
+          "mishka_installer",
+          "Are you sure you have entered the package name or url correctly?"
+        )
       else
-        Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Unfortunately, we cannot connect to %{type} server now, please try other time! or make it correct", type: type)
+        Gettext.dgettext(
+          MishkaInstaller.gettext(),
+          "mishka_installer",
+          "Unfortunately, we cannot connect to %{type} server now, please try other time! or make it correct",
+          type: type
+        )
       end
+
     {:error, msg}
   end
 
-  defp rename_folder_copy_to_deps(data, file_path) when not is_nil(file_path) and is_binary(file_path) do
-    file = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{Path.basename(file_path, ".zip")}"])
-    new_name = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{data.app}"])
+  defp rename_folder_copy_to_deps(data, file_path)
+       when not is_nil(file_path) and is_binary(file_path) do
+    file =
+      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+        "deployment/",
+        "extensions/",
+        "#{Path.basename(file_path, ".zip")}"
+      ])
+
+    new_name =
+      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+        "deployment/",
+        "extensions/",
+        "#{data.app}"
+      ])
+
     File.rename!(file, new_name)
-    File.cp_r!(new_name, Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{data.app}"]))
+
+    File.cp_r!(
+      new_name,
+      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{data.app}"])
+    )
+
     data
   end
 
@@ -492,48 +699,63 @@ defmodule MishkaInstaller.Installer.DepHandler do
       case Dependency.create_or_update(data) do
         {:ok, :add, :dependency, repo_data} ->
           {:ok, :no_state,
-            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-            "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue."),
-          repo_data.app
-        }
+           Gettext.dgettext(
+             MishkaInstaller.gettext(),
+             "mishka_installer",
+             "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue."
+           ), repo_data.app}
 
         {:ok, :edit, :dependency, repo_data} ->
           if MishkaInstaller.PluginETS.get_all(event: @event) == [] do
             {:ok, :no_state,
-              Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-              "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue."),
-            repo_data.app
-          }
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "We could not find any registered-app that has important state, hence you can update safely. It should be noted if you send multi apps before finishing previous app, other new apps are saved in a queue."
+             ), repo_data.app}
           else
             {:ok, :registered_app,
-              Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-              "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue. After their response, we will change the %{app} dependency and let you know about its latest news.", app: repo_data.app),
-            repo_data.app}
+             Gettext.dgettext(
+               MishkaInstaller.gettext(),
+               "mishka_installer",
+               "There is an important state for an app at least, so we sent a notification to them and put your request in the update queue. After their response, we will change the %{app} dependency and let you know about its latest news.",
+               app: repo_data.app
+             ), repo_data.app}
           end
+
         {:error, action, :dependency, _repo_error} when action in [:add, :edit] ->
           # TODO: save it in activities
           {:error,
-            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-            "Unfortunately, an error occurred while storing the data in the database. To check for errors, see the Activities section, and if this error persists, report it to support.")
-          }
+           Gettext.dgettext(
+             MishkaInstaller.gettext(),
+             "mishka_installer",
+             "Unfortunately, an error occurred while storing the data in the database. To check for errors, see the Activities section, and if this error persists, report it to support."
+           )}
 
         {:error, action, :uuid, _error_tag} when action in [:uuid, :get_record_by_id] ->
           # TODO: save it in activities
           {:error,
-            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-            "Unfortunately, an error occurred while storing the data in the database. To check for errors, see the Activities section, and if this error persists, report it to support.")
-          }
+           Gettext.dgettext(
+             MishkaInstaller.gettext(),
+             "mishka_installer",
+             "Unfortunately, an error occurred while storing the data in the database. To check for errors, see the Activities section, and if this error persists, report it to support."
+           )}
+
         {:error, :update_app_version, :older_version} ->
           {:error,
-            Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-            "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released")
-          }
+           Gettext.dgettext(
+             MishkaInstaller.gettext(),
+             "mishka_installer",
+             "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"
+           )}
       end
     else
       {:error,
-        Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer",
-        "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released")
-      }
+       Gettext.dgettext(
+         MishkaInstaller.gettext(),
+         "mishka_installer",
+         "You have already installed this library and the installed version is the same as the latest version of the Hex site. Please take action when a new version of this app is released"
+       )}
     end
   end
 
@@ -541,31 +763,60 @@ defmodule MishkaInstaller.Installer.DepHandler do
     case status do
       {:ok, :no_state, msg, app_name} ->
         MishkaInstaller.DepCompileJob.add_job(app_name, output_type)
-        %{"app_name" => app_name, "status_message_type" => :success, "message" => msg, "selected_form" => type}
+
+        %{
+          "app_name" => app_name,
+          "status_message_type" => :success,
+          "message" => msg,
+          "selected_form" => type
+        }
+
       {:ok, :registered_app, msg, app_name} ->
-        %{"app_name" => app_name, "status_message_type" => :info, "message" => msg, "selected_form" => :registered_app}
+        %{
+          "app_name" => app_name,
+          "status_message_type" => :info,
+          "message" => msg,
+          "selected_form" => :registered_app
+        }
+
       {:error, msg} ->
-        %{"app_name" => nil, "status_message_type" => :danger, "message" => msg, "selected_form" => type}
+        %{
+          "app_name" => nil,
+          "status_message_type" => :danger,
+          "message" => msg,
+          "selected_form" => type
+        }
     end
   end
 
   defp unzip_dep_folder(file_path) do
-    {:unzip, :zip.unzip(~c'#{file_path}', [{:cwd, ~c'#{Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions"])}'}])}
+    {:unzip,
+     :zip.unzip(~c'#{file_path}', [
+       {:cwd,
+        ~c'#{Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions"])}'}
+     ])}
   end
 
   defp check_mix_file_and_get_ast({:unzip, {:ok, _content}}, file_path) do
-    mix_file = Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions/", "#{Path.basename(file_path, ".zip")}", "/mix.exs"])
+    mix_file =
+      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+        "deployment/",
+        "extensions/",
+        "#{Path.basename(file_path, ".zip")}",
+        "/mix.exs"
+      ])
+
     with {:mix_file, {:ok, body}} <- {:mix_file, File.read(mix_file)},
          {:code, {:ok, ast}} <- {:code, Code.string_to_quoted(body)} do
-
-        Extra.ast_mix_file_basic_information(ast, [:app, :version, :source_url])
+      Extra.ast_mix_file_basic_information(ast, [:app, :version, :source_url])
     else
       {:mix_file, {:error, _error}} -> {:error, :package, :mix_file}
       {:code, {:error, _error}} -> {:error, :package, :string_mix_file}
     end
   end
 
-  defp check_mix_file_and_get_ast({:unzip, {:error, _error}}, _file_path), do: {:error, :package, :unzip}
+  defp check_mix_file_and_get_ast({:unzip, {:error, _error}}, _file_path),
+    do: {:error, :package, :unzip}
 
   defp create_app_info(pkg, :hex) do
     %__MODULE__{
@@ -590,7 +841,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   end
 
-  defp create_app_info([app: app, version: version, source_url: source_url], :path)do
+  defp create_app_info([app: app, version: version, source_url: source_url], :path) do
     %__MODULE__{
       app: "#{app}",
       version: "#{version}",

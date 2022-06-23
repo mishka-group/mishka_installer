@@ -1,11 +1,16 @@
 ExUnit.start()
 alias Ecto.Integration.TestRepo
 Logger.configure(level: :error)
+
 Application.put_env(
   :ecto,
   TestRepo,
   adapter: Ecto.Adapters.Postgres,
-  url: System.get_env("DATABASE_DEVELOPERT_URL", "postgresql://postgres:postgres@localhost:5432/mishka_installer_test"),
+  url:
+    System.get_env(
+      "DATABASE_DEVELOPERT_URL",
+      "postgresql://postgres:postgres@localhost:5432/mishka_installer_test"
+    ),
   pool: Ecto.Adapters.SQL.Sandbox,
   queue_target: 5000,
   pool_size: 20

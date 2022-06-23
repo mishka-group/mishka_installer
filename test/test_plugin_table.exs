@@ -1,5 +1,6 @@
 defmodule MishkaInstaller.Repo.Migrations.TestPluginTable do
   use Ecto.Migration
+
   def change do
     create table(:plugins, primary_key: false) do
       add(:id, :uuid, primary_key: true)
@@ -13,6 +14,7 @@ defmodule MishkaInstaller.Repo.Migrations.TestPluginTable do
 
       timestamps()
     end
+
     create(index(:plugins, [:name], name: :index_plugins_on_name, unique: true))
   end
 end

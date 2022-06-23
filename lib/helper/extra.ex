@@ -16,16 +16,28 @@ defmodule MishkaInstaller.Helper.Extra do
           ast, acc ->
             {ast, acc}
         end)
-        convert_ast_output(acc)
+
+      convert_ast_output(acc)
     end) ++ extra
   end
 
   # I duplicated the code to make this operation clear instead of getting dynamically and make it complicated.
-  defp convert_ast_output(%{version: {:attribute, item}, attributes: attributes}), do: {:version, List.first(Map.get(attributes, item))}
-  defp convert_ast_output(%{version: ver, attributes: _attributes}) when is_binary(ver), do: {:version, ver}
-  defp convert_ast_output(%{app: {:attribute, item}, attributes: attributes}), do: {:app, List.first(Map.get(attributes, item))}
+  defp convert_ast_output(%{version: {:attribute, item}, attributes: attributes}),
+    do: {:version, List.first(Map.get(attributes, item))}
+
+  defp convert_ast_output(%{version: ver, attributes: _attributes}) when is_binary(ver),
+    do: {:version, ver}
+
+  defp convert_ast_output(%{app: {:attribute, item}, attributes: attributes}),
+    do: {:app, List.first(Map.get(attributes, item))}
+
   defp convert_ast_output(%{app: ver, attributes: _attributes}) when is_atom(ver), do: {:app, ver}
-  defp convert_ast_output(%{source_url: {:attribute, item}, attributes: attributes}), do: {:source_url, List.first(Map.get(attributes, item))}
-  defp convert_ast_output(%{source_url: ver, attributes: _attributes}) when is_binary(ver), do: {:source_url, ver}
+
+  defp convert_ast_output(%{source_url: {:attribute, item}, attributes: attributes}),
+    do: {:source_url, List.first(Map.get(attributes, item))}
+
+  defp convert_ast_output(%{source_url: ver, attributes: _attributes}) when is_binary(ver),
+    do: {:source_url, ver}
+
   defp convert_ast_output(_), do: {:error, :package, :convert_ast_output}
 end

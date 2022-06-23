@@ -6,7 +6,6 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
   import Mix.Ecto
   import Mix.Generator
 
-
   @spec run([any]) :: :ok
   @doc false
   def run(args) do
@@ -17,7 +16,6 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
         repos = parse_repo(args)
 
         Enum.each(repos, fn repo ->
-
           ensure_repo(repo, args)
           path = Ecto.Migrator.migrations_path(repo)
 
@@ -28,10 +26,10 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
           |> Enum.reverse()
           |> Enum.map(fn file ->
             generated_file(Path.basename(file), file, path)
-            :timer.sleep(2000);
+            :timer.sleep(2000)
           end)
-
         end)
+
       msg ->
         Mix.raise(msg)
     end
@@ -64,26 +62,31 @@ defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
     "#{y}#{pad(m)}#{pad(d)}#{pad(hh)}#{pad(mm)}#{pad(ss)}"
   end
 
-
   defp prefix do
     :mishka_installer
     |> Application.fetch_env!(:basic)
     |> Keyword.get(:prefix, nil)
   end
 
-
   defp pad(i) when i < 10, do: <<?0, ?0 + i>>
   defp pad(i), do: to_string(i)
 
   defp get_list_of_files() do
     with {:ls_file, {:ok, files_list}} <- {:ls_file, File.ls("priv/repo/migrations")},
-         {:activity, false} <- {:activity, Enum.any?(files_list, &String.match?(&1, ~r/_activity_migration.exs/))},
-         {:plugin, false} <- {:plugin, Enum.any?(files_list, &String.match?(&1, ~r/_plugin_migration.exs/))} do
+         {:activity, false} <-
+           {:activity, Enum.any?(files_list, &String.match?(&1, ~r/_activity_migration.exs/))},
+         {:plugin, false} <-
+           {:plugin, Enum.any?(files_list, &String.match?(&1, ~r/_plugin_migration.exs/))} do
       true
     else
-      {:ls_file, _} -> "Please check there is migrations (priv/repo/migrations) folder in your project"
-      {:activity, true} -> "If you run this script before please delete _activity_migration.exs file"
-      {:plugin, true}  -> "If you run this script before please delete _plugin_migration.exs file"
+      {:ls_file, _} ->
+        "Please check there is migrations (priv/repo/migrations) folder in your project"
+
+      {:activity, true} ->
+        "If you run this script before please delete _activity_migration.exs file"
+
+      {:plugin, true} ->
+        "If you run this script before please delete _plugin_migration.exs file"
     end
   end
 end

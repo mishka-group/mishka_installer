@@ -48,7 +48,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def init(_state) do
     Logger.info("OTP Dependencies changes protector server was started")
-    MishkaInstaller.DepUpdateJob.ets() # Start update ets
+    # Start update ets
+    MishkaInstaller.DepUpdateJob.ets()
     {:ok, %{data: nil, ref: nil}, {:continue, :check_json}}
   end
 
@@ -59,14 +60,18 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info(:check_json, state) do
-    if Mix.env() not in [:dev, :test], do: Logger.info("OTP Dependencies changes protector Cache server was valued by JSON.")
+    if Mix.env() not in [:dev, :test],
+      do: Logger.info("OTP Dependencies changes protector Cache server was valued by JSON.")
+
     Process.send_after(self(), :check_json, @re_check_json_time)
+
     new_state =
       if is_nil(state.ref) do
         Map.merge(state, %{data: json_check_and_create()})
       else
         state
       end
+
     {:noreply, new_state}
   end
 
@@ -74,6 +79,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   def handle_info({:ok, :dependency, _action, _repo_data}, state) do
     DepHandler.extensions_json_path()
     |> File.rm_rf()
+
     {:noreply, Map.merge(state, %{data: json_check_and_create()})}
   end
 
@@ -81,18 +87,34 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   def handle_info({_ref, {:installing_app, app_name, _move_apps, app_res}}, state) do
     # TODO: problem with dependency_activity to store output of errors
     project_path = MishkaInstaller.get_config(:project_path) || File.cwd!()
+
     case app_res do
       {:ok, :application_ensure} ->
-        [Path.join(project_path, ["deps/", "#{app_name}", "/_build"]), Path.join(project_path, ["deps/", "#{app_name}", "/deps"])]
-        |> Enum.map(& (File.rm_rf(&1)))
+        [
+          Path.join(project_path, ["deps/", "#{app_name}", "/_build"]),
+          Path.join(project_path, ["deps/", "#{app_name}", "/deps"])
+        ]
+        |> Enum.map(&File.rm_rf(&1))
+
         notify_subscribers({:ok, app_res, app_name})
+
       {:error, do_runtime, app, operation: operation, output: output} ->
         notify_subscribers({:error, app_res, "#{app}"})
-        MishkaInstaller.dependency_activity(%{state: [{:error, do_runtime, "#{app}", operation: operation, output: output}]}, "high")
+
+        MishkaInstaller.dependency_activity(
+          %{state: [{:error, do_runtime, "#{app}", operation: operation, output: output}]},
+          "high"
+        )
+
       {:error, do_runtime, ensure, output} ->
         notify_subscribers({:error, app_res, app_name})
-        MishkaInstaller.dependency_activity(%{state: [{:error, do_runtime, app_name, operation: ensure, output: output}]}, "high")
+
+        MishkaInstaller.dependency_activity(
+          %{state: [{:error, do_runtime, app_name, operation: ensure, output: output}]},
+          "high"
+        )
     end
+
     Oban.resume_queue(queue: :compile_events)
     {:noreply, state}
   end
@@ -100,7 +122,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_info({ref, answer}, %{ref: ref} = state) do
     # The task completed successfully
-    {:noreply, Map.merge(state, %{data: update_dependency_type(answer, state) || state, ref: nil, app: nil})}
+    {:noreply,
+     Map.merge(state, %{data: update_dependency_type(answer, state) || state, ref: nil, app: nil})}
   end
 
   @impl true
@@ -114,6 +137,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
       Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
         MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile(app, type)
       end)
+
     {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
   end
 
@@ -140,19 +164,21 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_call({:push, app: app, status: status}, _from, state) do
     new_state =
-      case Enum.find(state.data, & &1.app == app) do
+      case Enum.find(state.data, &(&1.app == app)) do
         nil ->
-          new_app = %{app: app, status: status, time: DateTime.utc_now}
+          new_app = %{app: app, status: status, time: DateTime.utc_now()}
           {:reply, new_app, Map.merge(state, %{data: state.data ++ [new_app]})}
+
         _ ->
           {:reply, {:duplicate, app}, state}
       end
+
     new_state
   end
 
   @impl true
   def handle_call({:get, app}, _from, state) do
-    {:reply, Enum.find(state.data, & &1.app == app), state}
+    {:reply, Enum.find(state.data, &(&1.app == app)), state}
   end
 
   @impl true
@@ -162,7 +188,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_call({:pop, app}, _from, state) do
-    new_state = Enum.reject(state.data, & &1.app == app)
+    new_state = Enum.reject(state.data, &(&1.app == app))
     {:reply, new_state, %{state | data: new_state}}
   end
 
@@ -185,45 +211,62 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     File.rm_rf(DepHandler.extensions_json_path())
     {:ok, :check_or_create_deps_json, json} = DepHandler.check_or_create_deps_json()
     {:ok, :read_dep_json, data} = DepHandler.read_dep_json(json)
+
     Enum.filter(data, &(&1["dependency_type"] == "force_update"))
-    |> Enum.map(&(%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now}))
+    |> Enum.map(&%{app: &1["app"], status: &1["dependency_type"], time: DateTime.utc_now()})
   rescue
     _e -> []
   end
 
   def update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:ok, :do_deps_compile, app_name} <- answer,
-         {:ok, :change_dependency_type_with_app, _repo_data} <- Dependency.change_dependency_type_with_app(app_name, dependency_type) do
-          json_check_and_create()
-          with {:ok, :compare_installed_deps_with_app_file, apps_list} <- DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
-            Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-              MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :uninstall)
-              {
-                :installing_app,
-                app_name,
-                DepHandler.move_and_replace_compiled_app_build(apps_list),
-                MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
-              }
-            end)
-          end
+         {:ok, :change_dependency_type_with_app, _repo_data} <-
+           Dependency.change_dependency_type_with_app(app_name, dependency_type) do
+      json_check_and_create()
+
+      with {:ok, :compare_installed_deps_with_app_file, apps_list} <-
+             DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
+        Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
+          MishkaInstaller.Installer.RunTimeSourcing.do_runtime(
+            String.to_atom(state.app),
+            :uninstall
+          )
+
+          {
+            :installing_app,
+            app_name,
+            DepHandler.move_and_replace_compiled_app_build(apps_list),
+            MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
+          }
+        end)
+      end
     else
       {:error, :do_deps_compile, app, operation: _operation, output: output} ->
         with {:ok, :get_record_by_field, :dependency, record_info} <- Dependency.show_by_name(app) do
           Dependency.delete(record_info.id)
         end
+
         notify_subscribers({:error, output, app})
         MishkaInstaller.dependency_activity(%{state: [answer]}, "high")
+
       {:error, :change_dependency_type_with_app, :dependency, :not_found} ->
         MishkaInstaller.dependency_activity(%{state: [answer], action: "no_app_found"}, "high")
+
       {:error, :change_dependency_type_with_app, :dependency, repo_error} ->
-        MishkaInstaller.dependency_activity(%{state: [answer], action: "edit", error: repo_error}, "high")
+        MishkaInstaller.dependency_activity(
+          %{state: [answer], action: "edit", error: repo_error},
+          "high"
+        )
     end
   end
 
   defp check_custom_pubsub_loaded(state) do
     custom_pubsub = MishkaInstaller.get_config(:pubsub)
+
     cond do
-      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) -> {:noreply, state, 100}
+      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) ->
+        {:noreply, state, 100}
+
       true ->
         Process.send_after(self(), :check_json, @re_check_json_time)
         Process.send_after(self(), :start_oban, @re_check_json_time)
@@ -234,11 +277,18 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @spec subscribe :: :ok | {:error, {:already_registered, pid}}
   def subscribe do
-    Phoenix.PubSub.subscribe(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module)
+    Phoenix.PubSub.subscribe(
+      MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
+      @module
+    )
   end
 
   @spec notify_subscribers({atom(), any, String.t() | atom()}) :: :ok | {:error, any}
   def notify_subscribers({status, answer, app}) do
-    Phoenix.PubSub.broadcast(MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub, @module , {status, String.to_atom(@module), answer, app})
+    Phoenix.PubSub.broadcast(
+      MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
+      @module,
+      {status, String.to_atom(@module), answer, app}
+    )
   end
 end

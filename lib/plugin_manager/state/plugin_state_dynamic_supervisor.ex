@@ -1,6 +1,6 @@
 defmodule MishkaInstaller.PluginStateDynamicSupervisor do
-
-  @spec start_job(%{id: String.t(), type: String.t(), parent_pid: any()}) :: :ignore | {:error, any} | {:ok, :add | :edit, pid}
+  @spec start_job(%{id: String.t(), type: String.t(), parent_pid: any()}) ::
+          :ignore | {:error, any} | {:ok, :add | :edit, pid}
   def start_job(args) do
     DynamicSupervisor.start_child(PluginStateOtpRunner, {MishkaInstaller.PluginState, args})
     |> case do
@@ -20,16 +20,16 @@ defmodule MishkaInstaller.PluginStateDynamicSupervisor do
   def running_imports(), do: registery()
 
   def running_imports(event_name) do
-    [{:"==", :"$3", event_name}]
+    [{:==, :"$3", event_name}]
     |> registery()
   end
 
   defp registery(guards \\ []) do
-    {match_all, map_result} =
-      {
-        {:"$1", :"$2", :"$3"},
-        [%{id: :"$1", pid: :"$2", type: :"$3"}]
-      }
+    {match_all, map_result} = {
+      {:"$1", :"$2", :"$3"},
+      [%{id: :"$1", pid: :"$2", type: :"$3"}]
+    }
+
     Registry.select(PluginStateRegistry, [{match_all, guards, map_result}])
   end
 

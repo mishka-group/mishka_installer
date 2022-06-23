@@ -57,7 +57,17 @@ defmodule MishkaInstaller.PluginETS do
   def init(_state) do
     Logger.info("The ETS state of plugin was staretd")
     Process.send_after(self(), :sync_with_database, @sync_with_database)
-    {:ok, %{set: ETS.Set.new!(name: @ets_table, protection: :public, read_concurrency: true, write_concurrency: true)}}
+
+    {:ok,
+     %{
+       set:
+         ETS.Set.new!(
+           name: @ets_table,
+           protection: :public,
+           read_concurrency: true,
+           write_concurrency: true
+         )
+     }}
   end
 
   @impl true
@@ -99,7 +109,9 @@ defmodule MishkaInstaller.PluginETS do
 
   defp table() do
     case ETS.Set.wrap_existing(@ets_table) do
-      {:ok, set} -> set
+      {:ok, set} ->
+        set
+
       _ ->
         start_link([])
         table()
@@ -108,7 +120,7 @@ defmodule MishkaInstaller.PluginETS do
 
   def sync_with_database() do
     MishkaInstaller.Plugin.plugins()
-    |> Enum.reject(& (&1.status in [:stopped]))
+    |> Enum.reject(&(&1.status in [:stopped]))
     |> Enum.map(&push/1)
   end
 end
