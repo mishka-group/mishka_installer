@@ -500,7 +500,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:upload, assigns) do
     ~H"""
-    <section id="dep-getter" class="col-md-6 mx-auto text-center" phx-drop-target={@uploads.dep.ref}>
+    <section id="dep-getter" class="col mx-auto text-center" phx-drop-target={@uploads.dep.ref}>
       <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
         <%= for entry <- @uploads.dep.entries do %>
           <%= for err <- upload_errors(@uploads.dep, entry) do %>
@@ -550,7 +550,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:hex, assigns) do
     ~H"""
-      <section id="dep-hex-getter" class="col-md-6 mx-auto text-center">
+      <section id="dep-hex-getter" class="col mx-auto text-center">
         <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
@@ -577,7 +577,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:git, assigns) do
     ~H"""
-      <section id="dep-git-getter" class="col-md-6 mx-auto text-center">
+      <section id="dep-git-getter" class="col mx-auto text-center">
         <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
           <% {status, message} = @status_message %>
           <%= if !is_nil(message) do %>
@@ -607,7 +607,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:registered_app, assigns) do
     ~H"""
-      <section id="dep-hex-getter" class="col-md-6 mx-auto text-center">
+      <section id="dep-hex-getter" class="col mx-auto text-center">
         <form id="extensions-upload-form" phx-submit="save" phx-change="validate">
           <svg xmlns="http://www.w3.org/2000/svg" width="80" height="80" fill="currentColor" class="bi bi-exclamation-triangle mb-4" viewBox="0 0 16 16">
             <path d="M7.938 2.016A.13.13 0 0 1 8.002 2a.13.13 0 0 1 .063.016.146.146 0 0 1 .054.057l6.857 11.667c.036.06.035.124.002.183a.163.163 0 0 1-.054.06.116.116 0 0 1-.066.017H1.146a.115.115 0 0 1-.066-.017.163.163 0 0 1-.054-.06.176.176 0 0 1 .002-.183L7.884 2.073a.147.147 0 0 1 .054-.057zm1.044-.45a1.13 1.13 0 0 0-1.96 0L.165 13.233c-.457.778.091 1.767.98 1.767h13.713c.889 0 1.438-.99.98-1.767L8.982 1.566z"/>
@@ -638,7 +638,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:compiling_activities, assigns) do
     ~H"""
-    <section id="dep-compiling-activities" class="col-md-6 mx-auto text-center">
+    <section id="dep-compiling-activities" class="col mx-auto text-center">
       <h3 class="mb-3 text-start"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Real-time activities of compiling output:") %></h3>
       <hr class="mb-5 mt-5">
       <%= if @log == [], do: raw("<div class=\"alert alert-warning\">#{Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "No activity is running")}</div>") %>
@@ -657,7 +657,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:installed_plugins, assigns) do
     ~H"""
-    <section id="dep-installed-plugins" class="col-md-6 mx-auto">
+    <section id="dep-installed-plugins" class="col mx-auto">
       <% {status, message} = @status_message %>
         <%= if !is_nil(message) do %>
           <div class="container" id="dep-status-msg">
@@ -714,7 +714,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp dep_form(:install_tools, assigns) do
     ~H"""
-    <section id="dep-install-tools" class="col-md-6 mx-auto">
+    <section id="dep-install-tools" class="col mx-auto">
       <% {status, message} = @status_message %>
         <%= if !is_nil(message) do %>
           <div class="container" id="dep-status-msg">
@@ -762,7 +762,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   defp icon(assigns) do
     ~H"""
-    <p id="dep-icon-getter" class="col-md-6 mx-auto text-end">
+    <p id="dep-icon-getter" class="col mx-auto text-end">
       <span phx-click="form_select" phx-value-type="compiling_activities">
         <svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" fill="currentColor" class="bi bi-activity" viewBox="0 0 16 16">
           <path fill-rule="evenodd" d="M6 2a.5.5 0 0 1 .47.33L10 12.036l1.53-4.208A.5.5 0 0 1 12 7.5h3.5a.5.5 0 0 1 0 1h-3.15l-1.88 5.17a.5.5 0 0 1-.94 0L6 3.964 4.47 8.171A.5.5 0 0 1 4 8.5H.5a.5.5 0 0 1 0-1h3.15l1.88-5.17A.5.5 0 0 1 6 2Z"/>
