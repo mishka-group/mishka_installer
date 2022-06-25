@@ -133,7 +133,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
     uploaded_files =
       consume_uploaded_entries(socket, :dep, fn %{path: path}, entry ->
         dest =
-          Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+          Path.join(MishkaInstaller.get_config(:project_path), [
             "deployment/",
             "extensions/",
             entry.client_name

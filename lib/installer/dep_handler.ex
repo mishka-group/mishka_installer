@@ -318,9 +318,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @spec check_or_create_deps_json(binary) ::
           {:ok, :check_or_create_deps_json, String.t()}
           | {:error, :check_or_create_deps_json, String.t()}
-  def check_or_create_deps_json(
-        project_path \\ MishkaInstaller.get_config(:project_path) || File.cwd!()
-      ) do
+  def check_or_create_deps_json(project_path \\ MishkaInstaller.get_config(:project_path)) do
     with {:deployment_path, true} <-
            {:deployment_path, File.exists?(Path.join(project_path, ["deployment"]))},
          {:extensions_path, true} <-
@@ -375,7 +373,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   @spec extensions_json_path :: binary()
   def extensions_json_path() do
-    path = MishkaInstaller.get_config(:project_path) || File.cwd!()
+    path = MishkaInstaller.get_config(:project_path)
     Path.join(path, ["deployment/", "extensions/", "extensions.json"])
   end
 
@@ -402,8 +400,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
           {:error, :compare_installed_deps_with_app_file, String.t()}
           | {:ok, :compare_installed_deps_with_app_file, list()}
   def compare_installed_deps_with_app_file(app) do
-    new_app_path =
-      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{app}"])
+    new_app_path = Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{app}"])
 
     if File.dir?(new_app_path) and File.dir?(new_app_path <> "/_build/#{Mix.env()}/lib") do
       apps_list =
@@ -541,7 +538,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   defp mix_creator("path", data) do
     uploaded_extension =
-      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+      Path.join(MishkaInstaller.get_config(:project_path), [
         "deployment/",
         "extensions/",
         "#{data["app"]}"
@@ -669,14 +666,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
   defp rename_folder_copy_to_deps(data, file_path)
        when not is_nil(file_path) and is_binary(file_path) do
     file =
-      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+      Path.join(MishkaInstaller.get_config(:project_path), [
         "deployment/",
         "extensions/",
         "#{Path.basename(file_path, ".zip")}"
       ])
 
     new_name =
-      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+      Path.join(MishkaInstaller.get_config(:project_path), [
         "deployment/",
         "extensions/",
         "#{data.app}"
@@ -686,7 +683,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
     File.cp_r!(
       new_name,
-      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deps/", "#{data.app}"])
+      Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{data.app}"])
     )
 
     data
@@ -793,13 +790,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
     {:unzip,
      :zip.unzip(~c'#{file_path}', [
        {:cwd,
-        ~c'#{Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), ["deployment/", "extensions"])}'}
+        ~c'#{Path.join(MishkaInstaller.get_config(:project_path), ["deployment/", "extensions"])}'}
      ])}
   end
 
   defp check_mix_file_and_get_ast({:unzip, {:ok, _content}}, file_path) do
     mix_file =
-      Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+      Path.join(MishkaInstaller.get_config(:project_path), [
         "deployment/",
         "extensions/",
         "#{Path.basename(file_path, ".zip")}",

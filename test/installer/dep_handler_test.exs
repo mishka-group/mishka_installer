@@ -146,8 +146,7 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
           max_status: nil,
           min_status: :lt
         }
-      ] =
-        assert DepHandler.compare_sub_dependencies_with_json()
+      ] = assert DepHandler.compare_sub_dependencies_with_json()
 
       # TODO: Add a test consider installed app with sub dependencies
     end

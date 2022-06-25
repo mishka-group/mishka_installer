@@ -86,7 +86,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_info({_ref, {:installing_app, app_name, _move_apps, app_res}}, state) do
     # TODO: problem with dependency_activity to store output of errors
-    project_path = MishkaInstaller.get_config(:project_path) || File.cwd!()
+    project_path = MishkaInstaller.get_config(:project_path)
 
     case app_res do
       {:ok, :application_ensure} ->

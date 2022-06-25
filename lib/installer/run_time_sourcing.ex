@@ -61,7 +61,6 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
           {:ok, :do_deps_compile, String.t()}
           | {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
   def do_deps_compile(app, type \\ :cmd) do
-    # I delete the File.cwd!() as a default path because we need to back again, and it needs many conditions especially in DDD project
     with _cd_path <- File.cd(MishkaInstaller.get_config(:project_path)),
          %{operation: "deps.get", output: _stream, status: 0} <- exec("deps.get", type),
          deps_path <- Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{app}"]),
@@ -116,7 +115,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   @spec get_build_path(atom()) :: binary
   def get_build_path(mode \\ Mix.env()) do
-    Path.join(MishkaInstaller.get_config(:project_path) || File.cwd!(), [
+    Path.join(MishkaInstaller.get_config(:project_path), [
       "_build/",
       "#{mode}/",
       "lib"

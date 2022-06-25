@@ -325,7 +325,6 @@ defmodule MishkaInstaller.Hook do
     |> Enum.map(&unregister(module: &1.name))
   end
 
-
   def call(event: event_name, state: state, operation: :no_return) do
     call(event: event_name, state: state)
     state

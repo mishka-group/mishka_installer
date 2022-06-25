@@ -264,7 +264,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
       }
     ]
     |> Enum.map(&Hook.register(event: &1))
-    |> IO.inspect
+    |> IO.inspect()
 
     :timer.sleep(3000)
 
