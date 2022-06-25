@@ -16,7 +16,15 @@ Application.put_env(
   pool_size: 20
 )
 
-Application.put_env(:mishka_installer, :basic, repo: TestRepo, pubsub: nil)
+Application.put_env(:mishka_installer, :basic,
+  repo: TestRepo,
+  pubsub: MishkaInstaller.PubSub,
+  html_router: nil,
+  project_path: File.cwd!,
+  mix: MishkaInstaller.MixProject,
+  mix_path: File.cwd! <> "/mix.exs",
+  gettext: nil
+)
 
 {:ok, _} = Ecto.Adapters.Postgres.ensure_all_started(TestRepo, :temporary)
 

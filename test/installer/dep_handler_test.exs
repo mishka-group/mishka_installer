@@ -18,15 +18,6 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
   }
 
   setup_all _tags do
-    Application.put_env(:mishka_installer, :basic,
-      pubsub: MishkaInstaller.PubSub,
-      html_router: nil,
-      project_path: "/Users/shahryar/Documents/Programming/Docker/mishka_installer",
-      mix: MishkaInstaller.MixProject,
-      mix_path: "/Users/shahryar/Documents/Programming/Docker/mishka_installer/mix.exs",
-      gettext: nil
-    )
-
     clean_json_file()
     :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
     [this: "what_it_is"]
