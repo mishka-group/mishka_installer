@@ -58,6 +58,17 @@ defmodule MishkaInstaller.Installer.MixCreator do
      ]}
   end
 
+  defp dep(:in_umbrella, name, value, dep_line) do
+    {:__block__, [closing: [line: dep_line], line: dep_line],
+    [
+      {{:__block__, [line: dep_line], [name]},
+       [
+         {{:__block__, [format: :keyword, line: dep_line], [:in_umbrella]},
+          {:__block__, [delimiter: "\"", line: dep_line], [value]}}
+       ]}
+    ]}
+  end
+
   defp dep(name, full_version, dep_line, other_options) do
     {:{},
      [trailing_comments: [], leading_comments: [], closing: [line: dep_line], line: dep_line],
@@ -83,6 +94,10 @@ defmodule MishkaInstaller.Installer.MixCreator do
   defp create_mix_postwalk(app_name, [[{:git, value} | other_options] = h | _t], dep_line)
        when is_list(h) do
     dep(:git, app_name, value, dep_line, other_options)
+  end
+
+  defp create_mix_postwalk(app_name, [[in_umbrella: value]], dep_line) do
+    dep(:in_umbrella, app_name, value, dep_line)
   end
 
   defp create_mix_postwalk(app_name, [version | t], dep_line)
