@@ -249,21 +249,22 @@ defmodule MishkaInstallerTest.Event.HookTest do
     [
       %MishkaInstaller.PluginState{
         name: "MishkaSendingEmailPlugin.SendingEmail",
-        event: :on_test_event,
+        event: "on_test_event",
         priority: 100
       },
       %MishkaInstaller.PluginState{
         name: "MishkaSendingEmailPlugin.SendingHalt",
-        event: :on_test_event,
+        event: "on_test_event",
         priority: 2
       },
       %MishkaInstaller.PluginState{
         name: "MishkaSendingEmailPlugin.SendingSMS",
-        event: :on_test_event,
+        event: "on_test_event",
         priority: 1
       }
     ]
     |> Enum.map(&Hook.register(event: &1))
+    |> IO.inspect
 
     :timer.sleep(3000)
 
