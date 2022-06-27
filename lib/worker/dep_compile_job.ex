@@ -3,7 +3,7 @@ defmodule MishkaInstaller.DepCompileJob do
   alias MishkaInstaller.Installer.DepHandler
   require Logger
 
-  @spec perform(Oban.Job.t()) :: :ok
+  @impl Oban.Worker
   def perform(%Oban.Job{args: %{"app" => app, "type" => type}}) when is_atom(type),
     do: run_compile(app, type)
 

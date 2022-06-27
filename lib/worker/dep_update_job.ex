@@ -5,7 +5,7 @@ defmodule MishkaInstaller.DepUpdateJob do
   @module "dependency_update_check"
   @ets_table :dependency_update
 
-  @spec perform(Oban.Job.t()) :: :ok
+  @impl Oban.Worker
   def perform(%Oban.Job{}), do: check_added_dependencies_update()
 
   @spec subscribe :: :ok | {:error, {:already_registered, pid}}
