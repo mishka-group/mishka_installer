@@ -51,7 +51,7 @@ It should be noted that this library must be installed in two parts of the plugi
 ```elixir
 def deps do
   [
-    {:mishka_installer, "~> 0.0.2"}
+    {:mishka_installer, "~> 0.0.3"}
   ]
 end
 ```

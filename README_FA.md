@@ -50,7 +50,7 @@
 ```elixir
 def deps do
   [
-    {:mishka_installer, "~> 0.0.2"}
+    {:mishka_installer, "~> 0.0.3"}
   ]
 end
 ```
