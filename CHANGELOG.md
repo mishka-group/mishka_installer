@@ -1,3 +1,13 @@
+# Changelog for MishkaInstaller 0.0.4
+
+- [x] Improve runtime sourcing module
+- [ ] Cover version 0.0.3 in the document
+- [ ] Add description of each dependency in GUI
+- [ ] Get and compile a dependency out of user project
+- [ ] Separate sub-dependencies with user installed-dependencies in GUI
+
+---
+
 # Changelog for MishkaInstaller 0.0.3
 
 - [x] Create run time updating dependencies

@@ -131,7 +131,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
         env: [{"MIX_ENV", "#{Mix.env()}"}]
       )
 
-      if status == 0, do: :ok, else: {:error, fn_atom, app, operation: command, output: stream}
+    if status == 0, do: :ok, else: {:error, fn_atom, app, operation: command, output: stream}
   end
 
   # Ref: https://hexdocs.pm/elixir/Port.html#module-spawn_executable
