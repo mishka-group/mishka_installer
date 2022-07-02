@@ -62,33 +62,13 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
           | {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
   def do_deps_compile(app, type \\ :cmd) do
     with _cd_path <- File.cd(MishkaInstaller.get_config(:project_path)),
-         %{operation: "deps.get", output: _stream, status: 0} <- exec("deps.get", type),
+         :ok <- exec("deps.get", type, app, :do_deps_compile),
          deps_path <- Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{app}"]),
-         {:change_dir, :ok} <- {:change_dir, File.cd(deps_path)},
-         {:inside_app, %{operation: "deps.get", output: _stream, status: 0}} <-
-           {:inside_app, exec("deps.get", type)},
-         %{operation: "deps.compile", output: _stream, status: 0} <- exec("deps.compile", type),
-         {:compile_main_app, %{operation: "compile", output: _stream, status: 0}} <-
-           {:compile_main_app, exec("compile", type)} do
+         :ok <- change_dir(deps_path, app),
+         :ok <- exec("deps.get", type, app, :do_deps_compile),
+         :ok <- exec("deps.compile", type, app, :do_deps_compile),
+         :ok <- exec("compile", type, app, :do_deps_compile) do
       {:ok, :do_deps_compile, app}
-    else
-      %{operation: "deps.get", output: stream, status: 1} ->
-        {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
-
-      {:inside_app, %{operation: "deps.get", output: stream, status: 1}} ->
-        {:error, :do_deps_compile, app, operation: "deps.get", output: stream}
-
-      {:compile_main_app, %{operation: "compile", output: stream, status: 1}} ->
-        {:error, :do_deps_compile, app, operation: "compile", output: stream}
-
-      {:change_dir, file_error} ->
-        {:error, :do_deps_compile, app, operation: "File.cd", output: file_error}
-
-      %{operation: "deps.compile", output: stream, status: 1} ->
-        {:error, :do_deps_compile, app, operation: "deps.compile", output: stream}
-
-      _ ->
-        {:error, :do_deps_compile, app, operation: "File.cd", output: "Wrong path"}
     end
   after
     # Maybe a developer does not consider changed-path, so for preventing issues we back to the project path after each compiling
@@ -141,9 +121,9 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
-  defp exec(command, type, operation \\ "mix")
+  defp exec(command, type, app, fn_atom, operation \\ "mix")
 
-  defp exec(command, :cmd, operation) do
+  defp exec(command, :cmd, app, fn_atom, operation) do
     {stream, status} =
       System.cmd(operation, [command],
         into: IO.stream(),
@@ -151,12 +131,12 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
         env: [{"MIX_ENV", "#{Mix.env()}"}]
       )
 
-    %{operation: command, output: stream, status: status}
+      if status == 0, do: :ok, else: {:error, fn_atom, app, operation: command, output: stream}
   end
 
   # Ref: https://hexdocs.pm/elixir/Port.html#module-spawn_executable
   # Ref: https://elixirforum.com/t/how-to-send-line-by-line-of-system-cmd-to-liveview-when-a-task-is-running/48336/
-  defp exec(command, :port, operation) do
+  defp exec(command, :port, app, fn_atom, operation) do
     path = System.find_executable("#{operation}")
 
     port =
@@ -169,7 +149,9 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
       ])
 
     start_exec_satet([])
-    loop(port, command)
+    %{status: status, output: output} = loop(port, command)
+
+    if status == 0, do: :ok, else: {:error, fn_atom, app, operation: command, output: output}
   end
 
   defp application_ensure({:ok, :prepend_compiled_apps}, app, :add) do
@@ -249,6 +231,12 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> case do
       {:ok, files_and_directories} -> {:ok, :delete_app_dir, files_and_directories}
       {:error, reason, file} -> {:error, :delete_app_dir, reason, file}
+    end
+  end
+
+  defp change_dir(deps_path, app) do
+    with {:error, _posix} <- File.cd(deps_path) do
+      {:error, :do_deps_compile, app, operation: "File.cd", output: "Wrong path"}
     end
   end
 end
