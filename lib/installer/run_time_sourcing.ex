@@ -73,7 +73,10 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   ---
 
-  The first pattern is `:add`. This function adds a library that is neither already installed nor loaded on your project.
+  # The first pattern is `:add`.
+
+  This function adds a library that is neither already installed nor loaded on your project.
+
 
   ## The overall activity of this function can be divided into several parts:
 
@@ -105,6 +108,35 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   4. `compare_dependencies/2`
   5. `prepend_compiled_apps/2`
   6. `application_ensure/2`
+
+  ---
+
+  # The second pattern is `:force_update`.
+
+  This pattern is similar to `:add`, except that you no longer check the installed dependencies with the compiled ones.
+  This pattern is mostly used for updates or when you are sure everything is already in place.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.RunTimeSourcing.do_runtime(:mishka_developer_tools, :force_update)
+
+  # Or
+
+  MishkaInstaller.Installer.RunTimeSourcing.do_runtime(:mishka_social, :force_update)
+  ```
+
+  ### This function calls 5 other functions including:
+
+  1. `get_build_path/0`
+  2. `File.ls!/1`
+  3. `Enum.reject/2`
+  4. `prepend_compiled_apps/2`
+  5. `application_ensure/2`
+
+  ---
+
+  # The third pattern is `:uninstall`.
   """
 
   @spec do_runtime(atom(), atom()) ::
