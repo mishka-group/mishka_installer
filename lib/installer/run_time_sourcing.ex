@@ -185,6 +185,23 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> delete_app_dir()
   end
 
+  @doc """
+  This function helps the programmer to join the channel of this module(`RunTimeSourcing`) and receive the output as a broadcast
+  in the form of `{:run_time_sourcing, answer}`.
+  It uses `Phoenix.PubSub.subscribe/2`
+
+  ## Examples
+  ```elixir
+  # Subscribe to `RunTimeSourcing` module
+  MishkaInstaller.Installer.RunTimeSourcing.subscribe()
+
+  # Getting the answer as Pubsub for examples in LiveView
+  @impl Phoenix.LiveView
+  def handle_info({:run_time_sourcing, answer}, socket) when is_binary(answer) do
+    {:noreply, socket}
+  end
+  ```
+  """
   @spec subscribe :: :ok | {:error, {:already_registered, pid}}
   def subscribe do
     Phoenix.PubSub.subscribe(MishkaInstaller.PubSub, @module)
