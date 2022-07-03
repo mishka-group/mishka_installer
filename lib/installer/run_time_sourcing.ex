@@ -11,7 +11,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   and updating process, it would be incomplete. We couldn't leave the programmers.
   Hence, the Phoenix Pubsub library can be an excellent option to notice processes are subscribed to in the MishkaInstaller channel.
 
-  ### The purpose of this section is divided into two categories as follows:
+  ## The purpose of this section is divided into two categories as follows:
 
   1. View in the terminal
   2. Send Ported Output by Pubsub
@@ -20,7 +20,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   ---
 
-  ### Below you can see the graph of connecting this module to another module.
+  ## Below you can see the graph of connecting this module to another module.
 
   +--------------------------------------------------+
   |                                                  |
@@ -70,6 +70,41 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   This function is made in three different situations that you can load according to your own needs.
   The overall purpose of this function with different patterns is to add - update and delete a library on your Elixir project
   without the need for Downtime.
+
+  ---
+
+  The first pattern is `:add`. This function adds a library that is neither already installed nor loaded on your project.
+
+  ## The overall activity of this function can be divided into several parts:
+
+  1. Routing of compiled sub-libraries (requested library dependencies)
+  2. Check compiled dependencies with installed-dependencies
+  3. Introducing and addressing dependencies (in terms of files)
+  4. Introducing and starting dependencies on the system
+
+  > As we have mentioned in option 4 when a state dependency is started, it also starts working; now, these items can
+  > be called directly by the programmer or placed in the `Application.ex` of the plugin itself as a `Genserver`.
+  > The first entry is the dependency name. This name must be exactly the name mentioned in the `mix.exs` file of the requested dependency.
+  > For this purpose, the type of the library name must be an atom type and the second entry is `:add`
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.RunTimeSourcing.do_runtime(:mishka_developer_tools, :add)
+
+  # Or
+
+  MishkaInstaller.Installer.RunTimeSourcing.do_runtime(:mishka_social, :add)
+  ```
+
+  ### This function calls 6 other functions including:
+
+  1. `get_build_path/0`
+  2. `File.ls!/1`
+  3. `Enum.reject/2`
+  4. `compare_dependencies/2`
+  5. `prepend_compiled_apps/2`
+  6. `application_ensure/2`
   """
 
   @spec do_runtime(atom(), atom()) ::
@@ -77,7 +112,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   def do_runtime(app, :add) when is_atom(app) do
     get_build_path()
     |> File.ls!()
-    |> Enum.reject(&(&1 == ".DS_Store"))
+    |> Enum.reject(&(&1 == ".DS_Store")) # For macOS users to delete `.DS_Store` file.
     |> compare_dependencies()
     |> prepend_compiled_apps()
     |> application_ensure(app, :add)
