@@ -137,6 +137,27 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   ---
 
   # The third pattern is `:uninstall`.
+
+  This function stops an already installed library and removes it from the list of installed libraries(unload an app).
+  After deleting by the `Application` module functions, the compiled directory of the requested library is also deleted.
+
+  # Examples
+
+  ```elixir
+  MishkaInstaller.Installer.RunTimeSourcing.do_runtime(:mishka_developer_tools, :uninstall)
+
+  # Or
+
+  MishkaInstaller.Installer.RunTimeSourcing.do_runtime(:mishka_social, :uninstall)
+  ```
+
+  ### This function calls 5 other functions including:
+
+  1. `File.ls!/1`
+  2. `Application.stop/1`
+  3. `Application.unload/1`
+  4. `delete_app_dir/1`
+  5. `get_build_path/1`
   """
 
   @spec do_runtime(atom(), atom()) ::
