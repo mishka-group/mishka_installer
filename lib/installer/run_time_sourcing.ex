@@ -1,7 +1,53 @@
 defmodule MishkaInstaller.Installer.RunTimeSourcing do
   @moduledoc """
-  This module is created just for compiling and sourcing, hence if you want to work with Json file and the other compiling dependencies
-  please see the `MishkaInstaller.Installer.DepHandler` module.
+  # RunTimeSourcing module
+
+  Using this module, you can independently add a downloaded-library while your system is running, with minimal dependencies.
+  The important thing to note is that you are actually adding a complete dependency and a complete Elixir project which is compiled to the system, and this is not Hot Coding.
+  At the time of this section's development, we have been very aware that with the least dependence and only with the Erlang and Elixir functions do all the process.
+  We covered the whole process, but without informing different sectors and being able to notify the installation, removing, and updating process, it would be incomplete. We couldn't leave the programmers.
+  Hence, the Phoenix Pubsub library can be an excellent option to notice processes are subscribed to in the MishkaInstaller channel.
+
+  ### The purpose of this section is divided into two categories as follows:
+
+  1. View in the terminal
+  2. Send Ported Output by Pubsub
+
+  > This module requires the `import_path` as a variable system, which is your project's path.
+
+  ---
+
+  ### Below you can see the graph of connecting this module to another module.
+
+  +--------------------------------------------------+
+  |                                                  |
+  |                                                  |
+  |      MishkaInstaller.Installer.DepHandler        +-----------------------------------------------------+
+  |                                                  |                                                     |
+  |                                                  |                                                     |
+  +--------------------------------------------------+                                                     |
+                                                                                                           |
+  +--------------------------------------------------+                             +-----------------------v---------------------+
+  |                                                  |                             |                                             |
+  |                                                  |                             |                                             |
+  |    MishkaInstaller.Installer.Live.DepGetter      |                             |  MishkaInstaller.Installer.RunTimeSourcing  |
+  |                                                  +----------------------------->                                             |
+  |                                                  |                             |                                             |
+  +--------------------------------------------------+                             +------------------------^--------------------+
+                                                                                                            |
+  +--------------------------------------------------+                                                      |
+  |                                                  |                                                      |
+  |                                                  |                                                      |
+  |  MishkaInstaller.Installer.DepChangesProtector   |                                                      |
+  |                                                  +------------------------------------------------------+
+  |                                                  |
+  +--------------------------------------------------+
+
+  ---
+
+  - Warning: This module is independent and surrounded by operational functions to create a custom system by developers themselves. Suppose you want to have an action function that makes an exemplary process by managing errors and the download queue. In that case, it is best to use two `MishkaInstaller.Installer.DepHandler` and `MishkaInstaller.Installer.Live.DepGetter` modules.
+  - Warning: In this version, we use the project `mix.exs` so that this file does not change, and the new library is not added to it; it is impossible to use these functions. For your convenience, we added a module named mix creator as `MishkaInstaller.Installer.MixCreator` module. If you don't want to change `mix.exs` and download a dependency, you need to prepper the library file directly and compile it.
+  - Warning: Being limited to `mix.exs` will be deleted in the future
   """
   use Agent
   @module "run_time_sourcing"
