@@ -98,7 +98,11 @@ defmodule MishkaInstaller do
          ]}
       ]
     ]
-    DynamicSupervisor.start_child(MishkaInstaller.RunTimeObanSupervisor, {Oban, opts || oban_opts})
+
+    DynamicSupervisor.start_child(
+      MishkaInstaller.RunTimeObanSupervisor,
+      {Oban, opts || oban_opts}
+    )
   end
 
   defp activity_required_map(type, section, action, priority, status) do

@@ -3,9 +3,12 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   # RunTimeSourcing module
 
   Using this module, you can independently add a downloaded-library while your system is running, with minimal dependencies.
-  The important thing to note is that you are actually adding a complete dependency and a complete Elixir project which is compiled to the system, and this is not Hot Coding.
-  At the time of this section's development, we have been very aware that with the least dependence and only with the Erlang and Elixir functions do all the process.
-  We covered the whole process, but without informing different sectors and being able to notify the installation, removing, and updating process, it would be incomplete. We couldn't leave the programmers.
+  The important thing to note is that you are actually adding a complete dependency and a complete Elixir project which is
+  compiled to the system, and this is not Hot Coding.
+  At the time of this section's development, we have been very aware that with the least dependence and only with the Erlang
+  and Elixir functions do all the process.
+  We covered the whole process, but without informing different sectors and being able to notify the installation, removing,
+  and updating process, it would be incomplete. We couldn't leave the programmers.
   Hence, the Phoenix Pubsub library can be an excellent option to notice processes are subscribed to in the MishkaInstaller channel.
 
   ### The purpose of this section is divided into two categories as follows:
@@ -45,16 +48,29 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   ---
 
-  - Warning: This module is independent and surrounded by operational functions to create a custom system by developers themselves. Suppose you want to have an action function that makes an exemplary process by managing errors and the download queue. In that case, it is best to use two `MishkaInstaller.Installer.DepHandler` and `MishkaInstaller.Installer.Live.DepGetter` modules.
-  - Warning: In this version, we use the project `mix.exs` so that this file does not change, and the new library is not added to it; it is impossible to use these functions. For your convenience, we added a module named mix creator as `MishkaInstaller.Installer.MixCreator` module. If you don't want to change `mix.exs` and download a dependency, you need to prepper the library file directly and compile it.
+  - Warning: This module is independent and surrounded by operational functions to create a custom system by developers themselves.
+  Suppose you want to have an action function that makes an exemplary process by managing errors and the download queue. In that case,
+  it is best to use two `MishkaInstaller.Installer.DepHandler` and `MishkaInstaller.Installer.Live.DepGetter` modules.
+  - Warning: In this version, we use the project `mix.exs` so that this file does not change, and the new library is not added to it;
+  it is impossible to use these functions. For your convenience, we added a module named mix creator as `MishkaInstaller.Installer.MixCreator`
+  module. If you don't want to change `mix.exs` and download a dependency, you need to prepper the library file directly and compile it.
   - Warning: Being limited to `mix.exs` will be deleted in the future
   """
   use Agent
   @module "run_time_sourcing"
 
+  @typedoc "This type can be used when you want to ensure or start a project"
   @type ensure() :: :bad_directory | :load | :no_directory | :sure_all_started
+  @typedoc "This type can be used when you want to prepend a compiled-project"
   @type do_runtime() :: :application_ensure | :prepend_compiled_apps
+  @typedoc "This type can be used when you want to send an app name"
   @type app_name() :: String.t() | atom()
+
+  @doc """
+  This function is made in three different situations that you can load according to your own needs.
+  The overall purpose of this function with different patterns is to add - update and delete a library on your Elixir project
+  without the need for Downtime.
+  """
 
   @spec do_runtime(atom(), atom()) ::
           {:ok, :application_ensure} | {:error, do_runtime(), ensure(), any}

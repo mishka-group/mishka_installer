@@ -60,13 +60,13 @@ defmodule MishkaInstaller.Installer.MixCreator do
 
   defp dep(:in_umbrella, name, value, dep_line) do
     {:__block__, [closing: [line: dep_line], line: dep_line],
-    [
-      {{:__block__, [line: dep_line], [name]},
-       [
-         {{:__block__, [format: :keyword, line: dep_line], [:in_umbrella]},
-          {:__block__, [delimiter: "\"", line: dep_line], [value]}}
-       ]}
-    ]}
+     [
+       {{:__block__, [line: dep_line], [name]},
+        [
+          {{:__block__, [format: :keyword, line: dep_line], [:in_umbrella]},
+           {:__block__, [delimiter: "\"", line: dep_line], [value]}}
+        ]}
+     ]}
   end
 
   defp dep(name, full_version, dep_line, other_options) do
