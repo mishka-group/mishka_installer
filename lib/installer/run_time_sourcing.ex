@@ -267,7 +267,15 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @doc """
+  Prepending path means that after getting and compiling a dependency, you can determine a made `ebin` folder as an item of dependencies.
+  Hence, you need to move a compiled app with its sup-apps.
 
+  > This function calls `Code.prepend_path/1`.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.RunTimeSourcing.prepend_compiled_apps(["test_app", "mishka_developer_tools"])
+  ```
   """
   @spec prepend_compiled_apps(any) ::
           {:ok, :prepend_compiled_apps} | {:error, do_runtime(), ensure(), list}
