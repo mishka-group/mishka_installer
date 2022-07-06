@@ -1,16 +1,76 @@
 defmodule MishkaInstaller.Installer.MixCreator do
+  @moduledoc """
+  In version 0.0.2, the MishkaInstaller library was used to download a dependency from the project's own `mix.exs` file,
+  so this module was written to edit this file.
+  In fact, this module uses the Sourceror library to change the mentioned `mix.exs` file (with `AST`).
+  Another use of this module is reading information from the programmer's Git or custom link.
+
+  - Warning: in the next versions of MishkaInstaller, instead of `mix.exs`, the client project will be downloaded directly from
+  `Git` or **hex.pm** site. If this update is executed, the original project will not be changed.
+  - This module is not going to be deleted in new versions.
+  """
+
+  @doc """
+  With the help of this function, you can make a backup copy of `mix.exs` and `mix.lock` of your project and keep it in the
+  `deployment/extensions` path.
+  If this function is used with one input, it targets the `mix.exs` file, and if the second input is `:lock` atom,
+  it targets the `mix.lock` file to keep a backup copy.
+  With the help of this function, you can make a backup copy of `mix.exs` and `mix.lock` of your project and keep
+  it in the `deployment/extensions` path.
+  If this function is used with one input, it targets the `mix.exs` file, and if the second input is `:lock` atom,
+  it targets the `mix.lock` file to keep a backup copy.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.MixCreator.backup_mix("mix.exs")
+  MishkaInstaller.Installer.MixCreator.backup_mix("mix.lock", :lock)
+  ``
+  """
   @spec backup_mix(binary) :: {:error, atom} | {:ok, non_neg_integer}
   def backup_mix(mix_path), do: File.copy(mix_path, backup_path())
 
+  @doc """
+  Read `backup_mix/1` description.
+  """
   @spec backup_mix(binary(), :lock) :: {:error, atom} | {:ok, non_neg_integer}
   def backup_mix(lock_path, :lock), do: File.copy(lock_path, backup_path("original_mix.lock"))
 
+  @doc """
+  This function is also the same as the `backup_mix/1` function, with the difference that it returns the backed-up version
+  to the project path. Both functions use the `File.copy/1` function just to improve the naming and also to warn the programmer
+  that it has been replaced in this file.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.MixCreator.restore_mix("mix.exs")
+  MishkaInstaller.Installer.MixCreator.restore_mix("mix.lock", :lock)
+  ``
+  """
   @spec restore_mix(binary) :: {:error, atom} | {:ok, non_neg_integer}
   def restore_mix(mix_path), do: File.copy(backup_path(), mix_path)
+
+  @doc """
+  Read `restore_mix/1` description.
+  """
 
   @spec restore_mix(binary(), :lock) :: {:error, atom} | {:ok, non_neg_integer}
   def restore_mix(lock_path, :lock), do: File.copy(backup_path("original_mix.lock"), lock_path)
 
+  @doc """
+  This function receives a list of libraries stored in the `extensions.json` file along with the `mix.exs` path of the file
+  that needs to be changed, and after that, it changes the `deps` function in `mix.exs` and overwrites it with the new libraries.
+
+  ## Examples
+
+  ```elixir
+  mix_path = MishkaInstaller.get_config(:mix)
+  MixCreator.create_mix(mix_path.project[:deps], "mix_path")
+  ``
+
+  As you see, we pass the current dependencies to let this function merge it with `extensions.json`
+  """
   @spec create_mix([tuple()], binary()) :: :ok | {:error, atom}
   def create_mix(list_of_deps, mix_path) do
     content =
