@@ -54,7 +54,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   - Warning: In this version, we use the project `mix.exs` so that this file does not change, and the new library is not added to it;
   it is impossible to use these functions. For your convenience, we added a module named mix creator as `MishkaInstaller.Installer.MixCreator`
   module. If you don't want to change `mix.exs` and download a dependency, you need to prepper the library file directly and compile it.
-  - Warning: Being limited to `mix.exs` will be deleted in the future
+  - Warning: Being limited to `mix.exs` will be deleted in the future.
   """
   use Agent
   @module "run_time_sourcing"
@@ -88,7 +88,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   > As we have mentioned in option 4 when a state dependency is started, it also starts working; now, these items can
   > be called directly by the programmer or placed in the `Application.ex` of the plugin itself as a `Genserver`.
   > The first entry is the dependency name. This name must be exactly the name mentioned in the `mix.exs` file of the requested dependency.
-  > For this purpose, the type of the library name must be an atom type and the second entry is `:add`
+  > For this purpose, the type of the library name must be an atom type and the second entry is `:add`.
 
   ## Examples
 
@@ -141,7 +141,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   This function stops an already installed library and removes it from the list of installed libraries(unload an app).
   After deleting by the `Application` module functions, the compiled directory of the requested library is also deleted.
 
-  # Examples
+  ## Examples
 
   ```elixir
   MishkaInstaller.Installer.RunTimeSourcing.do_runtime(:mishka_developer_tools, :uninstall)
@@ -207,6 +207,15 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     Phoenix.PubSub.subscribe(MishkaInstaller.PubSub, @module)
   end
 
+  @doc """
+  This function helps you compare the installed libraries and the ones you want to install and displays the ones not installed in a list.
+  The first entry is the installed apps, which can be left blank. it is loaded from `Application.loaded_applications/0`.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.RunTimeSourcing.compare_dependencies(["the_app_does_not_exist", "compiler"])
+  ```
+  """
   @spec compare_dependencies([tuple()], [String.t()]) :: [String.t()]
   def compare_dependencies(installed_apps \\ Application.loaded_applications(), files_list) do
     installed_apps =
@@ -224,6 +233,9 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> Enum.reject(&is_nil(&1))
   end
 
+  @doc """
+
+  """
   @spec do_deps_compile(String.t() | :cmd | :port) ::
           {:ok, :do_deps_compile, String.t()}
           | {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
@@ -242,6 +254,9 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     File.cd(MishkaInstaller.get_config(:project_path))
   end
 
+  @doc """
+
+  """
   @spec prepend_compiled_apps(any) ::
           {:ok, :prepend_compiled_apps} | {:error, do_runtime(), ensure(), list}
   def prepend_compiled_apps(false), do: {:error, :prepend_compiled_apps, :no_directory, []}
@@ -260,6 +275,9 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   end
 
+  @doc """
+
+  """
   @spec get_build_path(atom()) :: binary
   def get_build_path(mode \\ Mix.env()) do
     Path.join(MishkaInstaller.get_config(:project_path), [
@@ -269,13 +287,18 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     ])
   end
 
+  @doc """
   # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
   # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
+  """
   @spec read_app(binary(), app_name()) :: {:error, atom} | {:ok, binary}
   def read_app(lib_path, sub_app) do
     File.read("#{lib_path}/_build/#{Mix.env()}/lib/#{sub_app}/ebin/#{sub_app}.app")
   end
 
+  @doc """
+
+  """
   @spec consult_app_file(binary) ::
           {:error, {non_neg_integer | {non_neg_integer, pos_integer}, atom, any}}
           | {:ok, any}
