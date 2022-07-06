@@ -316,8 +316,11 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @doc """
-  # Ref: https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
-  # Ref: https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
+  This function loads a `.app` file as binary.
+
+  ## References:
+  1. https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
+  2. https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
   """
   @spec read_app(binary(), app_name()) :: {:error, atom} | {:ok, binary}
   def read_app(lib_path, sub_app) do
@@ -325,7 +328,11 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @doc """
+  This function converts loaded `.app` file as elixir type like list and tuple
 
+  ## References:
+  1. https://elixirforum.com/t/how-to-get-vsn-from-app-file/48132/2
+  2. https://github.com/elixir-lang/elixir/blob/main/lib/mix/lib/mix/tasks/compile.all.ex#L153-L154
   """
   @spec consult_app_file(binary) ::
           {:error, {non_neg_integer | {non_neg_integer, pos_integer}, atom, any}}
