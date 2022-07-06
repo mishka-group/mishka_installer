@@ -234,7 +234,19 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @doc """
+  This aggregator function is an action function to download and compile requested dependencies.
+  You can decide what your default output is. It should be noted that this part of the project
+  supports Terminal output with `System.cmd/2` function and sending `Pubsub` with `Port.open/2` module.
 
+  > Warning: the routing of this function may change in future versions.
+  > Please check it in each version if you use this function directly.
+  > Please consider after each operation; the directory reference gets back to the project path.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile("test_app", :cmd)
+  MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile("test_app", :port)
+  ```
   """
   @spec do_deps_compile(String.t() | :cmd | :port) ::
           {:ok, :do_deps_compile, String.t()}
