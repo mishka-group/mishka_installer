@@ -296,7 +296,15 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @doc """
+  It displays the build directory path based on `MishkaInstaller.get_config/1`.
+  Hence you should bind `:project_path` on runtime or before running the CMS in your config.
+  The first entry is the **Environment** status, which can be left blank. it is loaded from `Mix.env/0`.
 
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.RunTimeSourcing.get_build_path(:dev) # Or :test, Mix.env()
+  MishkaInstaller.Installer.RunTimeSourcing.get_build_path()
+  ```
   """
   @spec get_build_path(atom()) :: binary
   def get_build_path(mode \\ Mix.env()) do
