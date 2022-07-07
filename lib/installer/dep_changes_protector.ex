@@ -1,7 +1,50 @@
 defmodule MishkaInstaller.Installer.DepChangesProtector do
   @moduledoc """
-    This module helps you to protect the extension.json file and every action like add or delete or even edit a dependency is happened,
-    it can handle it and create new state.
+
+
+
+  ## Below you can see the graph of connecting this module to another module.
+
+  +---------------------------------------+
+  |                                       |
+  |                                       <----------------------------------------+
+  | MishkaInstaller.Installer.DepHandler  |                                        |
+  |                                       |            +---------------------------+------+
+  |                                       |            |                                  |
+  +-------------------+-----------------^-+            |                                  |
+                      |                 |              |  MishkaInstaller.DepCompileJob   |
+                      |                 |              |                                  <--------------+
+                      |                 |              |                                  |              |
+                      |                 |              +----------------------------------+              |
+                      |                 |                                                                |
+                      |                 |              +----------------------------------+              |
+                      |                 |              |                                  |              |
+                      |                 |              |                                  |              |
+                      |                 |              |  MishkaInstaller.DepUpdateJob    |              |
+                      |                 +--------------+                                  |              |
+                      |                                |                                  |              |
+                      |                                +----^-----------------------------+              |
+                      |                                     |                                            |
+                      |                                     |                                            |
+  +-------------------v---------------------------+         |   +----------------------------------------+-+
+  |                                               |         |   |                                          |
+  |                                               |         |   |                                          |
+  | MishkaInstaller.Installer.DepChangesProtector +---------+   | MishkaInstaller.Installer.Live.DepGetter |
+  |                                               |             |                                          |
+  |                                               |             |                                          |
+  +---------------------+-------------------------+             +------------------------------------------+
+                        |
+                        |
+                        |
+                        |
+                        |
+                        |
+    +-------------------v-----------------------+
+    |                                           |
+    | MishkaInstaller.Installer.RunTimeSourcing |
+    |                                           |
+    +-------------------------------------------+
+
   """
   use GenServer, restart: :permanent
   require Logger
