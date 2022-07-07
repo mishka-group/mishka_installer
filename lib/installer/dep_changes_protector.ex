@@ -1,7 +1,10 @@
 defmodule MishkaInstaller.Installer.DepChangesProtector do
   @moduledoc """
+  This module serializes how to get and install a library and add it to your system.
+  Based on the structure of `MishkaInstaller`, this module should not be called independently.
 
-
+  - The reason for the indirect call is to make the queue and also to run the processes in the background.
+  - For this purpose, two workers have been created for this module, which can handle the update operation and add a library.
 
   ## Below you can see the graph of connecting this module to another module.
 
@@ -45,6 +48,24 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     |                                           |
     +-------------------------------------------+
 
+  As you can see in the graph above, most of the requests, except the update request, pass through the path of the
+  `MishkaInstaller.DepCompileJob` module and call some functions of the `MishkaInstaller.Installer.DepHandler` module.
+  After completing the operation process, this module finally serializes the queued requests and broadcasts the output by means of `Pubsub`.
+
+  - **Warning**: Direct use of this module causes conflict in long operations and causes you to receive an error,
+  or the system is completely down.
+  - **Warning**: The update operation is connected to the worker of the `MishkaInstaller.DepUpdateJob` module.
+  - **Warning**: this section should be limited to the super admin user because it is directly related to the core of the system.
+  - **Warning**: User should always be notified to get backup.
+  - **Warning**: Do not send timeout request to Genserver of this module.
+  - **Warning**: This module must be supervised in the `Application.ex` file and loaded at runtime.
+  - **Warning**: this module has a direct relationship with the `extension.json` file, so it checks this file every few seconds and
+  fixes it if it is not created or has a problem.
+  - **Warning**: If you put `Pubsub` in your configuration settings and the value is not nil, this module will automatically send
+  a timeout several times until your Pubsub process goes live.
+  - Warning: at the time of starting Genserver, this module also starts `MishkaInstaller.DepUpdateJob.ets/0` runtime database.
+  - Warning: All possible errors are stored in the database introduced in the configuration, and you can access it with the
+  functions of the `MishkaInstaller.Activity` module.
   """
   use GenServer, restart: :permanent
   require Logger
@@ -53,16 +74,19 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   alias MishkaInstaller.Installer.DepHandler
   alias MishkaInstaller.Dependency
 
+  @doc false
   @spec start_link(list()) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(args \\ []) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
+  @doc false
   @spec push(map(), String.t() | atom()) :: map()
   def push(app, status) do
     GenServer.call(__MODULE__, {:push, app: app, status: status})
   end
 
+  @doc false
   @spec get(String.t()) :: map()
   def get(app) do
     GenServer.call(__MODULE__, {:get, app})
@@ -73,16 +97,21 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     GenServer.call(__MODULE__, :get)
   end
 
+  @doc false
   @spec pop(String.t()) :: map()
   def pop(app) do
     GenServer.call(__MODULE__, {:pop, app})
   end
 
+  @doc false
   @spec clean :: :ok
   def clean() do
     GenServer.cast(__MODULE__, :clean)
   end
 
+  @doc """
+
+  """
   @spec deps(String.t(), atom()) :: :ok
   def deps(app, type \\ :port) do
     GenServer.cast(__MODULE__, {:deps, app, type})
@@ -246,6 +275,9 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     {:noreply, []}
   end
 
+  @doc """
+
+  """
   @spec is_dependency_compiling? :: boolean
   def is_dependency_compiling?(), do: if(is_nil(get().ref), do: false, else: true)
 
@@ -261,7 +293,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     _e -> []
   end
 
-  def update_dependency_type(answer, state, dependency_type \\ "none") do
+  defp update_dependency_type(answer, state, dependency_type \\ "none") do
     with {:ok, :do_deps_compile, app_name} <- answer,
          {:ok, :change_dependency_type_with_app, _repo_data} <-
            Dependency.change_dependency_type_with_app(app_name, dependency_type) do
@@ -318,6 +350,9 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     end
   end
 
+  @doc """
+
+  """
   @spec subscribe :: :ok | {:error, {:already_registered, pid}}
   def subscribe do
     Phoenix.PubSub.subscribe(
@@ -326,6 +361,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     )
   end
 
+  @doc false
   @spec notify_subscribers({atom(), any, String.t() | atom()}) :: :ok | {:error, any}
   def notify_subscribers({status, answer, app}) do
     Phoenix.PubSub.broadcast(
