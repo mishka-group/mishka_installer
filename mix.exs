@@ -15,7 +15,12 @@ defmodule MishkaInstaller.MixProject do
       package: package(),
       homepage_url: "https://github.com/mishka-group",
       source_url: "https://github.com/mishka-group/mishka_installer",
-      xref: [exclude: [EctoEnum.Use]]
+      xref: [exclude: [EctoEnum.Use]],
+      docs: [
+        main: "MishkaInstaller",
+        extras: ["README.md"],
+        source_ref: "master"
+      ],
     ]
   end
 
