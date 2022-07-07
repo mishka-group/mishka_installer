@@ -6,42 +6,37 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   - The reason for the indirect call is to make the queue and also to run the processes in the background.
   - For this purpose, two workers have been created for this module, which can handle the update operation and add a library.
 
-  ## Below you can see the graph of connecting this module to another module.
+  ### Below you can see the graph of connecting this module to another module.
 
   ```
 
   +---------------------------------------+
   |                                       |
-  |                                       <----------------------------------------+
-  | MishkaInstaller.Installer.DepHandler  |                                        |
-  |                                       |            +---------------------------+------+
-  |                                       |            |                                  |
-  +-------------------+-----------------^-+            |                                  |
-                      |                 |              |  MishkaInstaller.DepCompileJob   |
-                      |                 |              |                                  <--------------+
-                      |                 |              |                                  |              |
-                      |                 |              +----------------------------------+              |
-                      |                 |                                                                |
-                      |                 |              +----------------------------------+              |
-                      |                 |              |                                  |              |
-                      |                 |              |                                  |              |
-                      |                 |              |  MishkaInstaller.DepUpdateJob    |              |
-                      |                 +--------------+                                  |              |
-                      |                                |                                  |              |
-                      |                                +----^-----------------------------+              |
-                      |                                     |                                            |
-                      |                                     |                                            |
-  +-------------------v---------------------------+         |   +----------------------------------------+-+
-  |                                               |         |   |                                          |
-  |                                               |         |   |                                          |
-  | MishkaInstaller.Installer.DepChangesProtector +---------+   | MishkaInstaller.Installer.Live.DepGetter |
-  |                                               |             |                                          |
-  |                                               |             |                                          |
-  +---------------------+-------------------------+             +------------------------------------------+
-                        |
-                        |
-                        |
-                        |
+  |                                       <-----------------------------------+
+  | MishkaInstaller.Installer.DepHandler  |                                   |
+  |                                       |       +---------------------------+------+
+  |                                       |       |                                  |
+  +-------------------+-----------------^-+       |                                  |
+                      |                 |         |  MishkaInstaller.DepCompileJob   |
+                      |                 |         |                                  <-----------+
+                      |                 |         |                                  |           |
+                      |                 |         +----------------------------------+           |
+                      |                 |                                                        |
+                      |                 |         +----------------------------------+           |
+                      |                 |         |                                  |           |
+                      |                 |         |                                  |           |
+                      |                 |         |  MishkaInstaller.DepUpdateJob    |           |
+                      |                 +---------+                                  |           |
+                      |                           |                                  |           |
+                      |                           +-^--------------------------------+           |
+                      |                             |                                            |
+  +-------------------v---------------------------+ |  +-----------------------------------------+
+  |                                               | |  |                                         |
+  |                                               | |  |                                         |
+  | MishkaInstaller.Installer.DepChangesProtector +-+  | MishkaInstaller.Installer.Live.DepGetter|
+  |                                               |    |                                         |
+  |                                               |    |                                         |
+  +---------------------+-------------------------+    +-----------------------------------------+
                         |
                         |
     +-------------------v-----------------------+

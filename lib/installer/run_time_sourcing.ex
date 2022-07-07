@@ -18,31 +18,28 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   ---
 
-  ## Below you can see the graph of connecting this module to another module.
+  ### Below you can see the graph of connecting this module to another module.
 
   ```
 
   +--------------------------------------------------+
   |                                                  |
   |                                                  |
-  |      MishkaInstaller.Installer.DepHandler        +-----------------------------------------------------+
-  |                                                  |                                                     |
-  |                                                  |                                                     |
-  +--------------------------------------------------+                                                     |
-                                                                                                           |
-  +--------------------------------------------------+                             +-----------------------v---------------------+
-  |                                                  |                             |                                             |
-  |                                                  |                             |                                             |
-  |    MishkaInstaller.Installer.Live.DepGetter      |                             |  MishkaInstaller.Installer.RunTimeSourcing  |
-  |                                                  +----------------------------->                                             |
-  |                                                  |                             |                                             |
-  +--------------------------------------------------+                             +------------------------^--------------------+
-                                                                                                            |
-  +--------------------------------------------------+                                                      |
-  |                                                  |                                                      |
-  |                                                  |                                                      |
-  |  MishkaInstaller.Installer.DepChangesProtector   |                                                      |
-  |                                                  +------------------------------------------------------+
+  |      MishkaInstaller.Installer.DepHandler        +--------------------+
+  |                                                  |                    |
+  |                                                  |                    |
+  +--------------------------------------------------+                    |
+  +---------------------------------------------+       +-----------------v-------------------------+
+  |                                             |       |                                           |
+  |    MishkaInstaller.Installer.Live.DepGetter +-------> MishkaInstaller.Installer.RunTimeSourcing |
+  |                                             |       |                                           |
+  +---------------------------------------------+       +------------------^------------------------+
+                                                                           |
+  +--------------------------------------------------+                     |
+  |                                                  |                     |
+  |                                                  |                     |
+  |  MishkaInstaller.Installer.DepChangesProtector   |                     |
+  |                                                  +---------------------+
   |                                                  |
   +--------------------------------------------------+
 
