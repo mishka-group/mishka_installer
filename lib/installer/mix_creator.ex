@@ -25,7 +25,7 @@ defmodule MishkaInstaller.Installer.MixCreator do
   ```elixir
   MishkaInstaller.Installer.MixCreator.backup_mix("mix.exs")
   MishkaInstaller.Installer.MixCreator.backup_mix("mix.lock", :lock)
-  ``
+  ```
   """
   @spec backup_mix(binary) :: {:error, atom} | {:ok, non_neg_integer}
   def backup_mix(mix_path), do: File.copy(mix_path, backup_path())
@@ -38,7 +38,7 @@ defmodule MishkaInstaller.Installer.MixCreator do
 
   @doc """
   This function is also the same as the `backup_mix/1` function, with the difference that it returns the backed-up version
-  to the project path. Both functions use the `File.copy/1` function just to improve the naming and also to warn the programmer
+  to the project path. Both functions use the `File.copy/2` function just to improve the naming and also to warn the programmer
   that it has been replaced in this file.
 
   ## Examples
@@ -46,7 +46,7 @@ defmodule MishkaInstaller.Installer.MixCreator do
   ```elixir
   MishkaInstaller.Installer.MixCreator.restore_mix("mix.exs")
   MishkaInstaller.Installer.MixCreator.restore_mix("mix.lock", :lock)
-  ``
+  ```
   """
   @spec restore_mix(binary) :: {:error, atom} | {:ok, non_neg_integer}
   def restore_mix(mix_path), do: File.copy(backup_path(), mix_path)
@@ -67,7 +67,7 @@ defmodule MishkaInstaller.Installer.MixCreator do
   ```elixir
   mix_path = MishkaInstaller.get_config(:mix)
   MixCreator.create_mix(mix_path.project[:deps], "mix_path")
-  ``
+  ```
 
   As you see, we pass the current dependencies to let this function merge it with `extensions.json`
   """

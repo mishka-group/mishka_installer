@@ -8,6 +8,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   ## Below you can see the graph of connecting this module to another module.
 
+  ```
+
   +---------------------------------------+
   |                                       |
   |                                       <----------------------------------------+
@@ -47,6 +49,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     | MishkaInstaller.Installer.RunTimeSourcing |
     |                                           |
     +-------------------------------------------+
+
+  ```
 
   As you can see in the graph above, most of the requests, except the update request, pass through the path of the
   `MishkaInstaller.DepCompileJob` module and call some functions of the `MishkaInstaller.Installer.DepHandler` module.

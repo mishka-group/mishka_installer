@@ -1,7 +1,5 @@
 defmodule MishkaInstaller.Installer.RunTimeSourcing do
   @moduledoc """
-  # RunTimeSourcing module
-
   Using this module, you can independently add a downloaded-library while your system is running, with minimal dependencies.
   The important thing to note is that you are actually adding a complete dependency and a complete Elixir project which is
   compiled to the system, and this is not Hot Coding.
@@ -21,6 +19,8 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   ---
 
   ## Below you can see the graph of connecting this module to another module.
+
+  ```
 
   +--------------------------------------------------+
   |                                                  |
@@ -45,6 +45,8 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   |                                                  +------------------------------------------------------+
   |                                                  |
   +--------------------------------------------------+
+
+  ```
 
   ---
 
