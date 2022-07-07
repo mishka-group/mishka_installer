@@ -63,8 +63,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   fixes it if it is not created or has a problem.
   - **Warning**: If you put `Pubsub` in your configuration settings and the value is not nil, this module will automatically send
   a timeout several times until your Pubsub process goes live.
-  - Warning: at the time of starting Genserver, this module also starts `MishkaInstaller.DepUpdateJob.ets/0` runtime database.
-  - Warning: All possible errors are stored in the database introduced in the configuration, and you can access it with the
+  - **Warning**: at the time of starting Genserver, this module also starts `MishkaInstaller.DepUpdateJob.ets/0` runtime database.
+  - **Warning**: All possible errors are stored in the database introduced in the configuration, and you can access it with the
   functions of the `MishkaInstaller.Activity` module.
   """
   use GenServer, restart: :permanent
