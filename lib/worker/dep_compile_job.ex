@@ -3,6 +3,9 @@ defmodule MishkaInstaller.DepCompileJob do
   alias MishkaInstaller.Installer.DepHandler
   require Logger
 
+  # TODO: check a ref exists or not and after that do compile, if is there so wait
+  # TODO: MishkaInstaller.Installer.DepChangesProtector.is_dependency_compiling?()
+
   @impl Oban.Worker
   def perform(%Oban.Job{args: %{"app" => app, "type" => type}}) when is_atom(type),
     do: run_compile(app, type)

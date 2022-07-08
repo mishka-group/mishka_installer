@@ -185,13 +185,12 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   end
 
   @doc """
-  This function helps the programmer to join the channel of this module(`RunTimeSourcing`) and receive the output as a broadcast
-  in the form of `{:run_time_sourcing, answer}`.
-  It uses `Phoenix.PubSub.subscribe/2`
+  This function helps the programmer to join the channel of this module(`MishkaInstaller.Installer.RunTimeSourcing`)
+  and receive the output as a broadcast in the form of `{:run_time_sourcing, answer}`. It uses `Phoenix.PubSub.subscribe/2`
 
   ## Examples
   ```elixir
-  # Subscribe to `RunTimeSourcing` module
+  # Subscribe to `MishkaInstaller.Installer.RunTimeSourcing` module
   MishkaInstaller.Installer.RunTimeSourcing.subscribe()
 
   # Getting the answer as Pubsub for examples in LiveView
