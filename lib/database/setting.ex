@@ -146,9 +146,9 @@ defmodule MishkaInstaller.Setting do
   end
 
   if Mix.env() == :test do
-    def notify_subscribers(params, _type_send), do: params
+    defp notify_subscribers(params, _type_send), do: params
   else
-    def notify_subscribers({:ok, action, :setting, repo_data} = params, type_send) do
+    defp notify_subscribers({:ok, action, :setting, repo_data} = params, type_send) do
       Phoenix.PubSub.broadcast(
         MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
         "setting",
@@ -158,7 +158,7 @@ defmodule MishkaInstaller.Setting do
       params
     end
 
-    def notify_subscribers(params, _), do: params
+    defp notify_subscribers(params, _), do: params
   end
 
   @spec allowed_fields(:atom | :string) :: nil | list

@@ -382,7 +382,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @doc false
   @spec notify_subscribers({atom(), any, String.t() | atom()}) :: :ok | {:error, any}
-  def notify_subscribers({status, answer, app}) do
+  defp notify_subscribers({status, answer, app}) do
     Phoenix.PubSub.broadcast(
       MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
       @module,

@@ -139,9 +139,9 @@ defmodule MishkaInstaller.Dependency do
   end
 
   if Mix.env() == :test do
-    def notify_subscribers(params, _type_send), do: params
+    defp notify_subscribers(params, _type_send), do: params
   else
-    def notify_subscribers({:ok, action, :dependency, repo_data} = params, type_send) do
+    defp notify_subscribers({:ok, action, :dependency, repo_data} = params, type_send) do
       Phoenix.PubSub.broadcast(
         MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
         "dependency",
@@ -151,7 +151,7 @@ defmodule MishkaInstaller.Dependency do
       params
     end
 
-    def notify_subscribers(params, _), do: params
+    defp notify_subscribers(params, _), do: params
   end
 
   defp convert_map_from_atom_to_string(map) do
