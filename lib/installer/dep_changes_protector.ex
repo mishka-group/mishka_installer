@@ -109,7 +109,17 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @doc """
+  This function is actually an action function and aggregator.
+  You call this `GenServer.cast` function with three inputs `{:deps, app, type}`, which executes with a very small timeout.
+  Warning: It is highly recommended not to call this function directly and use the worker (`MishkaInstaller.DepCompileJob`)
+  to compile. Finally, this function calls the `MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile/2` function with the help of
+  `Task.Supervisor.async_nolink/2`.
+  It is worth mentioning that you can view and monitor the output by subscribing to this module.
 
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.DepChangesProtector.deps(app_name, output_type)
+  ```
   """
   @spec deps(String.t(), atom()) :: :ok
   def deps(app, type \\ :port) do
