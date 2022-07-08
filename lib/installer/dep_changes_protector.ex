@@ -275,7 +275,13 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @doc """
+  This function checks if any process is running or not.
+  if `true` means no job is being done, if `false` means there is a job is being done.
 
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.DepChangesProtector.is_dependency_compiling?()
+  ```
   """
   @spec is_dependency_compiling? :: boolean
   def is_dependency_compiling?(), do: is_nil(get().ref)
@@ -352,7 +358,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @doc """
   This function helps the programmer to join the channel of this module(`MishkaInstaller.Installer.DepChangesProtector`)
   and receive the output as a broadcast in the form of `{status, :dep_changes_protector, answer, app}`.
-  It uses `Phoenix.PubSub.subscribe/2`
+  It uses `Phoenix.PubSub.subscribe/2`.
 
   ## Examples
   ```elixir

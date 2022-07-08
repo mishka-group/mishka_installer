@@ -186,7 +186,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
 
   @doc """
   This function helps the programmer to join the channel of this module(`MishkaInstaller.Installer.RunTimeSourcing`)
-  and receive the output as a broadcast in the form of `{:run_time_sourcing, answer}`. It uses `Phoenix.PubSub.subscribe/2`
+  and receive the output as a broadcast in the form of `{:run_time_sourcing, answer}`. It uses `Phoenix.PubSub.subscribe/2`.
 
   ## Examples
   ```elixir
