@@ -118,7 +118,10 @@ defmodule MishkaInstaller.Installer.DepHandler do
         }
 
   @doc """
-
+  The `run/2` function is actually the function of the installer and assembler of all the modules that this module is connected to.
+  This function has two inputs that you can see in the examples below. The first input is an atom, which specifies how to install a
+  library in the system.
+  The second entry, depending on the installation method, can be the dependency information requested for the installation.
 
   ## Examples
 
@@ -149,9 +152,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   MishkaInstaller.Installer.DepHandler.run(:upload, ["../mishka_installer/deployment/extensions/timex-3.7.8.zip"])
   ```
+
+
+  ### Reference
+
+  - Fix phoenix reload issue when a dependency is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
+  - `Phoenix.CodeReloader.reload/1` (https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1)
   """
-  # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
-  # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
+
   @spec run(:git | :hex | :upload, app_info(), atom()) :: map()
   def run(type, app, output_type \\ :cmd)
 
