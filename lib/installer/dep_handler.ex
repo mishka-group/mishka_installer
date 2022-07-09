@@ -103,9 +103,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
     dependencies: []
   ]
 
+  @typedoc "This type can be used when you want to introduce an app to install"
   @type app_info() :: String.t() | atom() | map() | list()
+  @typedoc "This type can be used when you want to introduce method of install a dependency"
   @type run() :: :hex | :git | :upload
+  @typedoc "This is delegate of `Application.loaded_applications/0` output"
   @type installed_apps() :: {atom, description :: charlist(), vsn :: charlist()}
+  @typedoc "This type can be used when you want to put your data in this module struct"
   @type t() :: %__MODULE__{
           app: String.t() | nil,
           version: String.t() | nil,
@@ -121,7 +125,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   The `run/2` function is actually the function of the installer and assembler of all the modules that this module is connected to.
   This function has two inputs that you can see in the examples below. The first input is an atom, which specifies how to install a
   library in the system.
-  The second entry, depending on the installation method, can be the dependency information requested for the installation.
+  Depending on the installation method, the second entry can be the dependency information requested for the installation.
 
   ## Examples
 
