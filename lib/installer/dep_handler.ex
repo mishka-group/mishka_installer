@@ -48,6 +48,37 @@ defmodule MishkaInstaller.Installer.DepHandler do
     ]
   }
   ```
+
+  ---
+
+  ### Below you can see the graph of connecting this module to another module.
+
+  ```
+  +----------------------------+          +-------------------------------------+
+  |                            |          |                                     |
+  | MishkaInstaller.Dependency |          | MishkaInstaller.Installer.MixCreator|
+  |                            <---+ +---->                                     |
+  +----------------------------+   | |    +-------------------------------------+
+                                   | |
+                                   | |    +-----------------------------------------+
+                                   | |    |                                         |
+                                   | |    |MishkaInstaller.Installer.RunTimeSourcing|
+                                   | |    |                                         |
+                                   | |    +---^-------------------------------------+
+                                   | |        |
+  +--------------------------------+-+---+    |
+  |                                      |    |
+  | MishkaInstaller.Installer.DepHandler +----+
+  |                                      |
+  +----------------------------^---------+
+                               |
+                               |
+      +------------------------+---------------+
+      |                                        |
+      |MishkaInstaller.Installer.Live.DepGetter|
+      |                                        |
+      +----------------------------------------+
+  ```
   """
 
   @event "on_change_dependency"
@@ -87,35 +118,37 @@ defmodule MishkaInstaller.Installer.DepHandler do
         }
 
   @doc """
-    ## Run and Get a dependency
-    ```elixir
-      Application.spec(:timex, :vsn)
-
-      MishkaInstaller.Installer.DepHandler.run(:hex, "faker")
-
-      app = %{url: "https://github.com/bitwalker/timex", tag: "3.7.5"}
-      MishkaInstaller.Installer.DepHandler.run(:git, app)
-
-      app = %{url: "https://github.com/bitwalker/timex", tag: "3.7.6"}
-      MishkaInstaller.Installer.DepHandler.run(:git, app)
-
-      app = %{url: "https://github.com/bitwalker/timex", tag: "3.7.8"}
-      MishkaInstaller.Installer.DepHandler.run(:git, app)
 
 
-      app = %{url: "https://github.com/elixirs/faker", tag: "v0.17.0"}
-      MishkaInstaller.Installer.DepHandler.run(:git, app)
+  ## Examples
 
-      app = %{url: "https://github.com/martinsvalin/html_entities", tag: "v0.5.1"}
-      MishkaInstaller.Installer.DepHandler.run(:git, app)
+  ```elixir
+  Application.spec(:timex, :vsn)
+
+  MishkaInstaller.Installer.DepHandler.run(:hex, "faker")
+
+  app = %{url: "https://github.com/bitwalker/timex", tag: "3.7.5"}
+  MishkaInstaller.Installer.DepHandler.run(:git, app)
+
+  app = %{url: "https://github.com/bitwalker/timex", tag: "3.7.6"}
+  MishkaInstaller.Installer.DepHandler.run(:git, app)
+
+  app = %{url: "https://github.com/bitwalker/timex", tag: "3.7.8"}
+  MishkaInstaller.Installer.DepHandler.run(:git, app)
 
 
-      app = %{url: "https://github.com/beatrichartz/csv", tag: "v2.3.0"}
-      MishkaInstaller.Installer.DepHandler.run(:git, app)
+  app = %{url: "https://github.com/elixirs/faker", tag: "v0.17.0"}
+  MishkaInstaller.Installer.DepHandler.run(:git, app)
 
-      MishkaInstaller.Installer.DepHandler.run(:upload, ["../mishka_installer/deployment/extensions/timex-3.7.8.zip"])
+  app = %{url: "https://github.com/martinsvalin/html_entities", tag: "v0.5.1"}
+  MishkaInstaller.Installer.DepHandler.run(:git, app)
 
-    ```
+
+  app = %{url: "https://github.com/beatrichartz/csv", tag: "v2.3.0"}
+  MishkaInstaller.Installer.DepHandler.run(:git, app)
+
+  MishkaInstaller.Installer.DepHandler.run(:upload, ["../mishka_installer/deployment/extensions/timex-3.7.8.zip"])
+  ```
   """
   # ref: fix phoenix reload issue when a dep is compiled (https://github.com/phoenixframework/phoenix/issues/4278)
   # this ref should be in the document https://hexdocs.pm/phoenix/Phoenix.CodeReloader.html#reload/1
