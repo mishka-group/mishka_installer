@@ -1,38 +1,13 @@
 defmodule MishkaInstaller.Installer.DepHandler do
-  @event "on_change_dependency"
-  alias MishkaInstaller.{
-    Dependency,
-    Installer.MixCreator,
-    Installer.DepChangesProtector,
-    Installer.RunTimeSourcing
-  }
+ @moduledoc """
+  A module aggregates several operational functions to simplify the integration of all activities,
+  including adding - removing, and updating a library in the project.
+  For this purpose, you can use this module directly in your program or just call some helper functions.
+  It should be noted that this module, like the `MishkaInstaller.Installer.RunTimeSourcing` module,
+  has a primary function that performs all the mentioned operations based on the request type (`run/2`).
+  Also, to perform some activities before applying any changes, the database and `extensions.json` file of your project will be rechecked.
 
-  alias MishkaInstaller.Helper.Extra
-  require Logger
-
-  defstruct [
-    :app,
-    :version,
-    :type,
-    :url,
-    :git_tag,
-    :custom_command,
-    :dependency_type,
-    dependencies: []
-  ]
-
-  @moduledoc """
-
-  A module that holds new dependencies' information, and add them into database or validating to implement in runtime
-
-  ### Responsibilities of this module
-
-  * Create `Json` - it helps developer to implement theire plugin/commponent into the project.
-  * Add dependencies into database - for validating, stroing and keeping backup of runtime dependencies
-  * Get dependencies information in several different ways
-
-
-  ### For example, these are output from `Json` file
+  ### For example, these are output from `Json` file and this module struct
   ```elixir
   [
     %{
@@ -42,8 +17,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
       url: "https://github.com/mishka-group/mishka_installer", # if it is hex: https://hex.pm/packages/mishka_installer
       git_tag: "0.0.2", # we consider it when it is a git, and if does not exist we get master,
       custom_command: "ecto.migrate", # you can write nil or you task file like ecto.migrate
-      dependency_type: :none, # :force_update, When you use this, the RunTime sourcing check what dependencies you use in your program have a higher version
-      #compared to the old source. it just notice admin there is a update, it does not force the source to be updated
+      dependency_type: :none, # :force_update, When you use this, the RunTime sourcing check what dependencies you use
+      # in your program have a higher version compared to the old source. it just notice admin there is a update,
+      # it does not force the source to be updated.
       dependencies: [ # this part let mishka_installer to know can update or not dependencies of a app, we should consider a backup file
         %{app: :mishka_developer_tools, max: "0.0.2", min: "0.0.1"},
         %{app: :mishka_social, max: "0.0.2", min: "0.0.1"}
@@ -51,6 +27,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     }
   ]
   ```
+
   OR
 
   ```elixir
@@ -72,6 +49,28 @@ defmodule MishkaInstaller.Installer.DepHandler do
   }
   ```
   """
+
+  @event "on_change_dependency"
+  alias MishkaInstaller.{
+    Dependency,
+    Installer.MixCreator,
+    Installer.DepChangesProtector,
+    Installer.RunTimeSourcing
+  }
+
+  alias MishkaInstaller.Helper.Extra
+  require Logger
+
+  defstruct [
+    :app,
+    :version,
+    :type,
+    :url,
+    :git_tag,
+    :custom_command,
+    :dependency_type,
+    dependencies: []
+  ]
 
   @type app_info() :: String.t() | atom() | map() | list()
   @type run() :: :hex | :git | :upload
