@@ -342,6 +342,23 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This function mixes your current list of dependencies with your added-dependencies from `extensions.json`.
+
+  ### This function calls 1 other function including:
+
+  1. `mix_read_from_json/0`
+
+  ## Examples
+
+  ```elixir
+  list_of_deps =
+    [
+      {:finch, "~> 0.12.0"},
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:ueberauth, git: "url", tag: "0.6.3"}
+    ]
+  MishkaInstaller.Installer.DepHandler.append_mix(list_of_deps)
+  ```
   """
   @spec append_mix([tuple()]) :: list
   def append_mix(list) do
