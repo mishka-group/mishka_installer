@@ -229,6 +229,14 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  For more information, please read `create_mix_file_and_start_compile/2`, but consider this function just
+  re-creates `mix.exs` file and does not compile an app. This function is based on the `Sourceror` library.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.create_mix_file()
+  ```
   """
   @spec create_mix_file :: :ok
   def create_mix_file() do
