@@ -424,6 +424,18 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This function works like `compare_dependencies_with_json/0`, but there is a difference which is in this part of the code,
+  we compare the installed app with sup-dependencies based on min and max versions that are allowed.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.compare_sub_dependencies_with_json()
+  ```
+
+  ### Reference
+
+  - How to improve sort of maps in a list which have duplicate key (https://elixirforum.com/t/47486)
   """
   @spec compare_sub_dependencies_with_json(any) ::
           list | {:error, :compare_sub_dependencies_with_json, String.t()}
