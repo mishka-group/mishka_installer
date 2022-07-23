@@ -481,6 +481,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # TODO: it needs to use reverse with output to be improved like `MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile` function.
   @doc """
+  With this function, you can check and create `extensions.json` and its path.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.check_or_create_deps_json()
+  ```
   """
   @spec check_or_create_deps_json(binary) ::
           {:ok, :check_or_create_deps_json, String.t()}
