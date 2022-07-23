@@ -604,6 +604,20 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This function compare installed app based on their files in `_build` and `deps` directory.
+
+  ### This function calls 3 other functions including:
+
+  1. `MishkaInstaller.Installer.RunTimeSourcing.read_app/2`
+  2. `MishkaInstaller.Installer.RunTimeSourcing.consult_app_file/2`
+  3. `compare_version_with_installed_app/2`
+  4. `File.dir?/1`
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.compare_installed_deps_with_app_file("app_name")
+  ```
   """
   @spec compare_installed_deps_with_app_file(String.t()) ::
           {:error, :compare_installed_deps_with_app_file, String.t()}
