@@ -378,6 +378,21 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  A function to compare dependencies between `extensions.json` and `Application.loaded_applications/0`; if an app exists, it returns.
+
+
+  ### This function calls 3 other functions including:
+
+  1. `check_or_create_deps_json/0`
+  2. `Application.loaded_applications/0`
+  3. `read_dep_json/1`
+
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.compare_dependencies_with_json()
+  ```
   """
   @spec compare_dependencies_with_json(installed_apps() | any()) ::
           list | {:error, :compare_dependencies_with_json, String.t()}
