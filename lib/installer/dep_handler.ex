@@ -479,6 +479,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  # TODO: it needs to use reverse with output to be improved like `MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile` function.
   @doc """
   """
   @spec check_or_create_deps_json(binary) ::
@@ -517,6 +518,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  It returns dependencies as a list of maps from `mix.exs`
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.get_deps_from_mix(MishkaInstaller.MixProject)
+  ```
   """
   @spec get_deps_from_mix(module()) :: list
   def get_deps_from_mix(mix_module) do
@@ -530,6 +538,12 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  It returns dependencies as a list of maps from `mix.lock`, based on `Mix.Dep.Lock.read/0`
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.get_deps_from_mix_lock()
+  ```
   """
   @spec get_deps_from_mix_lock :: list
   def get_deps_from_mix_lock() do

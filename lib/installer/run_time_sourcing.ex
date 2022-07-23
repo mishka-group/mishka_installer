@@ -164,7 +164,8 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
   def do_runtime(app, :add) when is_atom(app) do
     get_build_path()
     |> File.ls!()
-    |> Enum.reject(&(&1 == ".DS_Store")) # For macOS users to delete `.DS_Store` file.
+    # For macOS users to delete `.DS_Store` file.
+    |> Enum.reject(&(&1 == ".DS_Store"))
     |> compare_dependencies()
     |> prepend_compiled_apps()
     |> application_ensure(app, :add)
@@ -231,6 +232,7 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> Enum.reject(&is_nil(&1))
   end
 
+  # TODO: test this function with new changes
   @doc """
   This aggregator function is an action function to download and compile requested dependencies.
   You can decide what your default output is. It should be noted that this part of the project
