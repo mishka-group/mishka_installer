@@ -304,6 +304,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   ```elixir
   MishkaInstaller.Installer.DepHandler.read_dep_json()
+  # or
+  MishkaInstaller.Installer.DepHandler.mix_read_from_json(JSON_PATH)
   ```
   """
   @spec read_dep_json(any) :: {:error, :read_dep_json, String.t()} | {:ok, :read_dep_json, list()}
@@ -320,6 +322,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This function uses `read_dep_json/0` to read `extensions.json` file and returns list of dependencies-map.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.mix_read_from_json()
+  ```
   """
   @spec mix_read_from_json :: list
   def mix_read_from_json() do
