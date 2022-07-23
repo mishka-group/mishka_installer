@@ -298,6 +298,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This Function is for interacting with the external `extensions.json` file to load added-libraries.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.read_dep_json()
+  ```
   """
   @spec read_dep_json(any) :: {:error, :read_dep_json, String.t()} | {:ok, :read_dep_json, list()}
   def read_dep_json(json \\ File.read!(extensions_json_path())) do
@@ -559,8 +566,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     if !is_nil(ver), do: Version.compare("#{version}", "#{ver}") == :gt, else: true
   end
 
-  @doc """
-  """
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
       :ok ->
