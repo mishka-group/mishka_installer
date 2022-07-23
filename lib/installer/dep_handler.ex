@@ -563,6 +563,12 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This functions returns `extensions.json` file path based on `:project_path`.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.extensions_json_path()
+  ```
   """
   @spec extensions_json_path :: binary()
   def extensions_json_path() do
@@ -571,6 +577,12 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This function creates `extensions.json` as a json file.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.create_deps_json_file(project_path)
+  ```
   """
   @spec create_deps_json_file(binary()) ::
           {:error, :check_or_create_deps_json, binary} | {:ok, :check_or_create_deps_json, binary}
