@@ -606,7 +606,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   @doc """
   This function compare installed app based on their files in `_build` and `deps` directory.
 
-  ### This function calls 3 other functions including:
+  ### This function calls 4 other functions including:
 
   1. `MishkaInstaller.Installer.RunTimeSourcing.read_app/2`
   2. `MishkaInstaller.Installer.RunTimeSourcing.consult_app_file/2`
@@ -651,15 +651,36 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  With this function help you can move built app file to `_build` folder.
+
+  ### This function calls 3 other functions including:
+
+  1. `MishkaInstaller.Installer.RunTimeSourcing.do_runtime/2`
+  2. `MishkaInstaller.Installer.RunTimeSourcing.get_build_path/0`
+  3. `File.cp_r/3`
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.move_and_replace_compiled_app_build(app_list)
+  ```
   """
   def move_and_replace_compiled_app_build(app_list) do
     Enum.map(app_list, fn {app, build_path} ->
-      MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(app), :uninstall)
+      RunTimeSourcing.do_runtime(String.to_atom(app), :uninstall)
       File.cp_r(build_path, Path.join(RunTimeSourcing.get_build_path(), "#{app}"))
     end)
   end
 
   @doc """
+  This function helps you to compare an app version with its installed version, it returns `true` or `false`.
+  Based on `Application.spec/2`
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.compare_version_with_installed_app(app, version)
+  ```
   """
   def compare_version_with_installed_app(app, version) do
     ver = Application.spec(String.to_atom(app), :vsn)
