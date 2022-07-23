@@ -1,5 +1,5 @@
 defmodule MishkaInstaller.Installer.DepHandler do
- @moduledoc """
+  @moduledoc """
   A module aggregates several operational functions to simplify the integration of all activities,
   including adding - removing, and updating a library in the project.
   For this purpose, you can use this module directly in your program or just call some helper functions.
@@ -186,6 +186,26 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> run_request_handler(type, output_type)
   end
 
+  @doc """
+  This function provides an option to edit and start compiling from a `mix.exs` file.
+  It should be considered to use this facility as a helper because it might be deleted on the next version from our primary process;
+  `create_mix_file_and_start_compile/2` is kept to let developers use this based on their problems.
+  You must put two entries, the first one is the app name, and the second one is the type of compiling, which can be shown in a terminal
+  as stream outputs or sent with `Pubsub` and `Port`.
+  This function is based on the `Sourceror` library, and the types we discussed include `:cmd` and `:port`.
+
+  ### This function calls 3 other functions including:
+
+  1. `create_deps_json_file/1`
+  2. `MishkaInstaller.Installer.MixCreator.backup_mix/1`
+  3. `MishkaInstaller.Installer.DepChangesProtector.deps/2`
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Installer.DepHandler.create_mix_file_and_start_compile(app, type)
+  ```
+  """
   @spec create_mix_file_and_start_compile(String.t() | atom(), atom()) :: :ok
   def create_mix_file_and_start_compile(app_name, output_type) do
     mix_path = MishkaInstaller.get_config(:mix_path)
@@ -208,6 +228,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   @spec create_mix_file :: :ok
   def create_mix_file() do
     mix_path = MishkaInstaller.get_config(:mix_path)
@@ -229,6 +251,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   # This function helps developer to decide what they should do when an app is going to be updated.
   # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
   @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) ::
@@ -247,6 +271,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   @spec read_dep_json(any) :: {:error, :read_dep_json, String.t()} | {:ok, :read_dep_json, list()}
   def read_dep_json(json \\ File.read!(extensions_json_path())) do
     {:ok, :read_dep_json, json |> Jason.decode!()}
@@ -260,6 +286,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
        )}
   end
 
+  @doc """
+  """
   @spec mix_read_from_json :: list
   def mix_read_from_json() do
     case read_dep_json() do
@@ -271,6 +299,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   @spec append_mix([tuple()]) :: list
   def append_mix(list) do
     new_list = Enum.map(list, &(&1 |> Tuple.to_list() |> List.first()))
@@ -288,6 +318,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     _e -> list
   end
 
+  @doc """
+  """
   @spec compare_dependencies_with_json(installed_apps() | any()) ::
           list | {:error, :compare_dependencies_with_json, String.t()}
   def compare_dependencies_with_json(installed_apps \\ Application.loaded_applications()) do
@@ -317,6 +349,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   @spec compare_sub_dependencies_with_json(any) ::
           list | {:error, :compare_sub_dependencies_with_json, String.t()}
   def compare_sub_dependencies_with_json(installed_apps \\ Application.loaded_applications()) do
@@ -359,6 +393,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   @spec check_or_create_deps_json(binary) ::
           {:ok, :check_or_create_deps_json, String.t()}
           | {:error, :check_or_create_deps_json, String.t()}
@@ -394,6 +430,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   @spec get_deps_from_mix(module()) :: list
   def get_deps_from_mix(mix_module) do
     [{:deps, app_info} | _t] =
@@ -405,6 +443,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
+  @doc """
+  """
   @spec get_deps_from_mix_lock :: list
   def get_deps_from_mix_lock() do
     Mix.Dep.Lock.read()
@@ -415,12 +455,16 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
+  @doc """
+  """
   @spec extensions_json_path :: binary()
   def extensions_json_path() do
     path = MishkaInstaller.get_config(:project_path)
     Path.join(path, ["deployment/", "extensions/", "extensions.json"])
   end
 
+  @doc """
+  """
   @spec create_deps_json_file(binary()) ::
           {:error, :check_or_create_deps_json, binary} | {:ok, :check_or_create_deps_json, binary}
   def create_deps_json_file(project_path) do
@@ -440,6 +484,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   @spec compare_installed_deps_with_app_file(String.t()) ::
           {:error, :compare_installed_deps_with_app_file, String.t()}
           | {:ok, :compare_installed_deps_with_app_file, list()}
@@ -471,6 +517,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
+  @doc """
+  """
   def move_and_replace_compiled_app_build(app_list) do
     Enum.map(app_list, fn {app, build_path} ->
       MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(app), :uninstall)
@@ -478,11 +526,15 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end)
   end
 
+  @doc """
+  """
   def compare_version_with_installed_app(app, version) do
     ver = Application.spec(String.to_atom(app), :vsn)
     if !is_nil(ver), do: Version.compare("#{version}", "#{ver}") == :gt, else: true
   end
 
+  @doc """
+  """
   defp create_deps_json_directory(project_path, folder_path) do
     case File.mkdir(Path.join(project_path, folder_path)) do
       :ok ->

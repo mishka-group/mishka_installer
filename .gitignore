@@ -37,5 +37,6 @@ mix.lock
 /deployment/
 /priv/repo/
 /config/
-
+/elixirproject
+/mykey
 .iex.exs
