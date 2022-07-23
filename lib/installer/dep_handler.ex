@@ -260,9 +260,27 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
+  This function helps developers to decide what they should do when an app is going to be updated.
+  For example, each of the extensions maybe has states or necessary jobs; hence they can register their app for `on_change_dependency` event.
+
+  ## Examples
+
+  ```
+  old_ueberauth = %DepHandler{
+    app: "ueberauth",
+    version: "0.6.3",
+    type: "hex",
+    url: "https://hex.pm/packages/ueberauth",
+    git_tag: nil,
+    custom_command: nil,
+    dependency_type: "force_update",
+    dependencies: [
+      %{app: :plug, min: "1.5.0"}
+    ]
+  }
+  MishkaInstaller.Installer.DepHandler.add_new_app(old_ueberauth)
+  ```
   """
-  # This function helps developer to decide what they should do when an app is going to be updated.
-  # For example, each of the extensions maybe have states or necessary jobs, hence they can register their app for `on_change_dependency` event.
   @spec add_new_app(MishkaInstaller.Installer.DepHandler.t()) ::
           {:ok, :add_new_app, any} | {:error, :add_new_app, :changeset | :file, any}
   def add_new_app(%__MODULE__{} = app_info) do
