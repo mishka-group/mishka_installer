@@ -1,4 +1,7 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
+  @moduledoc """
+
+  """
   use Phoenix.LiveView
   use Phoenix.HTML
   alias Phoenix.LiveView.JS
