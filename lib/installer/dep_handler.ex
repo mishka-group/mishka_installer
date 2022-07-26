@@ -545,7 +545,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   end
 
   @doc """
-  It returns dependencies as a list of maps from `mix.lock`, based on `Mix.Dep.Lock.read/0`
+  It returns dependencies as a list of maps from `mix.lock`, based on `Mix.Dep.Lock.read`
 
   ## Examples
   ```elixir
@@ -609,7 +609,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
   ### This function calls 4 other functions including:
 
   1. `MishkaInstaller.Installer.RunTimeSourcing.read_app/2`
-  2. `MishkaInstaller.Installer.RunTimeSourcing.consult_app_file/2`
+  2. `MishkaInstaller.Installer.RunTimeSourcing.consult_app_file/1`
   3. `compare_version_with_installed_app/2`
   4. `File.dir?/1`
 
