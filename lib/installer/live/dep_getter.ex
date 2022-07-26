@@ -14,6 +14,69 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   - **Note:** For this reason, make important to set up authentication and authorization procedures and
   provide it access to your superuser before using this dashboard.
+
+  ---
+
+  ### Below you can see the graph of connecting this module to another module.
+
+
+  ```
+  +----------------------------------------+
+  |                                        |
+  |MishkaInstaller.Installer.Live.DepGetter+-------+
+  |                                        |       |
+  +------------------+---------------------+       |
+                     |                             |
+                     |                             |
+                     |                             |
+    +----------------v-------------------+         |
+    |                                    |         |
+    |MishkaInstaller.Installer.DepHandler|         |
+    |                                    |         |
+    +----------------+-------------------+         |
+                     |                             |
+                     |                             |
+                     |                             |
+  +------------------v--------------------------+  |
+  |                                             |  |
+  |MishkaInstaller.Installer.DepChangesProtector|  |
+  |                                             |  |
+  +-----+---------------------------------------+  |
+        |                                          |
+        |                                          |
+        |                                          |
+        |                     +--------------------v-+
+        |                     |                      |
+        |                     | MishkaInstaller.Hook |
+        |                     |                      |
+        |                     +---------+------------+
+        |                               |
+        |                               |
+        |          +--------------------v------------------------+
+        |          |                                             |
+        |          | MishkaInstaller.Reference.OnChangeDependency|
+        |          |                                             |
+        |          +---------------------------------------------+
+        |
+        |
+        +----------------+-------------------------+
+                         |                         |
+    +--------------------v--------------------+    |
+    |                                         |    |
+    |MishkaInstaller.Installer.RunTimeSourcing|    |
+    |                                         |    |
+    +-----------------------------------------+    |
+                                                   |
+                                                   |
+              +------------------------------+     |
+              |MishkaInstaller.DepCompileJob +----->
+              +------------------------------+     |
+                                                   |
+                                                   |
+                        +--------------------------v-+
+                        |MishkaInstaller.DepUpdateJob|
+                        +----------------------------+
+  ```
   """
   use Phoenix.LiveView
   use Phoenix.HTML
