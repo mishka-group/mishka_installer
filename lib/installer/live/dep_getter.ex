@@ -291,9 +291,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         nil
 
       {:ok, :get_record_by_field, :dependency, record_info} ->
-        Task.Supervisor.start_child(MishkaInstaller.Installer.DepHandler, fn ->
+        Task.Supervisor.start_child(DepHandler, fn ->
           :timer.sleep(1000)
-          MishkaInstaller.Installer.DepHandler.create_mix_file()
+          DepHandler.create_mix_file()
         end)
 
         MishkaInstaller.Dependency.delete(record_info.id)
@@ -457,7 +457,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_info({:ok, :dep_changes_protector, _answer, _app}, socket) do
-    Task.Supervisor.start_child(MishkaInstaller.Installer.DepHandler, fn ->
+    Task.Supervisor.start_child(DepHandler, fn ->
       MishkaInstaller.DepUpdateJob.check_added_dependencies_update()
     end)
 
