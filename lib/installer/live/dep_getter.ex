@@ -1,6 +1,19 @@
 defmodule MishkaInstaller.Installer.Live.DepGetter do
   @moduledoc """
+  Allows you to work with installed extensions in a simple and efficient manner.
+  Some important tools and `removal`/`installation` facilities are accessible for usage.
+  It's not necessary to install this module; you may do it in a matter of seconds.
+  Using this dashboard will need the usage of `Phoenix LiveView`, as it was built entirely using this library.
+  Bootstrap is used to construct the `HTML` components, but if you don't have it, you'll need to add the `CSS` yourself.
+  Real-time services are available in this section.
+  A different `LiveView` file can also be used, as can calling it directly from the router.
+  It is through this layer that the Port and `Phoenix Pubsub` modules are linked to keep tabs on the installation.
 
+  - **Note:** This dashboard is currently modest, but greater management tools will be provided in the future,
+  therefore we recommend that you utilize it now.
+
+  - **Note:** For this reason, make important to set up authentication and authorization procedures and
+  provide it access to your superuser before using this dashboard.
   """
   use Phoenix.LiveView
   use Phoenix.HTML

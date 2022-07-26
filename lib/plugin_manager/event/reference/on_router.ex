@@ -20,6 +20,13 @@ defmodule MishkaInstaller.Reference.OnRouter do
 
     put(path, plug, plug_opts, options \\ [])
     put("/events/:id", EventController, :action)
+
+    scope "/" do
+      pipe_through :browser
+      Enum.map(["1", "2"], fn x ->
+        live("/x", TrackappWeb.Live.DepGetter)
+      end)
+    end
   ```
   """
   defstruct [:action, :path, :endpoint, type: :public, plug_opts: []]
