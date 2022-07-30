@@ -1,4 +1,8 @@
 defmodule MishkaInstaller.Database.SettingSchema do
+  @moduledoc """
+  This module has been implemented to create the `Settings` table schema.
+  """
+
   use Ecto.Schema
   import Ecto.Changeset
   @primary_key {:id, :binary_id, autogenerate: true}
