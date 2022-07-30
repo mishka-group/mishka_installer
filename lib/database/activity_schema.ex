@@ -1,4 +1,7 @@
 defmodule MishkaInstaller.Database.ActivitySchema do
+  @moduledoc """
+  This module has been implemented to create the `Activity` table schema.
+  """
   use Ecto.Schema
 
   import Ecto.Changeset
