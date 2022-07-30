@@ -1,4 +1,7 @@
 defmodule MishkaInstaller.Database.PluginSchema do
+  @moduledoc """
+  This module has been implemented to create the `Plugins` table schema.
+  """
   use Ecto.Schema
 
   import Ecto.Changeset
