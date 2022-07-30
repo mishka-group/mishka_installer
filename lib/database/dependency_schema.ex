@@ -1,4 +1,7 @@
 defmodule MishkaInstaller.Database.DependencySchema do
+  @moduledoc """
+  This module has been implemented to create the `Dependencies` table schema.
+  """
   use Ecto.Schema
 
   import Ecto.Changeset
