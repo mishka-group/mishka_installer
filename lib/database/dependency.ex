@@ -1,10 +1,10 @@
 defmodule MishkaInstaller.Dependency do
   @moduledoc """
-
-  This module can hold your dependencies' information in database
-
-  > Do not use these functions directly, because we do not update JSON file in this module, some functions were prepared in DepHandler module for you.
+  This module is for communication with `Dependencies` table and has essential functions such as
+  adding, editing, deleting, and displaying.
+  This module is related to module `MishkaInstaller.Database.DependencySchema`.
   """
+
   alias MishkaInstaller.Database.DependencySchema
   alias MishkaInstaller.Installer.DepHandler
   import Ecto.Query
@@ -56,15 +56,9 @@ defmodule MishkaInstaller.Dependency do
     crud_get_by_field("app", app)
   end
 
-  def update_app_version(id, data) do
-    crud_edit(
-      Map.merge(convert_map_from_atom_to_string(data), %{
-        "id" => id,
-        "dependency_type" => "force_update"
-      })
-    )
-  end
-
+  @doc """
+  This is an aggregation function that includes editing or adding.
+  """
   @spec create_or_update(map()) :: tuple()
   def create_or_update(data) do
     case show_by_name(data.app) do
@@ -80,6 +74,9 @@ defmodule MishkaInstaller.Dependency do
     end
   end
 
+  @doc """
+  Show all dependencies.
+  """
   def dependencies() do
     from(dep in DependencySchema)
     |> fields()
@@ -91,6 +88,9 @@ defmodule MishkaInstaller.Dependency do
     |> Enum.map(&struct(DepHandler, &1))
   end
 
+  @doc """
+  This is an aggregation function that includes editing a type of app.
+  """
   @spec change_dependency_type_with_app(String.t(), String.t()) ::
           {:ok, :change_dependency_type_with_app, map()}
           | {:error, :change_dependency_type_with_app, :dependency, atom() | map()}
@@ -131,6 +131,10 @@ defmodule MishkaInstaller.Dependency do
     )
   end
 
+  @doc """
+  If you want to get the latest changes from the `Dependencies` table of your database,
+  this function can help you to be subscribed.
+  """
   def subscribe do
     Phoenix.PubSub.subscribe(
       MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
@@ -158,5 +162,14 @@ defmodule MishkaInstaller.Dependency do
     for {key, val} <- map, into: %{} do
       {to_string(key), to_string(val)}
     end
+  end
+
+  defp update_app_version(id, data) do
+    crud_edit(
+      Map.merge(convert_map_from_atom_to_string(data), %{
+        "id" => id,
+        "dependency_type" => "force_update"
+      })
+    )
   end
 end

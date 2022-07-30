@@ -1,4 +1,10 @@
 defmodule MishkaInstaller.Plugin do
+  @moduledoc """
+  This module is for communication with `Plugins` table and has essential functions such as
+  adding, editing, deleting, and displaying.
+  This module is related to module `MishkaInstaller.Database.PluginSchema`.
+  """
+
   alias MishkaInstaller.Database.PluginSchema
   alias MishkaInstaller.PluginState
   import Ecto.Query
@@ -45,6 +51,9 @@ defmodule MishkaInstaller.Plugin do
     crud_get_by_field("name", name)
   end
 
+  @doc """
+  This is an aggregation function that includes editing or adding by name of plugin.
+  """
   def add_or_edit_by_name(state) do
     case show_by_name("#{state.name}") do
       {:ok, :get_record_by_field, :plugin, repo_data} ->
@@ -55,6 +64,9 @@ defmodule MishkaInstaller.Plugin do
     end
   end
 
+  @doc """
+  Show plugins by event name or all the plugin.
+  """
   def plugins(event: event) do
     from(plg in PluginSchema, where: plg.event == ^event)
     |> fields()
@@ -83,6 +95,9 @@ defmodule MishkaInstaller.Plugin do
     )
   end
 
+  @doc """
+  Delete all the plugins of an event by an event name.
+  """
   def delete_plugins(event) do
     stream = MishkaInstaller.repo().stream(from(plg in PluginSchema))
 

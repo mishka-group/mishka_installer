@@ -1,4 +1,9 @@
 defmodule MishkaInstaller.Activity do
+  @moduledoc """
+  This module is for communication with `Activities` table and has essential functions such as
+  adding, editing, deleting, and displaying.
+  This module is related to module `MishkaInstaller.Database.ActivitySchema`.
+  """
   alias MishkaInstaller.Database.ActivitySchema
 
   use MishkaDeveloperTools.DB.CRUD,
@@ -8,6 +13,10 @@ defmodule MishkaInstaller.Activity do
 
   @behaviour MishkaDeveloperTools.DB.CRUD
 
+  @doc """
+  If you want to get the latest changes from the `Activities` table of your database,
+  this function can help you to be subscribed.
+  """
   def subscribe do
     Phoenix.PubSub.subscribe(
       MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
@@ -44,6 +53,9 @@ defmodule MishkaInstaller.Activity do
     crud_get_record(id)
   end
 
+  @doc """
+  This function helps to save the latest activities in different nodes without waiting for a response.
+  """
   @spec create_activity_by_start_child(map(), map()) ::
           :ignore | {:error, any} | {:ok, pid} | {:ok, pid, any}
   def create_activity_by_start_child(params, extra \\ %{}) do
@@ -52,6 +64,9 @@ defmodule MishkaInstaller.Activity do
     end)
   end
 
+  @doc """
+  This function helps to save the latest activities in different nodes within waiting for a response.
+  """
   @spec create_activity_by_task(map(), map()) :: Task.t()
   def create_activity_by_task(params, extra \\ %{}) do
     Task.Supervisor.async_nolink(__MODULE__, fn ->

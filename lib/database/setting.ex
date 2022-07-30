@@ -1,4 +1,10 @@
 defmodule MishkaInstaller.Setting do
+  @moduledoc """
+  This module is for communication with `Settings` table and has essential functions such as
+  adding, editing, deleting, and displaying.
+  This module is related to module `MishkaInstaller.Database.SettingSchema`.
+  """
+
   alias MishkaInstaller.Database.SettingSchema
   import Ecto.Query
 
@@ -9,6 +15,10 @@ defmodule MishkaInstaller.Setting do
 
   @behaviour MishkaDeveloperTools.DB.CRUD
 
+  @doc """
+  If you want to get the latest changes from the `Settings` table of your database,
+  this function can help you to be subscribed.
+  """
   def subscribe do
     Phoenix.PubSub.subscribe(
       MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,
@@ -56,6 +66,9 @@ defmodule MishkaInstaller.Setting do
     crud_get_by_field("name", name)
   end
 
+  @doc """
+  This is an aggregation function that includes editing or adding by name.
+  """
   def add_or_edit_by_name(data) do
     case show_by_name("#{data.name}") do
       {:ok, :get_record_by_field, :setting, repo_data} ->
@@ -66,6 +79,9 @@ defmodule MishkaInstaller.Setting do
     end
   end
 
+  @doc """
+  Show all settings.
+  """
   @spec settings([
           {:conditions, {String.t() | integer(), String.t() | integer()}} | {:filters, map()},
           ...
