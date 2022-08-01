@@ -1,19 +1,39 @@
 defmodule MishkaInstaller.Helper.Setting do
+  @moduledoc """
+  This module offers a number of necessary functions that can be used to access the runtime configuration.
+  The owner of the system has the ability to make changes to these parameters, which will then be updated in the database.
+  This section was formerly a part of `MishkaCMS`, and the accompanying system is likewise a very straightforward
+  one for saving particular settings when the system is being executed.
+
+  **Note**: that the functionality of this section is not restricted to the 'MishkaInstaller' section;
+  rather, it can be utilized in other parts of your product.
+  """
+
   use GenServer
   require Logger
+  alias MishkaInstaller.Setting, as: DBSetting
+
   @ets_table :setting_ets_state
   @sync_with_database 100_000
   @re_check_binding_db 10_000
-  alias MishkaInstaller.Setting, as: DBSetting
 
+  @doc """
+  Start the ETS table `:setting_ets_state` and sync with the settings table in the Postgres database.
+  """
   def start_link(args) do
     GenServer.start_link(__MODULE__, args, name: __MODULE__)
   end
 
+  @doc """
+  Push your required configs to ETS.
+  """
   def push(config) do
     ETS.Set.put!(table(), {String.to_atom(config.name), config.configs})
   end
 
+  @doc """
+  Get your required configs from ETS.
+  """
   def get(config_name) do
     case ETS.Set.get(table(), String.to_atom(config_name)) do
       {:ok, {_name, config}} -> config
@@ -21,6 +41,9 @@ defmodule MishkaInstaller.Helper.Setting do
     end
   end
 
+  @doc """
+  Get All your required configs from ETS.
+  """
   def get_all() do
     ETS.Set.to_list!(table())
   end
@@ -29,6 +52,7 @@ defmodule MishkaInstaller.Helper.Setting do
     ETS.Set.delete(table(), String.to_atom(config_name))
   end
 
+  @doc false
   def child_spec(process_name) do
     %{
       id: __MODULE__,
@@ -90,6 +114,9 @@ defmodule MishkaInstaller.Helper.Setting do
     Logger.warn("Your ETS state of setting was restarted by a problem")
   end
 
+  @doc """
+  Sync the ETS config table with your database.
+  """
   def sync_with_database() do
     DBSetting.settings()
     |> Enum.map(&push/1)
