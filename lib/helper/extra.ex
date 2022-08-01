@@ -1,5 +1,21 @@
 defmodule MishkaInstaller.Helper.Extra do
-  # Ref: https://elixirforum.com/t/getting-basic-information-of-a-elixir-project-from-github/48231/7
+  @moduledoc """
+  You can find some utility functions in this module. It will be merged with the other helper module.
+  """
+
+  @doc """
+  With this function, you can extract some basic information from a `mix` file by AST.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Helper.Extra .ast_mix_file_basic_information(ast, [:app, :version, :source_url], [{:tag, tag}])
+  ```
+
+  ### Reference
+
+  - https://elixirforum.com/t/getting-basic-information-of-a-elixir-project-from-github/48231/7
+  """
   def ast_mix_file_basic_information(ast, selection, extra \\ []) do
     Enum.map(selection, fn item ->
       {_ast, acc} =
