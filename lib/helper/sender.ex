@@ -1,15 +1,37 @@
 defmodule MishkaInstaller.Helper.Sender do
   @moduledoc """
-    At first, we try to get basic information from `hex.pm` website; but after releasing some versions of MishkaInstaller,
-    this API can be useful for managing packages from admin panel.
+  To begin, we look at the `hex.pm` website in an effort to get some fundamental information.
+  Despite this, after several versions of MishkaInstaller have been released,
+  this API may prove to be helpful for managing packages from within an administrative panel.
 
-    **Ref: `https://github.com/hexpm/hexpm/issues/1124`**
+  ### Reference
+   - https://github.com/hexpm/hexpm/issues/1124
   """
   @request_name HexClientApi
   alias MishkaInstaller.Helper.Extra
 
   @type app :: map()
 
+  @doc """
+  This is an executor function and has several different modes, including:
+
+  1. Get information from `hex.pm` website
+  2. Getting information from GitHub
+  3. Getting information from the latest GitHub releases
+  4. Get information from the latest GitHub tags
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
+  # or
+  MishkaInstaller.Helper.Sender.package("github", %{"url" => app.url, "tag" => app.tag})
+  # or
+  MishkaInstaller.Helper.Sender.package("github_latest_release", json_data["url"])
+  # or
+  MishkaInstaller.Helper.Sender.package("github_latest_tag", json_data["url"])
+  ```
+  """
   @spec package(String.t(), app()) ::
           list
           | {:error, :package, :mix_file | :not_found | :not_tag | :unhandled}
