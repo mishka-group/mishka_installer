@@ -1,5 +1,5 @@
 defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
-  @shortdoc "Generates Guardian.DB's migration"
+  @shortdoc "Generates MishkaInstallers required migrations."
 
   use Mix.Task
 
