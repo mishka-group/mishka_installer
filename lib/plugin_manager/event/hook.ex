@@ -33,7 +33,7 @@ defmodule MishkaInstaller.Hook do
 
   If this opportunity is provided, the management can manage its own plugins in different ways if it has a dashboard.
 
-  It is crucial to highlight that each plugin is its own Genserver; in addition,
+  It is crucial to highlight that each plugin is its own `GenServer`; in addition,
   it is dynamically supervised, and the information is stored in the database as well as in ETS.
 
   Furthermore, this section is very useful even if the programmer wants to perform many tasks
@@ -66,7 +66,7 @@ defmodule MishkaInstaller.Hook do
   ---
 
   The library categorizes your whole software design structure into many parts;
-  and has an appropriate dependency that is optional with Genserver;
+  and has an appropriate dependency that is optional with `GenServer`;
   it considers a monitoring branch for each of your plugins, which results in fewer errors and `downtime`. The considered part:
 
   1. Behaviors and events
@@ -194,7 +194,7 @@ defmodule MishkaInstaller.Hook do
   > and you can replace `{:reply, :halt, new_state}` with `{:reply, new_state}`.
 
   Subsequent plugins with higher priorities are not counted, and the loop ends here.
-  Notice that a Genserver will be made based on each plugin name without a supervisor,
+  Notice that a `GenServer` will be made based on each plugin name without a supervisor,
   which can be used for temporary memory in the case when the ` __using__` function is used as above,
   which results in the following option:
 
@@ -285,7 +285,7 @@ defmodule MishkaInstaller.Hook do
                                   |
                                   |
                     +-------------+----------------+
-                    | Developer's plugin Genserver |
+                    | Developer's plugin GenServer |
                     +-------------^----------------+
                                   |
                                   |
@@ -308,6 +308,67 @@ defmodule MishkaInstaller.Hook do
   @type plugin() :: event()
 
   @doc """
+  Registering a plugin is the first step in modularizing and event-oriented programming for your project.
+  You should be aware, prior to registering a custom plugin to the project and activating it in a particular section,
+  that the plugin is designed by a programmer and is required to adhere to a series of fundamental structures before it can be used.
+
+  ### Each plugin must meet the following conditions when registering:
+
+  1. Because the process of utilizing a plugin is dependent on beginning 'GenServer' by the name of that plugin,
+  you need to think of it as a `GenServer` and begin using it.
+  2. If you do not wish to handle this process manually, the '__using__' module of the Hook package has already prepared it for you;
+  all you need to do is call it.
+  The aforementioned explanation can be found in its entirety in the code snippet.
+  3. The definition of each plugin is determined by a certain **behavior** carried out by a module.
+  You need to have some fundamental instances of this behavior, in addition to the requirements set forth by the plugin's developer.
+
+  #### Some fundamental behaviors are as follows:
+
+  - initial
+  - call
+  - stop
+  - delete
+  - restart
+  - start
+
+  > For more clarity, you can see `MishkaInstaller.Reference.OnUserLoginFailure` behavior.
+
+  4. All plugins are stored in ETS.
+  5. All plugins are stored in the database.
+  6. All plugins are stored in one supervisor and another `GenServer`.
+
+  > In order to register a plugin, you need to call it in the 'initial' function of the module
+  > in which you used the 'MishkaInstaller.Hook' directive and bind it with the 'use' directive. Take, for instance:
+
+  ```elixir
+  use MishkaInstaller.Hook,
+    module: __MODULE__,
+    behaviour: OnUserAfterLogin,
+    event: :on_user_after_login,
+    initial: []
+
+  @spec initial(list()) :: {:ok, OnUserAfterLogin.ref(), list()}
+  def initial(args) do
+    event = %PluginState{name: "MishkaUser.SuccessLogin", event: Atom.to_string(@ref), priority: 1}
+    Hook.register(event: event)
+    {:ok, @ref, args}
+  end
+  ```
+
+  After being added to the 'MishkaInstaller.PluginState' module struct, each plug-in is required to be registered in the system,
+  as demonstrated by the preceding line of code.
+  It is important to know that each plugin in your project can be registered in one of two different ways.
+
+  1. By diagnosing problems and ensuring that the requested plugin is operational.
+  2. By requiring the test stages to be completed or by ignoring the requirements of the plug-in itself.
+
+  ## Examples
+  ```elixir
+  event = %PluginState{name: "MishkaUser.SuccessLogin", event: Atom.to_string(@ref), priority: 1}
+  MishkaInstaller.Hook.register(event: event)
+  # or
+  MishkaInstaller.Hook.register(event: event, depends: :force)
+  ```
   """
   @spec register([{:depends, :force} | {:event, MishkaInstaller.PluginState.t()}]) ::
           {:error, :register, any} | {:ok, :register, :activated | :force}
@@ -318,7 +379,7 @@ defmodule MishkaInstaller.Hook do
       with {:ok, :ensure_event, _msg} <- ensure_event(event, :debug),
            {:error, :get_record_by_field, :plugin} <- Plugin.show_by_name("#{event.name}"),
            {:ok, :add, :plugin, _record_info} <- Plugin.create(event, @allowed_fields) do
-        # Create a Genserver with DynamicSupervisor
+        # Create a GenServer with DynamicSupervisor
         PluginState.push_call(event)
         # Save all event info into ETS, Existed-key is overwritten
         PluginETS.push(event)
@@ -335,7 +396,7 @@ defmodule MishkaInstaller.Hook do
           {:error, :register, check_data}
 
         {:ok, :get_record_by_field, :plugin, record_info} ->
-          # Create a Genserver with DynamicSupervisor
+          # Create a GenServer with DynamicSupervisor
           PluginState.push_call(plugin_state_struct(record_info))
           # Save all event info into ETS, Existed-key is overwritten
           PluginETS.push(plugin_state_struct(record_info))
@@ -356,7 +417,7 @@ defmodule MishkaInstaller.Hook do
   end
 
   def register(event: %PluginState{} = event, depends: :force) do
-    # Create a Genserver with DynamicSupervisor
+    # Create a GenServer with DynamicSupervisor
     PluginState.push_call(event)
     # Save all event info into ETS
     PluginETS.push(event)
@@ -371,7 +432,7 @@ defmodule MishkaInstaller.Hook do
     with {:ok, :get_record_by_field, :plugin, record_info} <-
            Plugin.show_by_name("#{module_name}"),
          {:ok, :ensure_event, _msg} <- ensure_event(plugin_state_struct(record_info), :debug) do
-      # Create a Genserver with DynamicSupervisor
+      # Create a GenServer with DynamicSupervisor
       PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
       # Save all event info into ETS, Existed-key is overwritten
       PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
@@ -399,7 +460,7 @@ defmodule MishkaInstaller.Hook do
   def start(module: module_name, depends: :force) do
     with {:ok, :get_record_by_field, :plugin, record_info} <-
            Plugin.show_by_name("#{module_name}") do
-      # Create a Genserver with DynamicSupervisor
+      # Create a GenServer with DynamicSupervisor
       PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
       # Save all event info into ETS, Existed-key is overwritten
       PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
@@ -434,7 +495,7 @@ defmodule MishkaInstaller.Hook do
          {:ok, :get_record_by_field, :plugin, record_info} <-
            Plugin.show_by_name("#{module_name}"),
          {:ok, :ensure_event, _msg} <- ensure_event(plugin_state_struct(record_info), :debug) do
-      # Create a Genserver with DynamicSupervisor
+      # Create a GenServer with DynamicSupervisor
       PluginState.push_call(plugin_state_struct(record_info))
       # Save all event info into ETS, Existed-key is overwritten
       PluginETS.push(plugin_state_struct(record_info))
@@ -471,7 +532,7 @@ defmodule MishkaInstaller.Hook do
     with {:ok, :delete} <- PluginState.delete(module: module_name),
          {:ok, :get_record_by_field, :plugin, record_info} <-
            Plugin.show_by_name("#{module_name}") do
-      # Create a Genserver with DynamicSupervisor
+      # Create a GenServer with DynamicSupervisor
       PluginState.push_call(plugin_state_struct(record_info))
       # Save all event info into ETS, Existed-key is overwritten
       PluginETS.push(plugin_state_struct(record_info))
@@ -824,7 +885,7 @@ defmodule MishkaInstaller.Hook do
       @ref event
       @behaviour behaviour
 
-      # Start registering with Genserver and set this in application file of MishkaInstaller
+      # Start registering with GenServer and set this in application file of MishkaInstaller
       def start_link(_args) do
         GenServer.start_link(unquote(module_selected), %{id: "#{unquote(module_selected)}"},
           name: unquote(module_selected)
