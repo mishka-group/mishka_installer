@@ -3,37 +3,51 @@ defmodule MishkaInstaller.Hook do
   In addition to being one of the most significant modules of the MishkaInstaller library,
   the Hook module gives you the ability to make the library as a whole,
   as well as the projects that make use of this library, more modular.
+
   It is essential to comprehend that you may treat any action performed independently
   as an event and register an unlimited number of plugins for that event.
+
   You can do this by considering that action to be done separately.
   Each plugin has the potential to have its own individual inputs and outputs,
   and depending on the architecture of the area that you want to use Hook in,
   you may even be able to change the output and send it to other plugins.
+
   Throughout all of the many parts that have been built for this module,
   it has been attempted to have a flexible approach to dealing with errors
   and to provide the programmer with a wide variety of options.
+
   With the additional functions at her disposal, the programmer can actually create a
   gateway in their projects, where the data flow must pass through several gates,
   whether it changes or remains unchanged, and a series of operations are performed.
+
   For illustration's sake, let's suppose you want the registration system to allow users
   to sign up for social networks on Twitter and Google.
+
   When you use this library, it is conceivable that you can quickly display HTML
   or even operate in the background before registering after registering.
+
   This is a significant improvement over the standard practice,
   in which you are required to modify the primary codes of your project. Create a separate plugin.
+
   It is interesting to notice that these facilities are quite basic and convenient for the admin user.
+
   If this opportunity is provided, the management can manage its own plugins in different ways if it has a dashboard.
+
   It is crucial to highlight that each plugin is its own Genserver; in addition,
   it is dynamically supervised, and the information is stored in the database as well as in ETS.
+
   Furthermore, this section is very useful even if the programmer wants to perform many tasks
   that are not associated with Perform defined functions.
+
   The fact that the programmers have to introduce each plugin to the system based on a specific
   behavior is one of the exciting aspects of using this section. Additionally,
   the system has prepared some default behaviors to force the programmers
   to introduce the plugins in the order specified by the system.
+
   The use of custom behaviors on the part of the programmer and MishkaInstaller itself makes debugging easier;
   however, this library does not leave the programmer to fend for themselves in this significant matter;
   rather, a straightforward error storage system is prepared based on the particular activities being performed.
+
   Should prevent any unpredictable behavior at any costs.
 
   ## Build purpose
@@ -52,7 +66,7 @@ defmodule MishkaInstaller.Hook do
   ---
 
   The library categorizes your whole software design structure into many parts;
-  and has an appropriate dependency that is optional with `Genserver`;
+  and has an appropriate dependency that is optional with Genserver;
   it considers a monitoring branch for each of your plugins, which results in fewer errors and `downtime`. The considered part:
 
   1. Behaviors and events
@@ -180,7 +194,7 @@ defmodule MishkaInstaller.Hook do
   > and you can replace `{:reply, :halt, new_state}` with `{:reply, new_state}`.
 
   Subsequent plugins with higher priorities are not counted, and the loop ends here.
-  Notice that a `Genserver` will be made based on each plugin name without a supervisor,
+  Notice that a Genserver will be made based on each plugin name without a supervisor,
   which can be used for temporary memory in the case when the ` __using__` function is used as above,
   which results in the following option:
 
