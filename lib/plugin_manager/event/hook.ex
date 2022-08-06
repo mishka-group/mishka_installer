@@ -224,6 +224,77 @@ defmodule MishkaInstaller.Hook do
     html_router: YOUR_WEBSITE_ROUTER_MODULE
   ```
 
+
+  ---
+
+  ## Module communication process of MishkaInstaller.Hook
+
+  ### 1. call plugins
+
+  ```
+
+                                      +--------------+
+                                      |  Application |
+                                      +------+-------+
+                                             |
+                                      +------v------+
+                                      |  Supervisor |
+                                      +------+------+
+                                             |
+                                             |
+  +---------------------------+ +------------v----------------+
+  |                           | |                             |
+  | MishkaInstaller.PluginETS | | MishkaInstaller.PluginState |
+  |                           | |                             |
+  +---------------+-----------+ +-------------+---------------+
+                  |                           |
+                  |                           |
+              +---v---------------------------v-----+
+              |                                     |
+              |      MishkaInstaller.Hook.call      |
+              |                                     |
+              +-------------------------------------+
+
+  ```
+  ---
+
+  ### 2. Register plugin
+
+  ```
+                                      +--------------+
+                                      |  Application |
+                                      +------+-------+
+                                             |
+                                      +------v------+
+                                      |  Supervisor |
+                                      +-------+-----+
+                                              |
+                                              |
+  +---------------------------+ +-------------v---------------+
+  |                           | |                             |
+  | MishkaInstaller.PluginETS | | MishkaInstaller.PluginState |
+  |                           | |                             |
+  +-----------------^---------+ +-------------^---------------+
+                    |                         |
+                    |                         |
+              +-----+-------------------------+-----+
+              |                                     |
+              |    MishkaInstaller.Hook.register    |
+              |                                     |
+              +-------------------^-----------------+
+                                  |
+                                  |
+                    +-------------+----------------+
+                    | Developer's plugin Genserver |
+                    +-------------^----------------+
+                                  |
+                                  |
+                    +-------------+----------------+
+                    |                              |
+                    |Developer's plugin Application|
+                    |                              |
+                    +------------------------------+
+  ```
   """
   alias MishkaInstaller.PluginState
   alias MishkaInstaller.PluginStateDynamicSupervisor, as: PSupervisor
