@@ -434,7 +434,7 @@ defmodule MishkaInstaller.Hook do
   which can be altered by looking at the needs of a plugin and the forced mode, respectively.
 
   Note: When running in debug mode, the referred-to plugin in the project must
-  be set to 'Application.load/1,' and 'Application.unload/1' cannot be started.
+  be set to 'Application.load/1', and 'Application.unload/1' cannot be started.
 
   Note: If your plugin has other dependencies, all of them must be activated before restarting.
 
@@ -512,10 +512,24 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
+  The only difference between this method and the `start/1` function is that
+  this function deletes from RAM any states that are associated with the plugin that you want to use.
+
+  ## Examples
+  ```elixir
+    MishkaInstaller.Hook.restart(module: "ensure_event_plugin")
+    # or
+    MishkaInstaller.Hook.restart(module: "ensure_event_plugin", depends: :force)
+    # or
+    MishkaInstaller.Hook.restart(event: "on_user_after_login")
+    # or
+    MishkaInstaller.Hook.restart(event: "on_user_after_login", depends: :force)
+  ```
   """
   @spec restart([{:depends, :force} | {:event, event()} | {:module, plugin()}]) ::
           list | {:error, :restart, any()} | {:ok, :restart, String.t()}
   def restart(module: module_name) do
+    # TODO: it should delete ETS state like `PluginState`
     with {:ok, :delete} <- PluginState.delete(module: module_name),
          {:ok, :get_record_by_field, :plugin, record_info} <-
            Plugin.show_by_name("#{module_name}"),
