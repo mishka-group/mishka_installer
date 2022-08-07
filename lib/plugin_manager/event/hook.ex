@@ -258,7 +258,7 @@ defmodule MishkaInstaller.Hook do
   ```
   ---
 
-  ### 2. Register plugin
+  ### 2. Register a plugin
 
   ```
                                       +--------------+
@@ -425,6 +425,31 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
+  You are able to activate all the plugins that have been installed by using this feature.
+  It is important to point out that it is possible to activate numerous plugins at the same time as
+  a single plugin or even a batch based on a particular event.
+  This can be done in several different ways.
+
+  Much like the `register/1` function, this function has two modes,
+  which can be altered by looking at the needs of a plugin and the forced mode, respectively.
+
+  Note: When running in debug mode, the referred-to plugin in the project must
+  be set to 'Application.load/1,' and 'Application.unload/1' cannot be started.
+
+  Note: If your plugin has other dependencies, all of them must be activated before restarting.
+
+  > For more information, see `ensure_event?/1` and `ensure_event/2` functions.
+
+  ## Examples
+  ```elixir
+    MishkaInstaller.Hook.start(module: "ensure_event_plugin")
+    # or
+    MishkaInstaller.Hook.start(module: "ensure_event_plugin", depends: :force)
+    # or
+    MishkaInstaller.Hook.start(event: "on_user_after_login")
+    # or
+    MishkaInstaller.Hook.start(event: "on_user_after_login", depends: :force)
+  ```
   """
   @spec start([{:depends, :force} | {:event, event()} | {:module, plugin()}]) ::
           list | {:error, :start, any()} | {:ok, :start, :force | String.t()}
