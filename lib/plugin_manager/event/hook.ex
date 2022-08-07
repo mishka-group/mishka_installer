@@ -616,6 +616,14 @@ defmodule MishkaInstaller.Hook do
     |> Enum.map(&restart(module: &1.name, depends: :force))
   end
 
+  @doc """
+  Based on the function `restart/1`, restart all installed plugins.
+
+  ## Examples
+  ```elixir
+    MishkaInstaller.Hook.restart()
+  ```
+  """
   def restart() do
     Plugin.plugins()
     |> Enum.map(&restart(module: &1.name))
