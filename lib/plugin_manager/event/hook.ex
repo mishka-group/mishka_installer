@@ -442,13 +442,13 @@ defmodule MishkaInstaller.Hook do
 
   ## Examples
   ```elixir
-    MishkaInstaller.Hook.start(module: "ensure_event_plugin")
-    # or
-    MishkaInstaller.Hook.start(module: "ensure_event_plugin", depends: :force)
-    # or
-    MishkaInstaller.Hook.start(event: "on_user_after_login")
-    # or
-    MishkaInstaller.Hook.start(event: "on_user_after_login", depends: :force)
+  MishkaInstaller.Hook.start(module: "ensure_event_plugin")
+  # or
+  MishkaInstaller.Hook.start(module: "ensure_event_plugin", depends: :force)
+  # or
+  MishkaInstaller.Hook.start(event: "on_user_after_login")
+  # or
+  MishkaInstaller.Hook.start(event: "on_user_after_login", depends: :force)
   ```
   """
   @spec start([{:depends, :force} | {:event, event()} | {:module, plugin()}]) ::
@@ -517,13 +517,13 @@ defmodule MishkaInstaller.Hook do
 
   ## Examples
   ```elixir
-    MishkaInstaller.Hook.restart(module: "ensure_event_plugin")
-    # or
-    MishkaInstaller.Hook.restart(module: "ensure_event_plugin", depends: :force)
-    # or
-    MishkaInstaller.Hook.restart(event: "on_user_after_login")
-    # or
-    MishkaInstaller.Hook.restart(event: "on_user_after_login", depends: :force)
+  MishkaInstaller.Hook.restart(module: "ensure_event_plugin")
+  # or
+  MishkaInstaller.Hook.restart(module: "ensure_event_plugin", depends: :force)
+  # or
+  MishkaInstaller.Hook.restart(event: "on_user_after_login")
+  # or
+  MishkaInstaller.Hook.restart(event: "on_user_after_login", depends: :force)
   ```
   """
   @spec restart([{:depends, :force} | {:event, event()} | {:module, plugin()}]) ::
@@ -620,7 +620,7 @@ defmodule MishkaInstaller.Hook do
 
   ## Examples
   ```elixir
-    MishkaInstaller.Hook.restart()
+  MishkaInstaller.Hook.restart()
   ```
   """
   def restart() do
@@ -636,9 +636,9 @@ defmodule MishkaInstaller.Hook do
   ## Examples
 
   ```elixir
-    MishkaInstaller.Hook.stop(module: "ensure_event_plugin")
-    # or
-    MishkaInstaller.Hook.stop(event: "on_user_after_login")
+  MishkaInstaller.Hook.stop(module: "ensure_event_plugin")
+  # or
+  MishkaInstaller.Hook.stop(event: "on_user_after_login")
   ```
   """
   @spec stop([{:event, event()} | {:module, plugin()}]) ::
@@ -678,9 +678,9 @@ defmodule MishkaInstaller.Hook do
   ## Examples
 
   ```elixir
-    MishkaInstaller.Hook.delete(module: "ensure_event_plugin")
-    # or
-    MishkaInstaller.Hook.delete(event: "on_user_after_login")
+  MishkaInstaller.Hook.delete(module: "ensure_event_plugin")
+  # or
+  MishkaInstaller.Hook.delete(event: "on_user_after_login")
   ```
   """
   @spec delete([{:event, event()} | {:module, plugin()}]) ::
@@ -721,9 +721,9 @@ defmodule MishkaInstaller.Hook do
   ## Examples
 
   ```elixir
-    MishkaInstaller.Hook.unregister(module: "ensure_event_plugin")
-    # or
-    MishkaInstaller.Hook.unregister(event: "on_user_after_login")
+  MishkaInstaller.Hook.unregister(module: "ensure_event_plugin")
+  # or
+  MishkaInstaller.Hook.unregister(event: "on_user_after_login")
   ```
   """
   @spec unregister([{:event, event()} | {:module, plugin()}]) ::
@@ -776,6 +776,51 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
+  Your software will be able to call each of the active and registered plugins in the list in the order that they appear
+  depending on the priority that the function assigns to each plugin, and it will do so with a particular event.
+  The program generates a `State` and sends it to the first plugin in the list. This plugin, in turn,
+  sends the desired output changes to the remaining plugins in the list, and this process is repeated all the way down
+  to the plugin that is at the end of the list.
+
+  It is important to note that you are free to make use of the available options in accordance with the logic of the
+  component of your program that is responsible for loading the event you want.
+
+  1. You can transmit a `State` to an unlimited number of plugins and perform various operations on it,
+  but the output of the `State` will not be taken into consideration, and the starting `State` will be used as the one that determines the final output.
+
+  2. You have the ability to include a portion of the `State`'s information in the private map.
+  This flag ensures that just reading is open to the public, while authoring is obviously restricted in terms of the final product.
+
+  3. At the time of registration, each plugin is assigned a priority; the lower this number,
+  the higher the likelihood that this plugin will be called before others on the list;
+  if it shares the same priority as multiple other plugins, the order in which it appears in the list will be determined by its name.
+
+
+  ## Examples
+
+  ```elixir
+  state =  %MishkaInstaller.Reference.OnUserAfterLogin{conn: conn, endpoint: :html, user_info: user_info}
+  # or load with private flag
+  state = %TestEvent{user_info: %{name: "shahryar"}, private: %{acl: 0, ip: "127.0.1.1", endpoint: :admin}}
+
+  MishkaInstaller.Hook.call(event: "on_user_after_login", state: state)
+  # or
+  MishkaInstaller.Hook.call(event: "on_user_after_login", state: state, operation: :no_return)
+
+  # Example call in a controller
+
+  def login(conn, %{"user" => %{"email" => email, "password" => password}} = _params) do
+    # If your conditions are passed we call an event and pass it a struct of entries
+    # which our developers need to create plugin with this information
+    hook = MishkaInstaller.Hook.call(event: "on_user_after_login", state: state)
+
+    hook.conn
+    |> renew_session()
+    |> put_session(:user_id, user_info.id)
+    |> put_flash(:info, "You entered to our world, well played.")
+    |> redirect(to: "/home")
+  end
+  ```
   """
   def call(event: event_name, state: state, operation: :no_return) do
     call(event: event_name, state: state)
