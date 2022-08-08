@@ -629,7 +629,7 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
-  This function will delete the specified plugin from the `State` that you are contemplating, but there will be no change to the database due to this action.
+  This function will stop the specified plugin from the `State` that you are contemplating, but there will be no change to the database due to this action.
   It is important to remember that stopping a batch based on a particular occurrence is also possible.
 
 
@@ -675,6 +675,21 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
+  This function will delete the specified plugin from the `State` that you are contemplating, but there will be no change to the database due to this action.
+  It is important to remember that stopping a batch based on a particular occurrence is also possible.
+
+
+  ## Examples
+
+  ```elixir
+    MishkaInstaller.Hook.delete(module: "ensure_event_plugin")
+    # or
+    MishkaInstaller.Hook.delete(module: "ensure_event_plugin", depends: :force)
+    # or
+    MishkaInstaller.Hook.delete(event: "on_user_after_login")
+    # or
+    MishkaInstaller.Hook.delete(event: "on_user_after_login", depends: :force)
+  ```
   """
   @spec delete([{:event, event()} | {:module, plugin()}]) ::
           list | {:error, :delete, String.t()} | {:ok, :delete, String.t()}

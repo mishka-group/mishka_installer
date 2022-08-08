@@ -381,6 +381,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("app_action", %{"operation" => "start", "app" => app}, socket) do
+    # TODO: change the status of app in state if exists
     new_socket =
       case Application.start(String.to_atom(app)) do
         :ok ->
@@ -429,6 +430,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("app_action", %{"operation" => "stop", "app" => app}, socket) do
+    # TODO: change the status of app in state if exists
     new_socket =
       case Application.stop(String.to_atom(app)) do
         :ok ->
