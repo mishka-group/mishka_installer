@@ -314,9 +314,9 @@ defmodule MishkaInstaller.Hook do
 
   ### Each plugin must meet the following conditions when registering:
 
-  1. Because the process of utilizing a plugin is dependent on beginning 'GenServer' by the name of that plugin,
+  1. Because the process of utilizing a plugin is dependent on beginning `GenServer` by the name of that plugin,
   you need to think of it as a `GenServer` and begin using it.
-  2. If you do not wish to handle this process manually, the '__using__' module of the Hook package has already prepared it for you;
+  2. If you do not wish to handle this process manually, the `__using__` module of the Hook package has already prepared it for you;
   all you need to do is call it.
   The aforementioned explanation can be found in its entirety in the code snippet.
   3. The definition of each plugin is determined by a certain **behavior** carried out by a module.
@@ -337,8 +337,8 @@ defmodule MishkaInstaller.Hook do
   5. All plugins are stored in the database.
   6. All plugins are stored in one supervisor and another `GenServer`.
 
-  > In order to register a plugin, you need to call it in the 'initial' function of the module
-  > in which you used the 'MishkaInstaller.Hook' directive and bind it with the 'use' directive. Take, for instance:
+  > In order to register a plugin, you need to call it in the `initial` function of the module
+  > in which you used the `MishkaInstaller.Hook` directive and bind it with the `use` directive. Take, for instance:
 
   ```elixir
   use MishkaInstaller.Hook,
@@ -355,7 +355,7 @@ defmodule MishkaInstaller.Hook do
   end
   ```
 
-  After being added to the 'MishkaInstaller.PluginState' module struct, each plug-in is required to be registered in the system,
+  After being added to the `MishkaInstaller.PluginState` module struct, each plug-in is required to be registered in the system,
   as demonstrated by the preceding line of code.
   It is important to know that each plugin in your project can be registered in one of two different ways.
 
@@ -434,7 +434,7 @@ defmodule MishkaInstaller.Hook do
   which can be altered by looking at the needs of a plugin and the forced mode, respectively.
 
   Note: When running in debug mode, the referred-to plugin in the project must
-  be set to 'Application.load/1', and 'Application.unload/1' cannot be started.
+  be set to `Application.load/1`, and `Application.unload/1` cannot be started.
 
   Note: If your plugin has other dependencies, all of them must be activated before restarting.
 
@@ -715,7 +715,7 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
-  This function is very similar to the 'delete/1' command; however, in addition to removing the plugin from the system,
+  This function is very similar to the `delete/1` command; however, in addition to removing the plugin from the system,
   it also removes the plugin from the database.
 
   ## Examples
