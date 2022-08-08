@@ -529,7 +529,6 @@ defmodule MishkaInstaller.Hook do
   @spec restart([{:depends, :force} | {:event, event()} | {:module, plugin()}]) ::
           list | {:error, :restart, any()} | {:ok, :restart, String.t()}
   def restart(module: module_name) do
-    # TODO: it should delete ETS state like `PluginState`
     with {:ok, :delete} <- PluginState.delete(module: module_name),
          {:ok, :get_record_by_field, :plugin, record_info} <-
            Plugin.show_by_name("#{module_name}"),
@@ -630,6 +629,21 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
+  This function will delete the specified plugin from the `State` that you are contemplating, but there will be no change to the database due to this action.
+  It is important to remember that stopping a batch based on a particular occurrence is also possible.
+
+
+  ## Examples
+
+  ```elixir
+    MishkaInstaller.Hook.stop(module: "ensure_event_plugin")
+    # or
+    MishkaInstaller.Hook.stop(module: "ensure_event_plugin", depends: :force)
+    # or
+    MishkaInstaller.Hook.stop(event: "on_user_after_login")
+    # or
+    MishkaInstaller.Hook.stop(event: "on_user_after_login", depends: :force)
+  ```
   """
   @spec stop([{:event, event()} | {:module, plugin()}]) ::
           list | {:error, :stop, String.t()} | {:ok, :stop, String.t()}
