@@ -638,11 +638,7 @@ defmodule MishkaInstaller.Hook do
   ```elixir
     MishkaInstaller.Hook.stop(module: "ensure_event_plugin")
     # or
-    MishkaInstaller.Hook.stop(module: "ensure_event_plugin", depends: :force)
-    # or
     MishkaInstaller.Hook.stop(event: "on_user_after_login")
-    # or
-    MishkaInstaller.Hook.stop(event: "on_user_after_login", depends: :force)
   ```
   """
   @spec stop([{:event, event()} | {:module, plugin()}]) ::
@@ -684,11 +680,7 @@ defmodule MishkaInstaller.Hook do
   ```elixir
     MishkaInstaller.Hook.delete(module: "ensure_event_plugin")
     # or
-    MishkaInstaller.Hook.delete(module: "ensure_event_plugin", depends: :force)
-    # or
     MishkaInstaller.Hook.delete(event: "on_user_after_login")
-    # or
-    MishkaInstaller.Hook.delete(event: "on_user_after_login", depends: :force)
   ```
   """
   @spec delete([{:event, event()} | {:module, plugin()}]) ::
@@ -731,11 +723,7 @@ defmodule MishkaInstaller.Hook do
   ```elixir
     MishkaInstaller.Hook.unregister(module: "ensure_event_plugin")
     # or
-    MishkaInstaller.Hook.unregister(module: "ensure_event_plugin", depends: :force)
-    # or
     MishkaInstaller.Hook.unregister(event: "on_user_after_login")
-    # or
-    MishkaInstaller.Hook.unregister(event: "on_user_after_login", depends: :force)
   ```
   """
   @spec unregister([{:event, event()} | {:module, plugin()}]) ::
