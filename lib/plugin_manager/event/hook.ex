@@ -723,6 +723,20 @@ defmodule MishkaInstaller.Hook do
   end
 
   @doc """
+  This function is very similar to the 'delete/1' command; however, in addition to removing the plugin from the system,
+  it also removes the plugin from the database.
+
+  ## Examples
+
+  ```elixir
+    MishkaInstaller.Hook.unregister(module: "ensure_event_plugin")
+    # or
+    MishkaInstaller.Hook.unregister(module: "ensure_event_plugin", depends: :force)
+    # or
+    MishkaInstaller.Hook.unregister(event: "on_user_after_login")
+    # or
+    MishkaInstaller.Hook.unregister(event: "on_user_after_login", depends: :force)
+  ```
   """
   @spec unregister([{:event, event()} | {:module, plugin()}]) ::
           list | {:error, :unregister, any} | {:ok, :unregister, Stream.timer()}
