@@ -840,6 +840,29 @@ defmodule MishkaInstaller.Hook do
     _e -> state
   end
 
+  @doc """
+  You will have the opportunity to select the type of dependency, which can either be `:soft` or `:hard`,
+  when you are in the process of registering each plugin.
+  It is not necessary to check related plugins if this item is configured to use the first available option,
+  and a plugin can be installed in the system on its own accord if this option is selected.
+
+  If the second choice for the desired plugin is chosen, which is `hard`,
+  then this method will be of assistance to you. It will verify each of the plugins listed in the dependent parameter,
+  and if there are no issues, it will return `true`. If there are issues, however, it will return `false`.
+
+  ## Examples
+
+  ```elixir
+  test_plug =
+    %MishkaInstaller.PluginState{
+      name: "MishkaInstaller.Hook",
+      event: "event_one",
+      depend_type: :hard,
+      depends: ["MishkaInstaller.PluginState"]
+    }
+  MishkaInstaller.Hook.ensure_event?(test_plug)
+  ```
+  """
   @spec ensure_event?(PluginState.t()) :: boolean
   def ensure_event?(%PluginState{depend_type: :hard, depends: depends} = event) do
     check_data = check_dependencies(depends, event.name)
@@ -851,10 +874,24 @@ defmodule MishkaInstaller.Hook do
     end
   end
 
-  @doc """
-  """
   def ensure_event?(%PluginState{} = _event), do: true
 
+  @doc """
+  The operation performed in this function is the same as `ensure_event?/1`, except that the output is a pattern with a special message.
+
+  ## Examples
+
+  ```elixir
+  test_plug =
+    %MishkaInstaller.PluginState{
+      name: "MishkaInstaller.Hook",
+      event: "event_one",
+      depend_type: :hard,
+      depends: ["MishkaInstaller.PluginState"]
+    }
+  MishkaInstaller.Hook.ensure_event(test_plug, :debug)
+  ```
+  """
   @spec ensure_event(PluginState.t(), :debug) ::
           {:error, :ensure_event, %{errors: list}} | {:ok, :ensure_event, String.t()}
   def ensure_event(%PluginState{depend_type: :hard, depends: depends} = event, :debug)
