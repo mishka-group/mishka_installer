@@ -53,6 +53,12 @@ defmodule MishkaInstaller.PluginETS do
 
   @doc """
   Storing a plug-in on the ETS table.
+
+  ## Examples
+  ```elixir
+  event = %MishkaInstaller.PluginState{name: "MishkaUser.SuccessLogin", event: Atom.to_string(@ref), priority: 1}
+  MishkaInstaller.PluginETS.push(event)
+  ```
   """
   def push(%MishkaInstaller.PluginState{name: name, event: event} = state) do
     ETS.Set.put!(table(), {String.to_atom(name), event, state})
@@ -60,6 +66,11 @@ defmodule MishkaInstaller.PluginETS do
 
   @doc """
   Getting a plug-in from the ETS table.
+
+  ## Examples
+  ```elixir
+   MishkaInstaller.PluginETS.get_all(module: "TestModule.a_plugin")
+  ```
   """
   def get(module: name) do
     case ETS.Set.get(table(), String.to_atom(name)) do
@@ -70,6 +81,11 @@ defmodule MishkaInstaller.PluginETS do
 
   @doc """
   Getting all plug-ins from the ETS table.
+
+  ## Examples
+  ```elixir
+    MishkaInstaller.PluginETS.get_all(event: "test_event")
+  ```
   """
   def get_all(event: event_name) do
     ETS.Set.match!(table(), {:_, event_name, :"$3"})
@@ -79,6 +95,13 @@ defmodule MishkaInstaller.PluginETS do
   @doc """
    - Deleting a plug-in from the ETS table.
    - Deleting plugins from the ETS table based on a specific event.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginETS.delete(module: "TestModule.a_plugin")
+  # or
+  MishkaInstaller.PluginETS.delete(event: "test_event")
+  ```
   """
   def delete(module: module_name) do
     ETS.Set.delete(table(), String.to_atom(module_name))
@@ -101,6 +124,11 @@ defmodule MishkaInstaller.PluginETS do
 
   @doc """
   Initializing ETS table with database
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginETS.sync_with_database()
+  ```
   """
   def sync_with_database() do
     MishkaInstaller.Plugin.plugins()
