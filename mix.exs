@@ -20,7 +20,7 @@ defmodule MishkaInstaller.MixProject do
         main: "MishkaInstaller",
         extras: ["README.md"],
         source_ref: "master"
-      ],
+      ]
     ]
   end
 
