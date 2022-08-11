@@ -1,4 +1,21 @@
 defmodule MishkaInstaller.PluginState do
+  @moduledoc """
+  This module served as the first layer in the domain of plugin state management in earlier versions;
+  however, following optimization using ETS, it is now regarded as the main structure in the second layer.
+
+  If a developer chooses to construct a custom plugin by using the `use MishkaInstaller.Hook` directive,
+  then the developer actually implements this module as the first layer to register a plugin and the second layer as a supervisor.
+  The scope of a plugin's state management is not restricted to the automatically specified duties performed by the `MishkaInstaller`;
+  for instance, it provides developers with a temporary state and offers them the freedom to act in accordance with whatever method they choose.
+
+
+  ### Each plugin should have these parameters
+
+  ```elixir
+    defstruct [:name, :event, priority: 1, status: :started, depend_type: :soft, depends: [], extra: [], parent_pid: nil]
+  ```
+  """
+
   use GenServer
   require Logger
   alias MishkaInstaller.PluginStateDynamicSupervisor, as: PSupervisor
@@ -16,10 +33,15 @@ defmodule MishkaInstaller.PluginState do
     parent_pid: nil
   ]
 
+  @typedoc "This type can be used when you want to introduce the parameters of a plugin"
   @type params() :: map()
+  @typedoc "This type can be used when you want to introduce an ID of a plugin"
   @type id() :: String.t()
+  @typedoc "This type can be used when you want to introduce an plugin name"
   @type module_name() :: String.t()
+  @typedoc "This type can be used when you want to introduce an event name"
   @type event_name() :: String.t()
+  @typedoc "This type can be used when you want to introduce an event"
   @type plugin() :: %PluginState{
           name: module_name(),
           event: event_name(),
@@ -30,8 +52,11 @@ defmodule MishkaInstaller.PluginState do
           depends: list(String.t()),
           extra: list(map())
         }
+  @typedoc "This type can be used when you want to introduce an event"
   @type t :: plugin()
 
+  @doc """
+  """
   def start_link(args) do
     {id, type, parent_pid} =
       {Map.get(args, :id), Map.get(args, :type), Map.get(args, :parent_pid)}
@@ -39,6 +64,7 @@ defmodule MishkaInstaller.PluginState do
     GenServer.start_link(__MODULE__, default(id, type, parent_pid), name: via(id, type))
   end
 
+  @doc false
   def child_spec(process_name) do
     %{
       id: __MODULE__,
@@ -52,6 +78,8 @@ defmodule MishkaInstaller.PluginState do
     %PluginState{name: plugin_name, event: event, parent_pid: parent_pid}
   end
 
+  @doc """
+  """
   @spec push(MishkaInstaller.PluginState.t()) :: :ok | {:error, :push, any}
   def push(%PluginState{} = element) do
     case PSupervisor.start_job(%{
@@ -64,6 +92,8 @@ defmodule MishkaInstaller.PluginState do
     end
   end
 
+  @doc """
+  """
   @spec push_call(MishkaInstaller.PluginState.t()) :: :ok | {:error, :push, any}
   def push_call(%PluginState{} = element) do
     case PSupervisor.start_job(%{
@@ -80,6 +110,8 @@ defmodule MishkaInstaller.PluginState do
     end
   end
 
+  @doc """
+  """
   @spec get([{:module, module_name()}]) :: plugin() | {:error, :get, :not_found}
   def get(module: module_name) do
     case PSupervisor.get_plugin_pid(module_name) do
@@ -88,14 +120,20 @@ defmodule MishkaInstaller.PluginState do
     end
   end
 
+  @doc """
+  """
   def get_all(event: event_name) do
     PSupervisor.running_imports(event_name) |> Enum.map(&get(module: &1.id))
   end
 
+  @doc """
+  """
   def get_all() do
     PSupervisor.running_imports() |> Enum.map(&get(module: &1.id))
   end
 
+  @doc """
+  """
   def delete(module: module_name) do
     case PSupervisor.get_plugin_pid(module_name) do
       {:ok, :get_plugin_pid, pid} ->
@@ -111,6 +149,8 @@ defmodule MishkaInstaller.PluginState do
     PSupervisor.running_imports(event_name) |> Enum.map(&delete(module: &1.id))
   end
 
+  @doc """
+  """
   def delete_child(module: module_name) do
     case PSupervisor.get_plugin_pid(module_name) do
       {:ok, :get_plugin_pid, pid} -> DynamicSupervisor.terminate_child(PluginStateOtpRunner, pid)
@@ -118,12 +158,16 @@ defmodule MishkaInstaller.PluginState do
     end
   end
 
+  @doc """
+  """
   def terminate_all_pids() do
     Enum.map(PSupervisor.running_imports(), fn item ->
       GenServer.cast(item.pid, {:delete, :module})
     end)
   end
 
+  @doc """
+  """
   def stop(module: module_name) do
     case PSupervisor.get_plugin_pid(module_name) do
       {:ok, :get_plugin_pid, pid} ->

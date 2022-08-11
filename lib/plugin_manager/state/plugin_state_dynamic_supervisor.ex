@@ -2,7 +2,7 @@ defmodule MishkaInstaller.PluginStateDynamicSupervisor do
   @moduledoc """
   This module supervises the states created during the registration of each plugin.
 
-  ## Module communication process of MishkaInstaller.PluginStateDynamicSupervisor
+  ## Module communication process of this module
 
   ```
          +------------------------------------------------+
