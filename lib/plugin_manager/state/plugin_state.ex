@@ -14,6 +14,60 @@ defmodule MishkaInstaller.PluginState do
   ```elixir
     defstruct [:name, :event, priority: 1, status: :started, depend_type: :soft, depends: [], extra: [], parent_pid: nil]
   ```
+
+
+  ### Module communication process of MishkaInstaller.PluginState
+
+  ```
+         +------------------------------------------------+
+         |                                                |
+         |                                                |
+  +------+  MishkaInstaller.PluginStateDynamicSupervisor  |
+  |      |                                                |
+  |      |                                                |
+  |      +--------------------------------------+----^----+
+  |                                             |    |
+  |                                             |    |
+  |                                             |    |
+  |      +------------------------+             |    |
+  |      |                        |             |    |
+  +------>  PluginStateRegistry   |             |    |
+         |                        |             |    |
+         +--------^---------------+             |    |
+                  |                             |    |
+                  |                             |    |
+                  |                             |    |
+                  |                             |    |
+                  |        +--------------------v----+-----+
+                  |        |                               |
+                  |        |  MishkaInstaller.PluginState  |
+                  +--------+                               |
+                           +--------------------+--------^-+
+                                                |        |
+                                                |        |
+                                                |        |
+                                                |        |
+            +----------------------------+      |        |
+            |                            |      |        |
+            | MishkaInstaller.PluginETS  <------+        |
+            |                            |               |
+            +----------------------------+               |
+                                                         |
+                                                         |
+                                                         |
+                                    +--------------------+-+
+                                    |                      |
+                      +-------------+ MishkaInstaller.Hook |
+                      |             |                      |
+                      |             +----------------------+
+                      |
+                      |
+            +---------v----------------------+
+            |                                |
+            |     Behaviour References       |
+            |                                |
+            +--------------------------------+
+  ```
   """
 
   use GenServer
