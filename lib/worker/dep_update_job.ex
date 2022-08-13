@@ -1,18 +1,41 @@
 defmodule MishkaInstaller.DepUpdateJob do
+  @moduledoc """
+  This module provides assistance to your software so that it may check all of the plugins and libraries that you have installed
+  to see whether a newer version of those extensions has been made available.
+  """
   use Oban.Worker, queue: :update_events, max_attempts: 1
   require Logger
   alias MishkaInstaller.Helper.Sender
   @module "dependency_update_check"
   @ets_table :dependency_update
 
+  @doc false
   @impl Oban.Worker
   def perform(%Oban.Job{}), do: check_added_dependencies_update()
 
+  @doc """
+  This function provides a channel to get new updates of extension releases; your project can subscribe and use this information.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.DepUpdateJob.subscribe()
+  ```
+  """
   @spec subscribe :: :ok | {:error, {:already_registered, pid}}
   def subscribe do
     Phoenix.PubSub.subscribe(MishkaInstaller.PubSub, @module)
   end
 
+  @doc """
+  Get new release information of an extension.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.DepUpdateJob.get("test_app")
+  ```
+  """
   @spec get(binary) :: nil | tuple
   def get(app) do
     case ETS.Set.get(ets(), String.to_atom(app)) do
@@ -21,11 +44,30 @@ defmodule MishkaInstaller.DepUpdateJob do
     end
   end
 
+  @doc """
+  Get new releases information of extensions.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.DepUpdateJob.get_all()
+  ```
+  """
   @spec get_all :: [tuple]
   def get_all() do
     ETS.Set.to_list!(ets())
   end
 
+  @doc """
+  Check and find new updates of extensions if new releases exist. This function just returns `:ok` atom and saves update news into ETS.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.DepUpdateJob.check_added_dependencies_update()
+  ```
+  """
+  @spec check_added_dependencies_update :: :ok
   def check_added_dependencies_update() do
     Logger.warn("DepUpdateJob request was sent")
 
@@ -139,6 +181,15 @@ defmodule MishkaInstaller.DepUpdateJob do
       false
   end
 
+  @doc """
+  Start ETS table to store new updates of installed extensions.
+
+  ## Examples
+
+  ```elixir
+  MishkaInstaller.DepUpdateJob.ets()
+  ```
+  """
   def ets() do
     case ETS.Set.new(
            name: @ets_table,
