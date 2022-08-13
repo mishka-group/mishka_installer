@@ -110,6 +110,9 @@ defmodule MishkaInstaller.PluginState do
   @type t :: plugin()
 
   @doc """
+  You should in no way use this function in its direct form. The supervisor coverage needs to run before using this function since
+  it will establish a state for your plugin and save its PID in the registry.
+  Make use of the function named `MishkaInstaller.PluginStateDynamicSupervisor.start_job/1`.
   """
   def start_link(args) do
     {id, type, parent_pid} =
@@ -133,6 +136,19 @@ defmodule MishkaInstaller.PluginState do
   end
 
   @doc """
+  This function helps you to create the state of a plugin. Please see `t:plugin/0` type documents. This function does not wait for a response.
+
+  ## Examples
+  ```elixir
+  plugin =
+    %MishkaInstaller.PluginState{
+      name: "unnested_plugin_five",
+      event: "nested_event_one",
+      depend_type: :hard,
+      depends: ["unnested_plugin_four"]
+    }
+  MishkaInstaller.PluginState.push(plugin)
+  ```
   """
   @spec push(MishkaInstaller.PluginState.t()) :: :ok | {:error, :push, any}
   def push(%PluginState{} = element) do
@@ -147,6 +163,7 @@ defmodule MishkaInstaller.PluginState do
   end
 
   @doc """
+  This function does the same thing as the `push/1` function, except that it waits for a response.
   """
   @spec push_call(MishkaInstaller.PluginState.t()) :: :ok | {:error, :push, any}
   def push_call(%PluginState{} = element) do
@@ -165,6 +182,12 @@ defmodule MishkaInstaller.PluginState do
   end
 
   @doc """
+  It gets a plugin information from the state.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginState.get(module: "PluginTest")
+  ```
   """
   @spec get([{:module, module_name()}]) :: plugin() | {:error, :get, :not_found}
   def get(module: module_name) do
@@ -175,18 +198,38 @@ defmodule MishkaInstaller.PluginState do
   end
 
   @doc """
+  This function gets all information of plugins which are under a specific event.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginState.get_all(event: "event_test")
+  ```
   """
   def get_all(event: event_name) do
     PSupervisor.running_imports(event_name) |> Enum.map(&get(module: &1.id))
   end
 
   @doc """
+  This function gets all information of plugins which are pushed on the state.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginState.get_all()
+  ```
   """
   def get_all() do
     PSupervisor.running_imports() |> Enum.map(&get(module: &1.id))
   end
 
   @doc """
+  Delete a plugin or plugins based on a specific event from the state.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginState.delete(module: "PluginTest")
+  # or
+  MishkaInstaller.PluginState.delete(event: "EventTest")
+  ```
   """
   def delete(module: module_name) do
     case PSupervisor.get_plugin_pid(module_name) do
@@ -204,6 +247,12 @@ defmodule MishkaInstaller.PluginState do
   end
 
   @doc """
+  Terminate a PID from the supervisor directly.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginState.delete_child(module: "PluginTest")
+  ```
   """
   def delete_child(module: module_name) do
     case PSupervisor.get_plugin_pid(module_name) do
@@ -213,6 +262,12 @@ defmodule MishkaInstaller.PluginState do
   end
 
   @doc """
+  Terminate all PIDs of the plugin state from the supervisor directly.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginState.terminate_all_pids()
+  ```
   """
   def terminate_all_pids() do
     Enum.map(PSupervisor.running_imports(), fn item ->
@@ -221,6 +276,14 @@ defmodule MishkaInstaller.PluginState do
   end
 
   @doc """
+  Stop a plugin state.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.PluginState.stop(module: PluginTest)
+  # or
+  MishkaInstaller.PluginState.stop(event: "event_test")
+  ```
   """
   def stop(module: module_name) do
     case PSupervisor.get_plugin_pid(module_name) do
