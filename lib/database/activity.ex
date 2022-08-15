@@ -17,6 +17,7 @@ defmodule MishkaInstaller.Activity do
   If you want to get the latest changes from the `Activities` table of your database,
   this function can help you to be subscribed.
   """
+  @spec subscribe :: :ok | {:error, {:already_registered, pid}}
   def subscribe do
     Phoenix.PubSub.subscribe(
       MishkaInstaller.get_config(:pubsub) || MishkaInstaller.PubSub,

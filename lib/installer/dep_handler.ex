@@ -977,7 +977,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
              "Unfortunately, an error occurred while storing the data in the database. To check for errors, see the Activities section, and if this error persists, report it to support."
            )}
 
-        {:error, action, :uuid, _error_tag} when action in [:uuid, :get_record_by_id] ->
+        {:error, _action, reason, _error_tag} when reason in [:uuid, :get_record_by_id] ->
           # TODO: save it in activities
           {:error,
            Gettext.dgettext(
