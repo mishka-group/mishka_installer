@@ -1,17 +1,21 @@
 defmodule MishkaInstaller.Reference.OnChangeDependency do
   defstruct [:app, :status]
 
+  @typedoc "This type can be used when you want to introduce an app"
   @type app() :: atom()
+  @typedoc "This type can be used when you want to introduce an app's status"
   @type status() :: :add | :force_update
-  # Name of this event
+  @typedoc "This type can be used when you want to introduce an app's reference name"
   @type ref() :: :on_change_dependency
-  # output of state for this event
+  @typedoc "This type can be used when you want to introduce a plugin output"
   @type reason() :: map() | String.t()
-  # information about this plugin on state which was saved
+  @typedoc "This type can be used when you want to register an app"
   @type registerd_info() :: MishkaInstaller.PluginState.t()
+  @typedoc "This type can be used when you want to introduce an app as a plugin"
   @type state() :: %__MODULE__{app: app(), status: state()}
-  # help developers to keep elixir style
+  @typedoc "This type can be used when you want to introduce an app as a plugin"
   @type t :: state()
+  @typedoc "This type can be used when you want to show the output of optional callbacks"
   @type optional_callbacks :: {:ok, ref(), registerd_info()} | {:error, ref(), reason()}
 
   @doc "This Callback can be used when you want to register a plugin"
