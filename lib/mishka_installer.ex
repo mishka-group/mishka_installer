@@ -85,7 +85,7 @@ defmodule MishkaInstaller do
 
   # Ref: https://elixirforum.com/t/how-to-start-oban-out-of-application-ex/48417/6
   # Ref: https://elixirforum.com/t/cant-start-oban-as-cron-every-minute/48459/5
-  @spec start_oban_in_runtime :: {:error, any} | {:ok, pid}
+  @spec start_oban_in_runtime(nil | list()) :: :ignore | {:error, any} | {:ok, pid} | {:ok, pid, any}
   def start_oban_in_runtime(opts \\ MishkaInstaller.get_config(:oban_config)) do
     oban_opts = [
       repo: MishkaInstaller.repo(),
