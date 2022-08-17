@@ -1,4 +1,6 @@
 defmodule MishkaInstaller.Reference.OnRouter do
+  # TODO: Should be rechecked in real-example, consider type of @type and defstruct
+  # TODO: Do not use it until a stable version is released
   @moduledoc """
 
   ## elixir macros for router
@@ -31,15 +33,21 @@ defmodule MishkaInstaller.Reference.OnRouter do
   """
   defstruct [:action, :path, :endpoint, type: :public, plug_opts: []]
 
+  @typedoc "This type can be used when you want to specify which HTTP typing method is your desired"
   @type action() :: :get | :post | :live | :delete | :put | :forward
+  @typedoc "This type can be used when you want to specify a path for your custom router"
   @type path() :: String.t()
+
   @type type() :: atom()
+  @typedoc "This type can be used when you want to introduce an endpoint module for your router"
   @type endpoint() :: module()
-  # Name of this event
+  @typedoc "This type can be used when you want to introduce an app's reference name"
   @type ref() :: :on_router
+  @typedoc "This type can be used when you want to introduce a plugin output"
   @type reason() :: map()
-  # information about this plugin on state which was saved
+  @typedoc "This type can be used when you want to register an app"
   @type registerd_info() :: MishkaInstaller.PluginState.t()
+  @typedoc "This type can be used when you want to introduce an app as a plugin"
   @type state() :: %__MODULE__{
           action: action(),
           path: path(),
@@ -47,8 +55,9 @@ defmodule MishkaInstaller.Reference.OnRouter do
           type: type(),
           plug_opts: list()
         }
-  # help developers to keep elixir style
+  @typedoc "This type can be used when you want to introduce an app as a plugin"
   @type t :: state()
+  @typedoc "This type can be used when you want to show the output of optional callbacks"
   @type optional_callbacks :: {:ok, ref(), registerd_info()} | {:error, ref(), reason()}
 
   @doc "This Callback can be used when you want to register a plugin"
