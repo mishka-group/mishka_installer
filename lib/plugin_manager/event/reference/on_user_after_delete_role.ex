@@ -7,22 +7,27 @@ defmodule MishkaInstaller.Reference.OnUserAfterDeleteRole do
   """
   defstruct [:role_id, :ip, :endpoint, :conn]
 
+  @typedoc "This type can be used when you want to introduce what `role_id` is required"
   @type role_id() :: <<_::288>>
+  @typedoc "This type can be used when you want to get a `user_id` (modifier_user)"
   @type user_id() :: role_id()
+  @typedoc "This type can be used when you want to introduce the connection of a user request"
   @type conn() :: Plug.Conn.t() | Phoenix.LiveView.Socket.t()
-  # User's IP from both side endpoints connections
+  @typedoc "This type can be used when you want to get a user' IP"
   @type ip() :: String.t() | tuple()
-  # API, HTML
+  @typedoc "This type can be used when you want to introduce an endpoint module for your router"
   @type endpoint() :: :html | :api
-  # Name of this event
+  @typedoc "This type can be used when you want to introduce an app's reference name"
   @type ref() :: :on_user_after_delete_role
-  # output of state for this event
+  @typedoc "This type can be used when you want to introduce a plugin output"
   @type reason() :: map() | String.t()
-  # information about this plugin on state which was saved
+  @typedoc "This type can be used when you want to register an app"
   @type registerd_info() :: MishkaInstaller.PluginState.t()
+  @typedoc "This type can be used when you want to introduce an app as a plugin"
   @type state() :: %__MODULE__{role_id: role_id(), ip: ip(), endpoint: endpoint(), conn: conn()}
-  # help developers to keep elixir style
+  @typedoc "This type can be used when you want to introduce an app as a plugin"
   @type t :: state()
+  @typedoc "This type can be used when you want to show the output of optional callbacks"
   @type optional_callbacks :: {:ok, ref(), registerd_info()} | {:error, ref(), reason()}
 
   @doc "This Callback can be used when you want to register a plugin"
