@@ -1,8 +1,8 @@
-defmodule MishkaInstaller.Reference.OnChangeDependency do
+defmodule MishkaInstaller.Reference.OnAfterDependency do
   @moduledoc """
     This event is kicked off anytime a plugin is moved into the installation or update stage of the process.
     In the event that a plugin from this area is carrying out the after completing all the above-mentioned procedures,
-    the developer will have access to the output in real time.
+    the developer will have access to the output after processing finished.
 
     **Note**: Treat this event as a no return flag while analyzing it.
 
@@ -12,12 +12,12 @@ defmodule MishkaInstaller.Reference.OnChangeDependency do
 
   @typedoc "This type can be used when you want to introduce an app"
   @type app() :: atom()
-  @typedoc "This type can be used when you want to introduce each line of compiling/installing"
+  @typedoc "This type can be used when you want to introduce output of finished compiling/installing"
   @type output() :: String.t()
   @typedoc "This type can be used when you want to introduce an app's status"
   @type status() :: :add | :update | :force_update
   @typedoc "This type can be used when you want to introduce an app's reference name"
-  @type ref() :: :on_change_dependency
+  @type ref() :: :on_after_dependency
   @typedoc "This type can be used when you want to introduce a plugin output"
   @type reason() :: map() | String.t()
   @typedoc "This type can be used when you want to register an app"
