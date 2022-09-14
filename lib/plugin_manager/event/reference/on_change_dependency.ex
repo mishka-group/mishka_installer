@@ -1,8 +1,18 @@
 defmodule MishkaInstaller.Reference.OnChangeDependency do
-  defstruct [:app, :status]
+  @moduledoc """
+    This event is kicked off anytime a plugin is moved into the installation or update stage of the process.
+    In the event that a plugin from this area is carrying out the after completing all the above-mentioned procedures,
+    the developer will have access to the output in real time.
+    Note: Treat this event as a no return flag while analyzing it.
+
+    It is currently being renovated, and in the future it might look different.
+  """
+  defstruct [:app, :status, :output]
 
   @typedoc "This type can be used when you want to introduce an app"
   @type app() :: atom()
+  @typedoc "This type can be used when you want to introduce each line of compiling/installing"
+  @type output() :: String.t()
   @typedoc "This type can be used when you want to introduce an app's status"
   @type status() :: :add | :force_update
   @typedoc "This type can be used when you want to introduce an app's reference name"
@@ -12,7 +22,7 @@ defmodule MishkaInstaller.Reference.OnChangeDependency do
   @typedoc "This type can be used when you want to register an app"
   @type registerd_info() :: MishkaInstaller.PluginState.t()
   @typedoc "This type can be used when you want to introduce an app as a plugin"
-  @type state() :: %__MODULE__{app: app(), status: state()}
+  @type state() :: %__MODULE__{app: app(), status: state(), output: output()}
   @typedoc "This type can be used when you want to introduce an app as a plugin"
   @type t :: state()
   @typedoc "This type can be used when you want to show the output of optional callbacks"

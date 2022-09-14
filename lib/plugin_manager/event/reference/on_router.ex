@@ -37,7 +37,7 @@ defmodule MishkaInstaller.Reference.OnRouter do
   @type action() :: :get | :post | :live | :delete | :put | :forward
   @typedoc "This type can be used when you want to specify a path for your custom router"
   @type path() :: String.t()
-
+  # TODO: why this type() was created?
   @type type() :: atom()
   @typedoc "This type can be used when you want to introduce an endpoint module for your router"
   @type endpoint() :: module()
