@@ -6,7 +6,7 @@ defmodule MishkaInstaller.Reference.OnContentAfterDelete do
 
     It is currently being renovated, and in the future it might look different.
   """
-  defstruct [:section, :private, :extra]
+  defstruct [:section, :private, extra: %{}]
 
   @typedoc "This type can be used when you want to introduce what place this captcha is going to be run"
   @type section() :: atom()
