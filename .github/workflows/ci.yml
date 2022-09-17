@@ -20,7 +20,7 @@ jobs:
           - pair:
               elixir: '1.14.0'
               otp: '25.0.4'
-              postgres: '14.1-alpine'
+              postgres: '14.5-alpine'
 
     runs-on: ubuntu-latest
 
