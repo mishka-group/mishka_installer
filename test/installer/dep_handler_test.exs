@@ -155,14 +155,14 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
       [
         %{app: :phoenix_pubsub, version: "~> 2.1"},
         %{app: :mishka_developer_tools, version: "~> 0.0.7"},
-        %{app: :jason, version: "~> 1.3"},
-        %{app: :finch, version: "~> 0.12.0"},
+        %{app: :jason, version: "~> 1.4"},
+        %{app: :finch, version: "~> 0.13.0"},
         %{app: :ex_doc, version: ">= 0.0.0"},
         %{app: :phoenix_live_view, version: "~> 0.17.9"},
-        %{app: :sourceror, version: "~> 0.11.1"},
+        %{app: :sourceror, version: "~> 0.11.2"},
         %{app: :ets, version: "~> 0.9.0"},
-        %{app: :oban, version: "~> 2.12"},
-        %{app: :gettext, version: "~> 0.19.1"}
+        %{app: :oban, version: "~> 2.13"},
+        %{app: :gettext, version: "~> 0.20.0"}
       ] = assert DepHandler.get_deps_from_mix(MishkaInstaller.MixProject)
     end
 

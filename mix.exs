@@ -35,14 +35,14 @@ defmodule MishkaInstaller.MixProject do
     [
       {:phoenix_pubsub, "~> 2.1"},
       {:mishka_developer_tools, "~> 0.0.7"},
-      {:jason, "~> 1.3"},
-      {:finch, "~> 0.12.0"},
+      {:jason, "~> 1.4"},
+      {:finch, "~> 0.13.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:phoenix_live_view, "~> 0.17.9"},
       {:sourceror, "~> 0.11.2"},
       {:ets, "~> 0.9.0"},
-      {:oban, "~> 2.12"},
-      {:gettext, "~> 0.19.1"}
+      {:oban, "~> 2.13"},
+      {:gettext, "~> 0.20.0"}
     ]
   end
 
