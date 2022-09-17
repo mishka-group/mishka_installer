@@ -18,9 +18,9 @@ jobs:
       matrix:
         include:
           - pair:
-              elixir: '1.13.4'
-              otp: '25.0.2'
-              postgres: '14.1-alpine'
+              elixir: '1.14.0'
+              otp: '25.0.4'
+              postgres: '14.5-alpine'
 
     runs-on: ubuntu-latest
 
