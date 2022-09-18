@@ -7,7 +7,7 @@ defmodule MishkaInstaller.Helper.Sender do
   ### Reference
    - https://github.com/hexpm/hexpm/issues/1124
   """
-  @request_name HexClientApi
+  @request_name SenderClientApi
   alias MishkaInstaller.Helper.Extra
 
   @type app :: map()

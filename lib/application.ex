@@ -3,7 +3,8 @@ defmodule MishkaInstaller.Application do
   @impl true
   def start(_type, _args) do
     children = [
-      {Finch, name: HexClientApi},
+      {Finch, name: SenderClientApi},
+      {Finch, name: DownloaderClientApi},
       {Registry, keys: :unique, name: PluginStateRegistry},
       {DynamicSupervisor, [strategy: :one_for_one, name: PluginStateOtpRunner]},
       {DynamicSupervisor, [strategy: :one_for_one, name: MishkaInstaller.RunTimeObanSupervisor]},

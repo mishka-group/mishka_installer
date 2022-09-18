@@ -116,4 +116,12 @@ defmodule MishkaInstaller do
       user_id: nil
     }
   end
+
+  def checksum(file_path) do
+    File.stream!(file_path,[],2048)
+    |> Enum.reduce(:crypto.hash_init(:sha256), fn(line, acc) -> :crypto.hash_update(acc,line) end )
+    |> :crypto.hash_final
+    |> Base.encode16
+    |> String.downcase()
+  end
 end
