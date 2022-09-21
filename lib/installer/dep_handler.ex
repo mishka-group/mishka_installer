@@ -88,7 +88,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     Installer.DepChangesProtector,
     Installer.RunTimeSourcing
   }
-
+  alias MishkaInstaller.Helper.LibraryMaker
   alias MishkaInstaller.Helper.Extra
   require Logger
 
@@ -168,13 +168,13 @@ defmodule MishkaInstaller.Installer.DepHandler do
   def run(type, app, output_type \\ :cmd)
 
   def run(:hex = type, app, output_type) do
-    MishkaInstaller.Helper.Sender.package("hex", %{"app" => app})
+    LibraryMaker.run(type, app, "latest")
     |> check_app_status(type, nil)
     |> run_request_handler(type, output_type)
   end
 
   def run(:git = type, app, output_type) do
-    MishkaInstaller.Helper.Sender.package("github", %{"url" => app.url, "tag" => app.tag})
+    LibraryMaker.run(:github, app.url, app.tag)
     |> check_app_status(type, nil)
     |> run_request_handler(type, output_type)
   end

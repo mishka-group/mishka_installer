@@ -21,22 +21,22 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
 
   @spec run(:github | :hex, String.t(), String.t()) :: list | {:error, atom(), atom} | {:ok, :run, binary}
   def run(type, app, version) do
-    with {:ok, :download, _, app_info} <- download(type, app, version),
+    with {:ok, :download, _, app_info, pkg} <- download(type, app, version),
          file_path <- "#{extensions_path()}/#{app_info["app"]}-#{app_info["version"]}",
          {:ok, :extract} <- extract(:tar, "#{app_info["app"]}-#{app_info["version"]}"),
          {:ok, files} <-
            File.ls("#{extensions_path()}/#{app_info["app"]}-#{app_info["version"]}"),
          extracted_file_type <- Enum.member?(files, "contents.tar.gz"),
-         final_lib_path <-
+         _final_lib_path <-
            extracted_to_normal_project(app_info, file_path, files, extracted_file_type) do
-      {:ok, :run, final_lib_path}
+      {:ok, :package, pkg}
     end
   end
 
   @spec download(:github | :hex, String.t(), String.t()) ::
           list | {:error, atom(), atom} | {:ok, :download, :github | :hex, map()}
   def download(:hex, app, version) do
-    with {:ok, :package, %{"releases" => releases}} <-
+    with {:ok, :package, %{"releases" => releases} = pkg} <-
            MishkaInstaller.Helper.Sender.package("hex", %{"app" => app}),
          {:ok, :select_hex_release, release_info} <- select_hex_release(releases, version),
          {:ok, :get_hex_releas_data, app_info} <- get_hex_releas_data(release_info),
@@ -44,17 +44,21 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
            download_tar_from_hex(app, app_info["version"]),
          {:ok, :file_write} <- file_write(app, app_info["version"], downloaded_app_body),
          {:ok, :checksum?} <- checksum?(app, app_info) do
-      {:ok, :download, :hex, %{"app" => "#{app}", "version" => app_info["version"]}}
+      {:ok, :download, :hex, %{"app" => "#{app}", "version" => app_info["version"]}, pkg}
+    else
+      {:error, _section, result} -> {:error, :package, result}
     end
   end
 
   def download(:github, url, version) do
-    with {:ok, :select_github_release, app_name, version, tar_url} <-
+    with {:ok, :select_github_release, pkg, tar_url} <-
            select_github_release(url, version),
          {:ok, :download_tar_from_github, downloaded_app_body} <-
            download_tar_from_github(tar_url),
-         {:ok, :file_write} <- file_write("#{app_name}", version, downloaded_app_body) do
-      {:ok, :download, :github, %{"app" => "#{app_name}", "version" => version}}
+         {:ok, :file_write} <- file_write("#{pkg[:app]}", pkg[:version], downloaded_app_body) do
+      {:ok, :download, :github, %{"app" => "#{pkg[:app]}", "version" => pkg[:version]}, pkg}
+    else
+      {:error, _section, result} -> {:error, :package, result}
     end
   end
 
@@ -144,7 +148,10 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
         {:error, :select_github_release, :not_found}
 
       data ->
-        {:ok, :select_github_release, data[:app], data[:version],
+        # {:ok, :select_github_release, data[:app], data[:version],
+        #  "#{String.replace(String.trim(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
+
+         {:ok, :select_github_release, data,
          "#{String.replace(String.trim(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
     end
   end

@@ -40,6 +40,8 @@ defmodule MishkaInstaller.DepCompileJob do
   end
 
   defp run_compile(app, type) do
+    # TODO: it should be call from lib library_maker
+    # TODO: if library_maker has error what we should do?
     Logger.warn("Try to re-compile the request of DepCompileJob")
     DepHandler.create_mix_file_and_start_compile(app, type)
     Oban.pause_queue(queue: :compile_events)
