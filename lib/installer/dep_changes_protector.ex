@@ -407,7 +407,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
         RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
         |> case do
           {:ok, :application_ensure} -> Logger.info("All installed extensions re-added")
-          {:error, :application_ensure, :load, {"no such file or directory", _app}} ->
+          {:error, :application_ensure, :load, {'no such file or directory', _app}} ->
             case DepHandler.compare_installed_deps_with_app_file(item.app) do
               {:ok, :compare_installed_deps_with_app_file, apps_list} ->
                 DepHandler.move_and_replace_compiled_app_build(apps_list)
