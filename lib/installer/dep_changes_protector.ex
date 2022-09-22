@@ -172,8 +172,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     case app_res do
       {:ok, :application_ensure} ->
         [
-          Path.join(project_path, ["deps/", "#{app_name}", "/_build"]),
-          Path.join(project_path, ["deps/", "#{app_name}", "/deps"])
+          Path.join(project_path, ["deployment/extensions/", "#{app_name}", "/_build"]),
+          Path.join(project_path, ["deployment/extensions/", "#{app_name}", "/deps"])
         ]
         |> Enum.map(&File.rm_rf(&1))
 
@@ -314,6 +314,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
            Dependency.change_dependency_type_with_app(app_name, dependency_type) do
       json_check_and_create()
 
+      # TODO: it should be changed to outofproject
       with {:ok, :compare_installed_deps_with_app_file, apps_list} <-
              DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
         Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->

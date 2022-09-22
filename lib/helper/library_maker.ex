@@ -15,8 +15,8 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
 
   # TODO: delete this test function
   def test() do
-    run(:github, "https://github.com/mishka-group/mishka_installer", "0.0.3")
-    # run(:hex, "mishka_installer", "0.0.3")
+    # run(:github, "https://github.com/mishka-group/mishka_installer", "0.0.3")
+    run(:hex, "mishka_social", "0.0.2")
   end
 
   @spec run(:github | :hex, String.t(), String.t()) :: list | {:error, atom(), atom} | {:ok, :run, binary}
@@ -34,7 +34,7 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
   end
 
   @spec download(:github | :hex, String.t(), String.t()) ::
-          list | {:error, atom(), atom} | {:ok, :download, :github | :hex, map()}
+          list | {:error, atom(), atom} | {:ok, :download, :github | :hex, map(), map | list()}
   def download(:hex, app, version) do
     with {:ok, :package, %{"releases" => releases} = pkg} <-
            MishkaInstaller.Helper.Sender.package("hex", %{"app" => app}),
@@ -46,7 +46,9 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
          {:ok, :checksum?} <- checksum?(app, app_info) do
       {:ok, :download, :hex, %{"app" => "#{app}", "version" => app_info["version"]}, pkg}
     else
-      {:error, _section, result} -> {:error, :package, result}
+      {:error, _section, result} ->
+        # TODO: save error log
+        {:error, :package, result}
     end
   end
 

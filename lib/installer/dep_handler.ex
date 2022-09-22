@@ -623,7 +623,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
           {:error, :compare_installed_deps_with_app_file, String.t()}
           | {:ok, :compare_installed_deps_with_app_file, list()}
   def compare_installed_deps_with_app_file(app) do
-    new_app_path = Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{app}"])
+    new_app_path = Path.join(MishkaInstaller.get_config(:project_path), ["deployment/extensions/", "#{app}"])
 
     if File.dir?(new_app_path) and File.dir?(new_app_path <> "/_build/#{Mix.env()}/lib") do
       apps_list =
@@ -863,7 +863,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> sync_app_with_database()
   end
 
-  defp check_app_status(result, type, file_path) when type in [:git, :upload] do
+  defp check_app_status(result, type, _file_path) when type in [:git, :upload] do
     case result do
       {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
         {:error,
@@ -885,7 +885,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
         else
           create_app_info(data, if(type == :git, do: type, else: :path))
           |> Map.from_struct()
-          |> rename_folder_copy_to_deps(file_path)
           |> sync_app_with_database()
         end
     end
@@ -910,34 +909,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
     {:error, msg}
   end
-
-  defp rename_folder_copy_to_deps(data, file_path)
-       when not is_nil(file_path) and is_binary(file_path) do
-    file =
-      Path.join(MishkaInstaller.get_config(:project_path), [
-        "deployment/",
-        "extensions/",
-        "#{Path.basename(file_path, ".zip")}"
-      ])
-
-    new_name =
-      Path.join(MishkaInstaller.get_config(:project_path), [
-        "deployment/",
-        "extensions/",
-        "#{data.app}"
-      ])
-
-    File.rename!(file, new_name)
-
-    File.cp_r!(
-      new_name,
-      Path.join(MishkaInstaller.get_config(:project_path), ["deps/", "#{data.app}"])
-    )
-
-    data
-  end
-
-  defp rename_folder_copy_to_deps(data, _file_path), do: data
 
   defp sync_app_with_database(data) do
     if compare_version_with_installed_app(data.app, data.version) do

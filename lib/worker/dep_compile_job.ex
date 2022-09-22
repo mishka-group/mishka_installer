@@ -5,7 +5,7 @@ defmodule MishkaInstaller.DepCompileJob do
   This module's responsibility includes reactivating the queue using the `MishkaInstaller.Installer.DepChangesProtector` module as one of its tasks.
   """
   use Oban.Worker, queue: :compile_events, max_attempts: 1
-  alias MishkaInstaller.Installer.DepHandler
+  alias MishkaInstaller.Installer.DepChangesProtector
   require Logger
 
   @doc false
@@ -40,10 +40,8 @@ defmodule MishkaInstaller.DepCompileJob do
   end
 
   defp run_compile(app, type) do
-    # TODO: it should be call from lib library_maker
-    # TODO: if library_maker has error what we should do?
     Logger.warn("Try to re-compile the request of DepCompileJob")
-    DepHandler.create_mix_file_and_start_compile(app, type)
+    DepChangesProtector.deps(app, type)
     Oban.pause_queue(queue: :compile_events)
     :ok
   end
