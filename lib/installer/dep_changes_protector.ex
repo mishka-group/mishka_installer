@@ -413,7 +413,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     if Mix.env() != :test do
       MishkaInstaller.Dependency.dependencies()
       |> Enum.map(fn item ->
-        MishkaInstaller.Installer.RunTimeSourcing.do_runtime(item.app, :add)
+        MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
         |> case do
           {:error, :prepend_compiled_apps, :bad_directory, list} -> IO.inspect(list, label: "This app does not exist in bin/_build")
           {:ok, :application_ensure} -> Logger.info("All installed extensions re-added")
