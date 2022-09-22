@@ -181,7 +181,8 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("save", %{"select_form" => "git", "url" => url, "git_tag" => tag}, socket) do
-    res = DepHandler.run(:git, %{url: url, tag: tag}, :port)
+    new_tag = if String.trim(tag) == "", do: "latest", else: String.trim(tag)
+    res = DepHandler.run(:git, %{url: url, tag: new_tag}, :port)
 
     new_socket =
       socket

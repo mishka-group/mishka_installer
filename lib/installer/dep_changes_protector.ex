@@ -140,6 +140,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   @impl true
+  def handle_continue(:add_extensions, state) do
+    add_extensions_when_server_reset(state)
+  end
+
+  @impl true
   def handle_info(:check_json, state) do
     if Mix.env() not in [:dev, :test],
       do: Logger.info("OTP Dependencies changes protector Cache server was valued by JSON.")
@@ -362,7 +367,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
         Process.send_after(self(), :check_json, @re_check_json_time)
         Process.send_after(self(), :start_oban, @re_check_json_time)
         MishkaInstaller.Dependency.subscribe()
-        {:noreply, state}
+        {:noreply, state, {:continue, :add_extensions}}
     end
   end
 
@@ -399,5 +404,23 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
       @module,
       {status, String.to_atom(@module), answer, app}
     )
+  end
+
+  defp add_extensions_when_server_reset(state) do
+    Logger.warn("Try to re-add installed extensions")
+    # TODO: add status for each app is active or stopped, not load them in nex version
+    # TODO: try to add them and check which app does not exist in bin
+    if Mix.env() != :test do
+      MishkaInstaller.Dependency.dependencies()
+      |> Enum.map(fn item ->
+        MishkaInstaller.Installer.RunTimeSourcing.do_runtime(item.app, :add)
+        |> case do
+          {:error, :prepend_compiled_apps, :bad_directory, list} -> IO.inspect(list, label: "This app does not exist in bin/_build")
+          {:ok, :application_ensure} -> Logger.info("All installed extensions re-added")
+          output -> Logger.emergency("We have problem to add all extensions, #{inspect(output)}")
+        end
+      end)
+    end
+    {:noreply, state}
   end
 end
