@@ -874,7 +874,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
            result: result
          )}
 
-      data ->
+      {:ok, :package, data} ->
         if Enum.any?(data, &(&1 == {:error, :package, :convert_ast_output})) do
           {:error,
            Gettext.dgettext(
