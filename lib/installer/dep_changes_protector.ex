@@ -399,26 +399,41 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   defp add_extensions_when_server_reset(state) do
-    Logger.warn("Try to re-add installed extensions")
     # TODO: add status for each app is active or stopped, not load them in nex version
     if Mix.env() != :test do
+      Logger.warn("Try to re-add installed extensions")
       MishkaInstaller.Dependency.dependencies()
       |> Enum.map(fn item ->
         RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
         |> case do
-          {:ok, :application_ensure} -> Logger.info("All installed extensions re-added")
+          {:ok, :application_ensure} ->
+            Logger.info("All installed extensions re-added")
+
           {:error, :application_ensure, :load, {'no such file or directory', _app}} ->
             case DepHandler.compare_installed_deps_with_app_file(item.app) do
               {:ok, :compare_installed_deps_with_app_file, apps_list} ->
                 DepHandler.move_and_replace_compiled_app_build(apps_list)
                 RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
+
               {:error, :compare_installed_deps_with_app_file, msg} ->
-                IO.inspect("This app does not exist in bin/_build, #{inspect(msg)}")
+                MishkaInstaller.Dependency.delete(item.id)
+
+                File.rm_rf!(
+                  Path.join(MishkaInstaller.get_config(:project_path), [
+                    "deployment/",
+                    "extensions/#{item.app}"
+                  ])
+                )
+
+                Logger.emergency("We have problem to add all extensions, #{inspect(msg)}")
             end
-          output -> Logger.emergency("We have problem to add all extensions, #{inspect(output)}")
+
+          output ->
+            Logger.emergency("We have problem to add all extensions, #{inspect(output)}")
         end
       end)
     end
+
     {:noreply, state}
   end
 end

@@ -252,7 +252,11 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
           {:ok, :do_deps_compile, String.t()}
           | {:error, :do_deps_compile, String.t(), [{:operation, String.t()} | {:output, any}]}
   def do_deps_compile(app, type \\ :cmd) do
-    with deps_path <- Path.join(MishkaInstaller.get_config(:project_path), ["deployment/extensions/", "#{app}"]),
+    with deps_path <-
+           Path.join(MishkaInstaller.get_config(:project_path), [
+             "deployment/extensions/",
+             "#{app}"
+           ]),
          :ok <- change_dir(deps_path, app),
          :ok <- exec("deps.get", type, app, :do_deps_compile),
          :ok <- exec("deps.compile", type, app, :do_deps_compile),

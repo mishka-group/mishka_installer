@@ -88,6 +88,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     Installer.DepChangesProtector,
     Installer.RunTimeSourcing
   }
+
   alias MishkaInstaller.Helper.LibraryMaker
   alias MishkaInstaller.Helper.Extra
   require Logger
@@ -623,7 +624,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
           {:error, :compare_installed_deps_with_app_file, String.t()}
           | {:ok, :compare_installed_deps_with_app_file, list()}
   def compare_installed_deps_with_app_file(app) do
-    new_app_path = Path.join(MishkaInstaller.get_config(:project_path), ["deployment/extensions/", "#{app}"])
+    new_app_path =
+      Path.join(MishkaInstaller.get_config(:project_path), ["deployment/extensions/", "#{app}"])
 
     if File.dir?(new_app_path) and File.dir?(new_app_path <> "/_build/#{Mix.env()}/lib") do
       apps_list =
@@ -645,7 +647,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
        Gettext.dgettext(
          MishkaInstaller.gettext(),
          "mishka_installer",
-         "App folder or its _build does not exist"
+         "App folder or its _build does not exist, If this app is already installed and you reset the server,
+          we deleted this app in the database and please install it again"
        )}
     end
   end

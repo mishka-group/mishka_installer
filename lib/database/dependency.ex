@@ -119,6 +119,7 @@ defmodule MishkaInstaller.Dependency do
     from([dep] in query,
       order_by: [desc: dep.inserted_at, desc: dep.id],
       select: %{
+        id: dep.id,
         app: dep.app,
         version: dep.version,
         type: dep.type,

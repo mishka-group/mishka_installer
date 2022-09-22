@@ -19,7 +19,8 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
     run(:hex, "mishka_social", "0.0.2")
   end
 
-  @spec run(:github | :hex, String.t(), String.t()) :: list | {:error, atom(), atom} | {:ok, :run, binary}
+  @spec run(:github | :hex, String.t(), String.t()) ::
+          list | {:error, atom(), atom} | {:ok, :run, binary}
   def run(type, app, version) do
     with {:ok, :download, _, app_info, pkg} <- download(type, app, version),
          file_path <- "#{extensions_path()}/#{app_info["app"]}-#{app_info["version"]}",
@@ -153,7 +154,7 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
         # {:ok, :select_github_release, data[:app], data[:version],
         #  "#{String.replace(String.trim(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
 
-         {:ok, :select_github_release, data,
+        {:ok, :select_github_release, data,
          "#{String.replace(String.trim(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
     end
   end
