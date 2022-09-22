@@ -151,9 +151,6 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
         {:error, :select_github_release, :not_found}
 
       data ->
-        # {:ok, :select_github_release, data[:app], data[:version],
-        #  "#{String.replace(String.trim(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
-
         {:ok, :select_github_release, data,
          "#{String.replace(String.trim(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
     end

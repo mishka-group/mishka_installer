@@ -647,8 +647,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
        Gettext.dgettext(
          MishkaInstaller.gettext(),
          "mishka_installer",
-         "App folder or its _build does not exist, If this app is already installed and you reset the server,
-          we deleted this app in the database and please install it again"
+         "App folder or its _build does not exist, If this app is already installed and you reset the server, we deleted this app in the database and please install it again"
        )}
     end
   end
