@@ -70,7 +70,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   require Logger
   @re_check_json_time 10_000
   @module "dep_changes_protector"
-  alias MishkaInstaller.Installer.DepHandler
+  alias MishkaInstaller.Installer.{DepHandler, RunTimeSourcing}
   alias MishkaInstaller.Dependency
 
   @doc false
@@ -172,16 +172,8 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   @impl true
   def handle_info({_ref, {:installing_app, app_name, _move_apps, app_res}}, state) do
     # TODO: problem with dependency_activity to store output of errors
-    project_path = MishkaInstaller.get_config(:project_path)
-
     case app_res do
       {:ok, :application_ensure} ->
-        [
-          Path.join(project_path, ["deployment/extensions/", "#{app_name}", "/_build"]),
-          Path.join(project_path, ["deployment/extensions/", "#{app_name}", "/deps"])
-        ]
-        |> Enum.map(&File.rm_rf(&1))
-
         notify_subscribers({:ok, app_res, app_name})
 
       {:error, do_runtime, app, operation: operation, output: output} ->
@@ -221,7 +213,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   def handle_info({:do_compile, app, type}, state) do
     task =
       Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-        MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile(app, type)
+        RunTimeSourcing.do_deps_compile(app, type)
       end)
 
     {:noreply, Map.merge(state, %{ref: task.ref, app: app})}
@@ -323,7 +315,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
       with {:ok, :compare_installed_deps_with_app_file, apps_list} <-
              DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
         Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
-          MishkaInstaller.Installer.RunTimeSourcing.do_runtime(
+          RunTimeSourcing.do_runtime(
             String.to_atom(state.app),
             :uninstall
           )
@@ -332,7 +324,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
             :installing_app,
             app_name,
             DepHandler.move_and_replace_compiled_app_build(apps_list),
-            MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
+            RunTimeSourcing.do_runtime(String.to_atom(state.app), :add)
           }
         end)
       end
@@ -409,14 +401,20 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   defp add_extensions_when_server_reset(state) do
     Logger.warn("Try to re-add installed extensions")
     # TODO: add status for each app is active or stopped, not load them in nex version
-    # TODO: try to add them and check which app does not exist in bin
     if Mix.env() != :test do
       MishkaInstaller.Dependency.dependencies()
       |> Enum.map(fn item ->
-        MishkaInstaller.Installer.RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
+        RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
         |> case do
-          {:error, :prepend_compiled_apps, :bad_directory, list} -> IO.inspect(list, label: "This app does not exist in bin/_build")
           {:ok, :application_ensure} -> Logger.info("All installed extensions re-added")
+          {:error, :application_ensure, :load, {"no such file or directory", _app}} ->
+            case DepHandler.compare_installed_deps_with_app_file(item.app) do
+              {:ok, :compare_installed_deps_with_app_file, apps_list} ->
+                DepHandler.move_and_replace_compiled_app_build(apps_list)
+                RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
+              {:error, :compare_installed_deps_with_app_file, msg} ->
+                IO.inspect("This app does not exist in bin/_build, #{inspect(msg)}")
+            end
           output -> Logger.emergency("We have problem to add all extensions, #{inspect(output)}")
         end
       end)
