@@ -1,10 +1,26 @@
 # Changelog for MishkaInstaller 0.0.4
 
 - [x] Improve runtime sourcing module
-- [ ] Cover version 0.0.3 in the document
+- [x] Cover version 0.0.3 in the document
+- [x] Get and compile a dependency out of user project
+- [x] Add `MishkaInstaller.Helper.LibraryMaker` utility module and function
+- [x] Connecting GUI LiveView to the database and managing the requested extensions file(compressed and dir)
+- [x] Force user to put their Pubsub and add some timeout to check is connected root project Repo or not
+- [x] Format project `mix format`
 - [ ] Add description of each dependency in GUI
-- [ ] Get and compile a dependency out of user project
 - [ ] Separate sub-dependencies with user installed-dependencies in GUI
+- [ ] Fix and Improve `MishkaInstaller.DepUpdateJob`
+- [ ] Change English README for version 0.0.4
+- [ ] Change Persian README for version 0.0.4
+- [ ] Add English introduction video version 0.0.4
+- [ ] Add Persian introduction video version 0.0.4
+- [ ] Add status changer in DepGetter module from state
+- [ ] Test version 0.0.4 with credo
+- [ ] Update Phoenix LiveView to 0.18.2
+- [ ] Add JSON API for admin
+- [ ] Create events for each part of MishkaInstaller to let developers extend installer
+- [ ] How to display the consumption of an application
+- [ ] Consolidate and rebuild all ‍activities with a specific structure
 
 ---
 

@@ -439,6 +439,22 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
                 Logger.emergency("We have problem to add all extensions, #{inspect(msg)}")
             end
 
+          {:error, :prepend_compiled_apps, :no_directory, _} ->
+            with {:ok, :compare_installed_deps_with_app_file, apps_list} <-
+                   DepHandler.compare_installed_deps_with_app_file("#{item.app}") do
+              DepHandler.move_and_replace_compiled_app_build(apps_list)
+              RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)
+
+              Logger.info(
+                "The #{item.app} installed extension re-added from deployment/extensions directory, because your _build directory has been deleted."
+              )
+            else
+              output ->
+                Logger.emergency(
+                  "We have problem to add #{item.app} extension, #{inspect(output)}"
+                )
+            end
+
           output ->
             Logger.emergency("We have problem to add all extensions, #{inspect(output)}")
         end
