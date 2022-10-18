@@ -353,7 +353,14 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
     custom_repo = MishkaInstaller.get_config(:repo)
 
     cond do
-      is_nil(custom_pubsub) || is_nil(Process.whereis(custom_pubsub)) ||
+      is_nil(custom_pubsub) ->
+        if Mix.env() != :test do
+          raise "Please set a Phoenix PubSub module in your config based on MishkaInstaller document."
+        else
+          {:noreply, state, 100}
+        end
+
+      is_nil(Process.whereis(custom_pubsub)) ||
           is_nil(Process.whereis(custom_repo)) ->
         {:noreply, state, 100}
 
