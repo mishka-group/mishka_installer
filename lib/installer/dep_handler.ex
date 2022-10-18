@@ -865,7 +865,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
     |> sync_app_with_database()
   end
 
-  defp check_app_status(result, type, _file_path) when type in [:git, :upload] do
+  defp check_app_status(result, type, file_path) when type in [:git, :upload] do
     case result do
       {:error, :package, result} when result in [:mix_file, :not_found, :not_tag, :unhandled] ->
         {:error,
@@ -885,6 +885,9 @@ defmodule MishkaInstaller.Installer.DepHandler do
              "Your mix.exs file must contain the app, version and source_url parameters"
            )}
         else
+          # Delete zip file and re-name the lib folder to its atom name in mix file
+          if type == :upload, do: LibraryMaker.change_uploaded_file(file_path, "#{data[:app]}")
+
           create_app_info(data, if(type == :git, do: type, else: :path))
           |> Map.from_struct()
           |> sync_app_with_database()
@@ -1026,7 +1029,8 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
     with {:mix_file, {:ok, body}} <- {:mix_file, File.read(mix_file)},
          {:code, {:ok, ast}} <- {:code, Code.string_to_quoted(body)} do
-      Extra.ast_mix_file_basic_information(ast, [:app, :version, :source_url])
+      data = Extra.ast_mix_file_basic_information(ast, [:app, :version, :source_url])
+      {:ok, :package, data}
     else
       {:mix_file, {:error, _error}} -> {:error, :package, :mix_file}
       {:code, {:error, _error}} -> {:error, :package, :string_mix_file}

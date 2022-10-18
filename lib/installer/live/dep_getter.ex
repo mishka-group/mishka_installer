@@ -746,7 +746,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
             <div class="container h-25 d-inline-block"></div>
           </div>
       <% end %>
-      <div class="bd-callout bd-callout-info mb-5">
+      <div class="container bd-callout bd-callout-info mb-5">
         <h3 class="mb-3"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Installed Apps:") %></h3>
         <p>
           <%= raw(Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "It should be noted the <span class=\"text-primary\">blue</span> apps exist in JSON file, and it is added by administrator and another apps exist in core, or they are sub-dependencies.")) %>
@@ -754,7 +754,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         </p>
       </div>
       <hr class="mb-5 mt-5">
-      <div id="all_loaded_app">
+      <div id="all_loaded_app" class="container">
         <%= for {app, _des, ver} <- @loaded_apps do %>
           <%= if app in Enum.map(DepHandler.compare_dependencies_with_json(), & &1.app) do %>
               <span id={"#{app}" <> "dropdown-class"} class="dropdown">

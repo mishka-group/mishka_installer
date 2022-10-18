@@ -81,6 +81,20 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
     end
   end
 
+  @spec change_uploaded_file(String.t(), String.t()) :: [binary]
+  def change_uploaded_file(file_path, app_name) do
+    new_lib_path =
+      Path.join(MishkaInstaller.get_config(:project_path), [
+        "deployment/",
+        "extensions/#{app_name}"
+      ])
+
+    String.replace(file_path, Path.extname(file_path), "")
+    |> File.rename(new_lib_path)
+
+    File.rm_rf!(file_path)
+  end
+
   defp get_hex_releas_data(app_info) do
     Finch.build(:get, app_info["url"])
     |> Finch.request(@request_name)
