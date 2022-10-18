@@ -14,6 +14,7 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
   @request_name DownloaderClientApi
 
   # TODO: delete this test function
+  # TODO: add uoload file
   def test() do
     # run(:github, "https://github.com/mishka-group/mishka_installer", "0.0.3")
     run(:hex, "mishka_social", "0.0.2")

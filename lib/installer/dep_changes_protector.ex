@@ -350,9 +350,11 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   defp check_custom_pubsub_loaded(state) do
     custom_pubsub = MishkaInstaller.get_config(:pubsub)
+    custom_repo = MishkaInstaller.get_config(:repo)
 
     cond do
-      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) ->
+      is_nil(custom_pubsub) || is_nil(Process.whereis(custom_pubsub)) ||
+          is_nil(Process.whereis(custom_repo)) ->
         {:noreply, state, 100}
 
       true ->
@@ -400,8 +402,10 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   defp add_extensions_when_server_reset(state) do
     # TODO: add status for each app is active or stopped, not load them in nex version
+    # TODO: save log and activity
     if Mix.env() != :test do
       Logger.warn("Try to re-add installed extensions")
+
       MishkaInstaller.Dependency.dependencies()
       |> Enum.map(fn item ->
         RunTimeSourcing.do_runtime(String.to_atom(item.app), :add)

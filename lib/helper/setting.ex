@@ -124,9 +124,11 @@ defmodule MishkaInstaller.Helper.Setting do
 
   defp check_custom_pubsub_loaded(state) do
     custom_pubsub = MishkaInstaller.get_config(:pubsub)
+    custom_repo = MishkaInstaller.get_config(:repo)
 
     cond do
-      !is_nil(custom_pubsub) && is_nil(Process.whereis(custom_pubsub)) ->
+      is_nil(custom_pubsub) || is_nil(Process.whereis(custom_pubsub)) ||
+          is_nil(Process.whereis(custom_repo)) ->
         {:noreply, state, 100}
 
       true ->
