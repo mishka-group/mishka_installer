@@ -355,10 +355,9 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         nil
 
       {:ok, :get_record_by_field, :dependency, record_info} ->
-        Task.Supervisor.start_child(DepHandler, fn ->
-          :timer.sleep(1000)
-          DepHandler.create_mix_file()
-        end)
+        Path.join(MishkaInstaller.get_config(:project_path), ["deployment/", "extensions"])
+        |> Path.join(["#{app}"])
+        |> File.rm_rf()
 
         MishkaInstaller.Dependency.delete(record_info.id)
     end
