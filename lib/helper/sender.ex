@@ -42,9 +42,12 @@ defmodule MishkaInstaller.Helper.Sender do
 
   def package("github", %{"url" => url, "tag" => tag} = _app)
       when not is_nil(url) and not is_nil(tag) do
+
     new_url =
       String.replace(
-        String.trim(url),
+        String.trim(
+          if(String.ends_with?(url, "/"), do: String.replace_trailing(url, "/", ""), else: url)
+        ),
         "https://github.com/",
         "https://raw.githubusercontent.com/"
       ) <> "/#{String.trim(tag)}/mix.exs"
@@ -89,6 +92,7 @@ defmodule MishkaInstaller.Helper.Sender do
   end
 
   defp request_handler({:ok, %Finch.Response{status: 404}}, _), do: {:error, :package, :not_found}
+
   defp request_handler(_outputs, _), do: {:error, :package, :unhandled}
 
   defp get_basic_information_form_github({:ok, :package, body}, tag) do
