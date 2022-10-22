@@ -673,7 +673,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
           <div class="container h-25 d-inline-block"></div>
           <input name="url" class="form-control form-control-lg mb-3 w-75 p-3 mx-auto" type="text" placeholder="Your Git url" required>
           <div class="container h-25 d-inline-block"></div>
-          <input name="git_tag" class="form-control form-control-lg mb-3 w-75 p-3 mx-auto" type="text" placeholder="Git tag, Ex: 0.0.2 or master">
+          <input name="git_tag" class="form-control form-control-lg mb-3 w-75 p-3 mx-auto" type="text" placeholder="Git tag, Ex: 0.0.2 or latest">
           <div class="container h-25 d-inline-block"></div>
           <input type="hidden" id="hidden_type" name="select_form" value="git">
           <button type="submit" class="btn btn-outline-secondary mt-4 mb-4"><%= Gettext.dgettext(MishkaInstaller.gettext(), "mishka_installer", "Download/Update from Git") %></button>
