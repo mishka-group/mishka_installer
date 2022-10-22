@@ -125,4 +125,10 @@ defmodule MishkaInstaller do
     |> Base.encode16()
     |> String.downcase()
   end
+
+  def trim_url(url) do
+    String.trim(
+      if(String.ends_with?(url, "/"), do: String.replace_trailing(url, "/", ""), else: url)
+    )
+  end
 end

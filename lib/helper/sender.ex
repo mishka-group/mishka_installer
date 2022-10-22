@@ -42,12 +42,9 @@ defmodule MishkaInstaller.Helper.Sender do
 
   def package("github", %{"url" => url, "tag" => tag} = _app)
       when not is_nil(url) and not is_nil(tag) do
-
     new_url =
       String.replace(
-        String.trim(
-          if(String.ends_with?(url, "/"), do: String.replace_trailing(url, "/", ""), else: url)
-        ),
+        MishkaInstaller.trim_url(url),
         "https://github.com/",
         "https://raw.githubusercontent.com/"
       ) <> "/#{String.trim(tag)}/mix.exs"
@@ -58,7 +55,11 @@ defmodule MishkaInstaller.Helper.Sender do
 
   def package("github_latest_release", url) do
     new_url =
-      String.replace(String.trim(url), "https://github.com/", "https://api.github.com/repos/") <>
+      String.replace(
+        MishkaInstaller.trim_url(url),
+        "https://github.com/",
+        "https://api.github.com/repos/"
+      ) <>
         "/releases/latest"
 
     send_build(:get, new_url)
@@ -66,7 +67,11 @@ defmodule MishkaInstaller.Helper.Sender do
 
   def package("github_latest_tag", url) do
     new_url =
-      String.replace(String.trim(url), "https://github.com/", "https://api.github.com/repos/") <>
+      String.replace(
+        MishkaInstaller.trim_url(url),
+        "https://github.com/",
+        "https://api.github.com/repos/"
+      ) <>
         "/tags"
 
     send_build(:get, new_url)

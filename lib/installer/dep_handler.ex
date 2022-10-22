@@ -876,6 +876,16 @@ defmodule MishkaInstaller.Installer.DepHandler do
            result: result
          )}
 
+      {:error, :package, :invalid_version} ->
+        {:error,
+         Gettext.dgettext(
+           MishkaInstaller.gettext(),
+           "mishka_installer",
+           "This error occurs when the desired version of the library is not received from its mix.exs file.
+           Sometimes, this problem may occur due to the fact that the version was built in a nested way. To solve this problem, refer to the version directly.",
+           result: result
+         )}
+
       {:ok, :package, data} ->
         if Enum.any?(data, &(&1 == {:error, :package, :convert_ast_output})) do
           {:error,

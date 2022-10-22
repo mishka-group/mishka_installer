@@ -44,10 +44,14 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
          {:ok, :checksum?} <- checksum?(app, app_info) do
       {:ok, :download, :hex, %{"app" => "#{app}", "version" => app_info["version"]}, pkg}
     else
-      {:error, _section, result} ->
-        # TODO: save error log
-        {:error, :package, result}
+      {:error, _section, result} -> {:error, :package, result}
     end
+  rescue
+    _e in Protocol.UndefinedError ->
+      {:error, :package, :invalid_version}
+
+    _ ->
+      {:error, :package, :unhandled}
   end
 
   def download(:github, url, version) do
@@ -60,6 +64,12 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
     else
       {:error, _section, result} -> {:error, :package, result}
     end
+  rescue
+    _e in Protocol.UndefinedError ->
+      {:error, :package, :invalid_version}
+
+    _ ->
+      {:error, :package, :unhandled}
   end
 
   # erl_tar:extract("rel/project-1.0.tar.gz", [compressed]);
@@ -150,7 +160,7 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
 
   # - https://elixirforum.com/t/how-to-download-a-file-with-finch-which-is-redirected/50368
   defp select_github_release(url, "latest") do
-    case MishkaInstaller.Helper.Sender.package("github_latest_release", url) do
+    case Sender.package("github_latest_release", url) do
       {:ok, :package, %{"tag_name" => version}} -> select_github_release(url, version)
       _ -> {:error, :select_github_release, :not_found}
     end
@@ -163,7 +173,7 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
 
       data ->
         {:ok, :select_github_release, data,
-         "#{String.replace(String.trim(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
+         "#{String.replace(MishkaInstaller.trim_url(url), "https://github.com/", "https://codeload.github.com/")}/legacy.tar.gz/refs/tags/#{version}"}
     end
   end
 
