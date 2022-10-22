@@ -16,8 +16,8 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
   # TODO: delete this test function
   # TODO: add uoload file
   def test() do
-    # run(:github, "https://github.com/mishka-group/mishka_installer", "0.0.3")
-    run(:hex, "mishka_social", "0.0.2")
+    run(:github, "https://github.com/mishka-group/mishka_installer", "0.0.3")
+    # run(:hex, "mishka_social", "0.0.2")
   end
 
   @spec run(:github | :hex, String.t(), String.t()) ::
@@ -35,6 +35,9 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
     end
   end
 
+  @doc """
+  A function which download a package from Hex/Github and save it in the `deployment/extensions` folder.
+  """
   @spec download(:github | :hex, String.t(), String.t()) ::
           list | {:error, atom(), atom} | {:ok, :download, :github | :hex, map(), map | list()}
   def download(:hex, app, version) do

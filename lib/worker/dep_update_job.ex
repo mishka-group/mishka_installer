@@ -136,6 +136,11 @@ defmodule MishkaInstaller.DepUpdateJob do
     end
   end
 
+  # Skip path type libraries and do not send any request for checking update
+  defp create_update_request(%{"type" => "path"} = json_data) do
+    {:error, {String.to_atom(json_data["app"]), :path, json_data["url"], json_data["version"]}, false}
+  end
+
   defp github_tag({:ok, :package, []}, json_data), do: {:error, :git, json_data, :empty_tag_list}
 
   defp github_tag({:ok, :package, pkg}, json_data) do
