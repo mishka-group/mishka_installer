@@ -2,28 +2,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
   use ExUnit.Case, async: true
   doctest MishkaInstaller
   alias MishkaInstaller.Hook
-  alias MishkaSendingEmailPlugin.{SendingEmail, SendingSMS, SendingHalt}
-
-  setup_all _tags do
-    start_supervised(SendingEmail)
-    start_supervised(SendingSMS)
-    start_supervised(SendingHalt)
-    start_supervised(MishkaInstaller.PluginETS)
-
-    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
-    # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
-    on_exit(fn ->
-      :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
-      # Ecto.Adapters.SQL.Sandbox.mode(Ecto.Integration.TestRepo, :auto)
-      clean_db()
-      :ok
-    end)
-
-    [this_is: "is"]
-  end
 
   @depends ["joomla_login_plugin", "wordpress_login_plugin", "magento_login_plugin"]
-  @new_soft_plugin %MishkaInstaller.PluginState{name: "plugin_hook_one", event: "event_one"}
+  @new_soft_plugin %MishkaInstaller.PluginState{
+    name: "MishkaSendingEmailPlugin.SendingSMS",
+    event: "on_test_event",
+    priority: 1
+  }
 
   @plugins [
     %MishkaInstaller.PluginState{name: "nested_plugin_one", event: "nested_event_one"},
@@ -94,13 +79,48 @@ defmodule MishkaInstallerTest.Event.HookTest do
     %MishkaInstaller.PluginState{name: "five", event: "one", depend_type: :hard, depends: ["one"]}
   ]
 
-  test "register plugin, soft depend_type", %{this_is: _this_is} do
+  @correct_plugins [
+    %MishkaInstaller.PluginState{
+      name: "MishkaSendingEmailPlugin.SendingEmail",
+      event: "on_test_event",
+      priority: 100
+    },
+    %MishkaInstaller.PluginState{
+      name: "MishkaSendingEmailPlugin.SendingHalt",
+      event: "on_test_event",
+      priority: 2
+    },
+    %MishkaInstaller.PluginState{
+      name: "MishkaSendingEmailPlugin.SendingSMS",
+      event: "on_test_event",
+      priority: 1
+    }
+  ]
+
+  @sample_of_login_state %MishkaSendingEmailPlugin.TestEvent{
+    user_info: %{name: "shahryar"},
+    ip: "127.0.1.1",
+    endpoint: :admin,
+    private: %{acl: 0}
+  }
+
+  setup_all do
+    :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
+
+    on_exit(fn ->
+      :ok = Ecto.Adapters.SQL.Sandbox.checkout(Ecto.Integration.TestRepo)
+      clean_db()
+    end)
+
+    [this_is: "is"]
+  end
+
+  test "register plugin, soft depend_type" do
     clean_db()
-    assert Hook.register(event: @new_soft_plugin) == {:ok, :register, :activated}
     assert Hook.register(event: @new_soft_plugin) == {:ok, :register, :activated}
   end
 
-  test "register plugin, hard depend_type", %{this_is: _this_is} do
+  test "register plugin, hard depend_type" do
     clean_db()
 
     # It is just not enough to set hard as depend_type, you should have some deps in depends list more than 0
@@ -115,7 +135,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
       assert Hook.register(event: Map.merge(@new_soft_plugin, %{name: ""}))
   end
 
-  test "start a registerd plugin", %{this_is: _this_is} do
+  test "start a registerd plugin" do
     clean_db()
     Hook.register(event: @new_soft_plugin)
     {:ok, :start, _msg} = assert Hook.start(module: @new_soft_plugin.name)
@@ -132,7 +152,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     {:error, :start, _msg} = assert Hook.start(module: "ensure_event_plugin")
   end
 
-  test "restart a registerd plugin", %{this_is: _this_is} do
+  test "restart a registerd plugin" do
     clean_db()
     Hook.register(event: @new_soft_plugin)
     {:ok, :start, _msg} = assert Hook.start(module: @new_soft_plugin.name)
@@ -150,7 +170,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     {:error, :restart, _msg} = assert Hook.restart(module: "none_plugin")
   end
 
-  test "restart a registerd plugin force type", %{this_is: _this_is} do
+  test "restart a registerd plugin force type" do
     clean_db()
     Hook.register(event: @new_soft_plugin)
     {:ok, :start, _msg} = assert Hook.start(module: @new_soft_plugin.name)
@@ -167,21 +187,21 @@ defmodule MishkaInstallerTest.Event.HookTest do
     {:error, :restart, _msg} = assert Hook.restart(module: "none_plugin", depends: :force)
   end
 
-  test "stop a registerd plugin", %{this_is: _this_is} do
+  test "stop a registerd plugin" do
     clean_db()
     Hook.register(event: @new_soft_plugin)
     {:ok, :stop, _msg} = assert Hook.stop(module: @new_soft_plugin.name)
     {:error, :stop, _msg} = assert Hook.stop(module: "none_plugin")
   end
 
-  test "delete a registerd plugin", %{this_is: _this_is} do
+  test "delete a registerd plugin" do
     clean_db()
     Hook.register(event: @new_soft_plugin)
     {:ok, :delete, _msg} = assert Hook.delete(module: @new_soft_plugin.name)
     {:error, :delete, _msg} = assert Hook.delete(module: "none_plugin")
   end
 
-  test "delete plugins dependencies with dependencies which exist", %{this_is: _this_is} do
+  test "delete plugins dependencies with dependencies which exist" do
     clean_db()
 
     Enum.map(@depends, fn item ->
@@ -239,39 +259,20 @@ defmodule MishkaInstallerTest.Event.HookTest do
   end
 
   test "call event and plugins with halt response" do
-    sample_of_login_state = %MishkaSendingEmailPlugin.TestEvent{
-      user_info: %{name: "shahryar"},
-      ip: "127.0.1.1",
-      endpoint: :admin,
-      private: %{acl: 0}
-    }
-
-    [
-      %MishkaInstaller.PluginState{
-        name: "MishkaSendingEmailPlugin.SendingEmail",
-        event: "on_test_event",
-        priority: 100
-      },
-      %MishkaInstaller.PluginState{
-        name: "MishkaSendingEmailPlugin.SendingHalt",
-        event: "on_test_event",
-        priority: 2
-      },
-      %MishkaInstaller.PluginState{
-        name: "MishkaSendingEmailPlugin.SendingSMS",
-        event: "on_test_event",
-        priority: 1
-      }
-    ]
+    @correct_plugins
     |> Enum.map(&Hook.register(event: &1))
 
-    :timer.sleep(3000)
+    assert Hook.call(event: "return_first_state", state: @sample_of_login_state) ==
+             @sample_of_login_state
+  end
 
-    assert Hook.call(event: "on_test_event", state: sample_of_login_state) ==
-             Map.merge(sample_of_login_state, %{ip: "129.0.1.1"})
+  test "call event and plugins with halt response and changed ip" do
+    {:ok, pid} = start_supervised(MishkaInstaller.PluginETS)
 
-    assert Hook.call(event: "return_first_state", state: sample_of_login_state) ==
-             sample_of_login_state
+    @correct_plugins
+    |> Enum.map(&MishkaInstaller.PluginETS.push(Map.merge(&1, %{parent_pid: pid})))
+
+    assert Hook.call(event: "on_test_event", state: @sample_of_login_state).ip == "129.0.1.1"
   end
 
   test "ensure_event?" do
