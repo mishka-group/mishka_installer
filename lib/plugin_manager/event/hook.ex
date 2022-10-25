@@ -426,6 +426,7 @@ defmodule MishkaInstaller.Hook do
 
   def register(event: %PluginState{} = event, depends: :force) do
     # Create a GenServer with DynamicSupervisor
+    # In force type, developers should put the extension name as an atom like mix.exs
     PluginState.push_call(event)
     # Save all event info into ETS
     PluginETS.push(event)

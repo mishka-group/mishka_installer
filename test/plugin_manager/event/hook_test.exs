@@ -15,14 +15,14 @@ defmodule MishkaInstallerTest.Event.HookTest do
     %MishkaInstaller.PluginState{
       name: "nested_plugin_two",
       event: "nested_event_one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["unnested_plugin_three"]
     },
     %MishkaInstaller.PluginState{
       name: "unnested_plugin_three",
       event: "nested_event_one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["nested_plugin_one"]
     },
@@ -30,7 +30,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     %MishkaInstaller.PluginState{
       name: "unnested_plugin_five",
       event: "nested_event_one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["unnested_plugin_four"]
     }
@@ -42,21 +42,21 @@ defmodule MishkaInstallerTest.Event.HookTest do
     %MishkaInstaller.PluginState{
       name: "three",
       event: "one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["two"]
     },
     %MishkaInstaller.PluginState{
       name: "four",
       event: "one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["three"]
     },
     %MishkaInstaller.PluginState{
       name: "five",
       event: "one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["four"]
     }
@@ -67,21 +67,21 @@ defmodule MishkaInstallerTest.Event.HookTest do
     %MishkaInstaller.PluginState{
       name: "two",
       event: "one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["four"]
     },
     %MishkaInstaller.PluginState{
       name: "three",
       event: "one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["five"]
     },
     %MishkaInstaller.PluginState{
       name: "four",
       event: "one",
-      extension: MishkaInstaller,
+      extension: :mishka_installer,
       depend_type: :hard,
       depends: ["three"]
     },
@@ -225,7 +225,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
         depend_type: :hard,
         depends: List.delete(@depends, item),
         parent_pid: self(),
-        extension: MishkaInstaller
+        extension: :mishka_installer
       })
       |> MishkaInstaller.PluginState.push_call()
     end)
