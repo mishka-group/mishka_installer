@@ -6,7 +6,7 @@ defmodule MishkaInstaller do
   def plugin_activity(action, %PluginState{} = plugin, priority, status \\ "info") do
     MishkaInstaller.Activity.create_activity_by_start_child(
       activity_required_map("plugin", "other", action, priority, status),
-      Map.drop(Map.from_struct(plugin), [:parent_pid])
+      Map.drop(Map.from_struct(plugin), [:parent_pid, :extension])
     )
   end
 

@@ -79,6 +79,7 @@ defmodule MishkaInstaller.PluginState do
   defstruct [
     :name,
     :event,
+    :extension,
     priority: 1,
     status: :started,
     depend_type: :soft,
@@ -95,10 +96,13 @@ defmodule MishkaInstaller.PluginState do
   @type module_name() :: String.t()
   @typedoc "This type can be used when you want to introduce an event name"
   @type event_name() :: String.t()
+  @typedoc "This type can be used when you want to introduce an event owner extension"
+  @type extension() :: String.t()
   @typedoc "This type can be used when you want to introduce an event"
   @type plugin() :: %PluginState{
           name: module_name(),
           event: event_name(),
+          extension: module(),
           priority: integer(),
           status: :started | :stopped | :restarted,
           depend_type: :soft | :hard,

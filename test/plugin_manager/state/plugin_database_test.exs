@@ -16,75 +16,84 @@ defmodule MishkaInstallerTest.State.PluginDatabaseTest do
   end
 
   @depends ["joomla_login_plugin", "wordpress_login_plugin", "magento_login_plugin"]
-  @new_soft_plugin %MishkaInstaller.PluginState{name: "plugin_one", event: "event_one"}
+  @new_soft_plugin %MishkaInstaller.PluginState{name: "plugin_one", event: "event_one", extension: MishkaInstaller,}
 
   @plugins [
-    %MishkaInstaller.PluginState{name: "nested_plugin_one", event: "nested_event_one"},
+    %MishkaInstaller.PluginState{name: "nested_plugin_one", event: "nested_event_one", extension: MishkaInstaller,},
     %MishkaInstaller.PluginState{
       name: "nested_plugin_two",
       event: "nested_event_one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["unnested_plugin_three"]
     },
     %MishkaInstaller.PluginState{
       name: "unnested_plugin_three",
       event: "nested_event_one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["nested_plugin_one"]
     },
-    %MishkaInstaller.PluginState{name: "unnested_plugin_four", event: "nested_event_one"},
+    %MishkaInstaller.PluginState{name: "unnested_plugin_four", event: "nested_event_one", extension: MishkaInstaller,},
     %MishkaInstaller.PluginState{
       name: "unnested_plugin_five",
       event: "nested_event_one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["unnested_plugin_four"]
     }
   ]
 
   @plugins2 [
-    %MishkaInstaller.PluginState{name: "one", event: "one", depend_type: :soft},
-    %MishkaInstaller.PluginState{name: "two", event: "one", depend_type: :hard, depends: ["one"]},
+    %MishkaInstaller.PluginState{name: "one", event: "one", depend_type: :soft, extension: MishkaInstaller,},
+    %MishkaInstaller.PluginState{name: "two", event: "one", depend_type: :hard, depends: ["one"], extension: MishkaInstaller,},
     %MishkaInstaller.PluginState{
       name: "three",
       event: "one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["two"]
     },
     %MishkaInstaller.PluginState{
       name: "four",
       event: "one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["three"]
     },
     %MishkaInstaller.PluginState{
       name: "five",
       event: "one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["four"]
     }
   ]
 
   @plugins3 [
-    %MishkaInstaller.PluginState{name: "one", event: "one", depend_type: :hard, depends: ["two"]},
+    %MishkaInstaller.PluginState{name: "one", event: "one", depend_type: :hard, depends: ["two"], extension: MishkaInstaller,},
     %MishkaInstaller.PluginState{
       name: "two",
       event: "one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["four"]
     },
     %MishkaInstaller.PluginState{
       name: "three",
       event: "one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["five"]
     },
     %MishkaInstaller.PluginState{
       name: "four",
       event: "one",
+      extension: MishkaInstaller,
       depend_type: :hard,
       depends: ["three"]
     },
-    %MishkaInstaller.PluginState{name: "five", event: "one", depend_type: :hard, depends: ["one"]}
+    %MishkaInstaller.PluginState{name: "five", event: "one", depend_type: :hard, depends: ["one"], extension: MishkaInstaller,}
   ]
 
   test "delete plugins dependencies with dependencies which do not exist", %{this_is: _this_is} do
@@ -110,6 +119,7 @@ defmodule MishkaInstallerTest.State.PluginDatabaseTest do
     Enum.map(@depends, fn item ->
       Map.merge(@new_soft_plugin, %{
         name: item,
+        extension: MishkaInstaller,
         depend_type: :hard,
         depends: List.delete(@depends, item),
         parent_pid: self()

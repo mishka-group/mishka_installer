@@ -376,16 +376,15 @@ defmodule MishkaInstaller.Hook do
     extra = (event.extra || []) ++ [%{operations: :hook}, %{fun: :register}]
 
     register_status =
-      with {:ok, :ensure_event, _msg} <- ensure_event(event, :debug),
+      with {:module, module_name} <- Code.ensure_loaded(String.to_atom("Elixir.#{event.name}")),
+           {:application, ex} <- {:application, Application.get_application(module_name)},
+           {:ok, :ensure_event, _msg} <- ensure_event(Map.merge(event, %{extension: ex}), :debug),
            {:error, :get_record_by_field, :plugin} <- Plugin.show_by_name("#{event.name}"),
-           {:ok, :add, :plugin, _record_info} <- Plugin.create(event, @allowed_fields),
-           {:module, module_name} <- Code.ensure_loaded(String.to_atom("Elixir.#{event.name}")),
-           {:get_application, _extension} <-
-             {:get_application, Application.get_application(module_name)} do
+           {:ok, :add, :plugin, _record_info} <- Plugin.create(event, @allowed_fields) do
         # Create a GenServer with DynamicSupervisor
-        PluginState.push_call(event)
+        PluginState.push_call(Map.merge(event, %{extension: ex}))
         # Save all event info into ETS, Existed-key is overwritten
-        PluginETS.push(event)
+        PluginETS.push(Map.merge(event, %{extension: ex}))
         {:ok, :register, :activated}
       else
         {:error, :ensure_event, %{errors: check_data}} ->
@@ -418,8 +417,8 @@ defmodule MishkaInstaller.Hook do
         {:error, :nofile} ->
           {:error, :register, :ensure_loaded}
 
-        {:get_application, false} ->
-          {:error, :register, :get_application}
+        {:application, nil} ->
+          {:error, :register, :application}
       end
 
     register_status
