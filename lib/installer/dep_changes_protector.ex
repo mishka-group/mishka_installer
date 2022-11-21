@@ -408,7 +408,7 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   defp add_extensions_when_server_reset(state) do
-    # TODO: add status for each app is active or stopped, not load them in nex version
+    # TODO: add status for each app is active or stopped, not load them in next version
     # TODO: save log and activity
     if Mix.env() != :test do
       Logger.warn("Try to re-add installed extensions")

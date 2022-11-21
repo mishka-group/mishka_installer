@@ -232,7 +232,6 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     |> Enum.reject(&is_nil(&1))
   end
 
-  # TODO: test this function with new changes
   @doc """
   This aggregator function is an action function to download and compile requested dependencies.
   You can decide what your default output is. It should be noted that this part of the project

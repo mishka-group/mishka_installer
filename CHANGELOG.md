@@ -9,11 +9,11 @@
 - [x] Format project `mix format`
 - [x] Add description of each dependency in GUI
 - [x] Fix and Improve `MishkaInstaller.DepUpdateJob`
+- [x] Add status changer in DepGetter module from state
 - [ ] Change English README for version 0.0.4
 - [ ] Change Persian README for version 0.0.4
 - [ ] Add English introduction video version 0.0.4
 - [ ] Add Persian introduction video version 0.0.4
-- [ ] Add status changer in DepGetter module from state
 - [ ] Test version 0.0.4 with credo
 - [ ] Create events for each part of MishkaInstaller to let developers extend installer
 
