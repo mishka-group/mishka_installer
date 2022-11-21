@@ -17,7 +17,7 @@ defmodule MishkaInstaller.Database.DependencySchema do
     field(:url, :string)
     field(:git_tag, :string)
     field(:custom_command, :string)
-    field(:dependencies, {:array, :map})
+    field(:dependencies, {:array, :map}, default: [])
 
     timestamps(type: :utc_datetime)
   end

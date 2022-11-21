@@ -722,7 +722,7 @@ defmodule MishkaInstaller.Installer.DepHandler do
 
   # Ref: https://elixirforum.com/t/how-to-improve-sort-of-maps-in-a-list-which-have-duplicate-key/47486
   defp merge_json_by_min_version(json_data) do
-    Enum.flat_map(json_data, & &1["dependencies"])
+    Enum.flat_map(json_data, & &1["dependencies"] || [])
     |> Enum.group_by(& &1["app"])
     |> Enum.map(fn {_key, list} ->
       Enum.max_by(list, & &1["min"], Version)
