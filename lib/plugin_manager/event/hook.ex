@@ -460,8 +460,11 @@ defmodule MishkaInstaller.Hook do
   MishkaInstaller.Hook.start(event: "on_user_after_login", depends: :force)
   ```
   """
-  @spec start([{:depends, :force} | {:event, event()} | {:module, plugin() | {:extension, atom}}]) ::
-          list | {:error, :start, any()} | {:ok, :start, :force | String.t()}
+  @spec start([
+          {:depends, :force} | {:event, event()} | {:extension, atom} | {:module, plugin()},
+          ...
+        ]) ::
+          list | {:error, :start, binary | [...]} | {:ok, :start, :force | binary}
   def start(module: module_name) do
     with {:ok, :get_record_by_field, :plugin, record_info} <-
            Plugin.show_by_name("#{module_name}"),
@@ -700,7 +703,7 @@ defmodule MishkaInstaller.Hook do
   MishkaInstaller.Hook.delete(event: "on_user_after_login")
   ```
   """
-  @spec delete([{:event, event()} | {:module, plugin() | {:extension, atom}}]) ::
+  @spec delete([{:event, event()} | {:extension, atom} | {:module, plugin()}, ...]) ::
           list | {:error, :delete, String.t()} | {:ok, :delete, String.t()}
   def delete(module: module_name) do
     case PluginState.delete(module: module_name) do

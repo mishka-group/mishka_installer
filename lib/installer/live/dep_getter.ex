@@ -359,6 +359,7 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
         |> Path.join(["#{app}"])
         |> File.rm_rf()
 
+        Hook.delete(extension: String.to_atom(app))
         MishkaInstaller.Dependency.delete(record_info.id)
     end
 
@@ -381,12 +382,11 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("app_action", %{"operation" => "start", "app" => app}, socket) do
-    # TODO: change the status of app in state if exists
-    # TODO: send request to ETS and disable all the plugin
-    # TODO: send request to PluginState and disable all the plugin
     new_socket =
       case Application.start(String.to_atom(app)) do
         :ok ->
+          Hook.start(extension: String.to_atom(app))
+
           socket
           |> assign(
             :status_message,
@@ -432,10 +432,11 @@ defmodule MishkaInstaller.Installer.Live.DepGetter do
 
   @impl Phoenix.LiveView
   def handle_event("app_action", %{"operation" => "stop", "app" => app}, socket) do
-    # TODO: change the status of app in state if exists
     new_socket =
       case Application.stop(String.to_atom(app)) do
         :ok ->
+          Hook.stop(extension: String.to_atom(app))
+
           socket
           |> assign(
             :status_message,

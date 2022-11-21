@@ -136,7 +136,7 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
     test "Compare sub dependencies with json", %{repo_data: _repo_data} do
       DepHandler.create_deps_json_file(File.cwd!())
       DepHandler.check_or_create_deps_json()
-      IO.inspect(DepHandler.compare_sub_dependencies_with_json(), label: "test compaire")
+
       [
         %{
           app: :plug,
