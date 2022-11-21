@@ -700,7 +700,7 @@ defmodule MishkaInstaller.Hook do
   MishkaInstaller.Hook.delete(event: "on_user_after_login")
   ```
   """
-  @spec delete([{:event, event()} | {:module, plugin()}]) ::
+  @spec delete([{:event, event()} | {:module, plugin() | {:extension, atom}}]) ::
           list | {:error, :delete, String.t()} | {:ok, :delete, String.t()}
   def delete(module: module_name) do
     case PluginState.delete(module: module_name) do
