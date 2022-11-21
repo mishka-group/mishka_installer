@@ -11,7 +11,11 @@ defmodule MishkaInstallerTest.Event.HookTest do
   }
 
   @plugins [
-    %MishkaInstaller.PluginState{name: "nested_plugin_one", event: "nested_event_one", extension: MishkaInstaller},
+    %MishkaInstaller.PluginState{
+      name: "nested_plugin_one",
+      event: "nested_event_one",
+      extension: MishkaInstaller
+    },
     %MishkaInstaller.PluginState{
       name: "nested_plugin_two",
       event: "nested_event_one",
@@ -85,7 +89,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
       depend_type: :hard,
       depends: ["three"]
     },
-    %MishkaInstaller.PluginState{name: "five", event: "one", depend_type: :hard, depends: ["one"], extension: MishkaInstaller}
+    %MishkaInstaller.PluginState{
+      name: "five",
+      event: "one",
+      depend_type: :hard,
+      depends: ["one"],
+      extension: MishkaInstaller
+    }
   ]
 
   @correct_plugins [

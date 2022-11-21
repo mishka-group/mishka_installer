@@ -460,7 +460,7 @@ defmodule MishkaInstaller.Hook do
   MishkaInstaller.Hook.start(event: "on_user_after_login", depends: :force)
   ```
   """
-  @spec start([{:depends, :force} | {:event, event()} | {:module, plugin()}]) ::
+  @spec start([{:depends, :force} | {:event, event()} | {:module, plugin() | {:extension, atom}}]) ::
           list | {:error, :start, any()} | {:ok, :start, :force | String.t()}
   def start(module: module_name) do
     with {:ok, :get_record_by_field, :plugin, record_info} <-
@@ -513,6 +513,10 @@ defmodule MishkaInstaller.Hook do
   def start(event: event) do
     Plugin.plugins(event: event)
     |> Enum.map(&start(module: &1.name))
+  end
+
+  def start(extension: extension) do
+    get_app_by_extension(extension, :start)
   end
 
   def start(event: event, depends: :force) do
@@ -650,7 +654,7 @@ defmodule MishkaInstaller.Hook do
   MishkaInstaller.Hook.stop(event: "on_user_after_login")
   ```
   """
-  @spec stop([{:event, event()} | {:module, plugin()}]) ::
+  @spec stop([{:event, event()} | {:module, plugin()} | {:extension, atom}]) ::
           list | {:error, :stop, String.t()} | {:ok, :stop, String.t()}
   def stop(module: module_name) do
     case PluginState.stop(module: module_name) do
@@ -672,6 +676,10 @@ defmodule MishkaInstaller.Hook do
            "The module concerned doesn't exist in database."
          )}
     end
+  end
+
+  def stop(extension: extension) do
+    get_app_by_extension(extension, :stop)
   end
 
   def stop(event: event_name) do
@@ -723,6 +731,10 @@ defmodule MishkaInstaller.Hook do
     |> Enum.map(&delete(module: &1.id))
   end
 
+  def delete(extension: extension) do
+    get_app_by_extension(extension, :delete)
+  end
+
   @doc """
   This function is very similar to the `delete/1` command; however, in addition to removing the plugin from the system,
   it also removes the plugin from the database.
@@ -735,7 +747,7 @@ defmodule MishkaInstaller.Hook do
   MishkaInstaller.Hook.unregister(event: "on_user_after_login")
   ```
   """
-  @spec unregister([{:event, event()} | {:module, plugin()}]) ::
+  @spec unregister([{:event, event()} | {:module, plugin()} | {:extension, atom}]) ::
           list | {:error, :unregister, any} | {:ok, :unregister, Stream.timer()}
   def unregister(module: module_name) do
     with {:ok, :delete, _msg} <- delete(module: module_name),
@@ -782,6 +794,10 @@ defmodule MishkaInstaller.Hook do
   def unregister(event: event_name) do
     Plugin.plugins(event: event_name)
     |> Enum.map(&unregister(module: &1.name))
+  end
+
+  def unregister(extension: extension) do
+    get_app_by_extension(extension, :unregister)
   end
 
   @doc """
@@ -1037,6 +1053,17 @@ defmodule MishkaInstaller.Hook do
       extra: Map.get(output, :extra) || [],
       parent_pid: Map.get(output, :parent_pid)
     }
+  end
+
+  defp get_app_by_extension(extension, callback) do
+    Plugin.plugins()
+    |> Enum.map(fn plg ->
+      with {:module, module_name} <- Code.ensure_loaded(String.to_atom("Elixir.#{plg.name}")),
+           {:application, ex} <- {:application, Application.get_application(module_name)},
+           {:extension, true} <- {:extension, ex == extension} do
+        apply(__MODULE__, callback, module: plg.name)
+      end
+    end)
   end
 
   @doc false
