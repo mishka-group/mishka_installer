@@ -79,7 +79,7 @@ defmodule MishkaInstaller do
         module
 
       {:error, _} ->
-        raise "This module does not exist or is not configured if it is related to Ecto. Please read the documentation at GitHub."
+        raise "This module does not exist or is not configured if it is related to Ecto. Please read the documentation at GitHub #{inspect(module)}."
     end
   end
 
