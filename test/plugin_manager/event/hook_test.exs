@@ -242,7 +242,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
     # it tests MishkaInstaller.Plugin.delete_plugins
     Hook.unregister(module: List.first(@depends))
-    assert length(MishkaInstaller.Plugin.plugins()) == 0
+    assert Enum.empty?(MishkaInstaller.Plugin.plugins())
   end
 
   test "delete plugins dependencies with nested dependencies which exist, strategy one", %{
@@ -264,7 +264,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     Enum.map(@plugins2, fn item -> MishkaInstaller.PluginState.push_call(item) end)
     # it tests MishkaInstaller.Plugin.delete_plugins
     Hook.unregister(module: "one")
-    assert length(MishkaInstaller.Plugin.plugins()) == 0
+    assert Enum.empty?(MishkaInstaller.Plugin.plugins())
   end
 
   test "delete plugins dependencies with nested dependencies which exist, strategy three", %{
@@ -275,7 +275,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     Enum.map(@plugins3, fn item -> MishkaInstaller.PluginState.push_call(item) end)
     # it tests MishkaInstaller.Plugin.delete_plugins
     Hook.unregister(module: "five")
-    assert length(MishkaInstaller.Plugin.plugins()) == 0
+    assert Enum.empty?(MishkaInstaller.Plugin.plugins())
   end
 
   test "call event and plugins with halt response" do

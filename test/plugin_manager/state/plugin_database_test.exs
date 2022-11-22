@@ -163,7 +163,7 @@ defmodule MishkaInstallerTest.State.PluginDatabaseTest do
     end)
 
     MishkaInstaller.Plugin.delete_plugins(List.first(@depends))
-    assert length(MishkaInstaller.Plugin.plugins()) == 0
+    assert Enum.empty?(MishkaInstaller.Plugin.plugins())
   end
 
   test "delete plugins dependencies with nested dependencies which exist, strategy one", %{
@@ -193,7 +193,7 @@ defmodule MishkaInstallerTest.State.PluginDatabaseTest do
     Enum.map(@plugins3, fn x -> Map.from_struct(x) |> MishkaInstaller.Plugin.create() end)
     Enum.map(@plugins3, fn item -> MishkaInstaller.PluginState.push_call(item) end)
     MishkaInstaller.Plugin.delete_plugins("five")
-    assert length(MishkaInstaller.Plugin.plugins()) == 0
+    assert Enum.empty?(MishkaInstaller.Plugin.plugins())
   end
 
   def clean_db() do
