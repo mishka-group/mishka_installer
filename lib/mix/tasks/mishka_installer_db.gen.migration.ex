@@ -1,4 +1,7 @@
 defmodule Mix.Tasks.MishkaInstaller.Db.Gen.Migration do
+  @moduledoc """
+  Generates MishkaInstallers required migrations.
+  """
   @shortdoc "Generates MishkaInstallers required migrations."
 
   use Mix.Task

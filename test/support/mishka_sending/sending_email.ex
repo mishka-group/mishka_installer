@@ -1,4 +1,5 @@
 defmodule MishkaSendingEmailPlugin.SendingEmail do
+  @moduledoc false
   # This module was just made for testing
   alias MishkaSendingEmailPlugin.TestEvent
 

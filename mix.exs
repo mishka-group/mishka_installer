@@ -42,7 +42,8 @@ defmodule MishkaInstaller.MixProject do
       {:sourceror, "~> 0.11.2"},
       {:ets, "~> 0.9.0"},
       {:oban, "~> 2.13"},
-      {:gettext, "~> 0.20.0"}
+      {:gettext, "~> 0.20.0"},
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
     ]
   end
 

@@ -1,4 +1,7 @@
 defmodule MishkaInstaller do
+  @moduledoc """
+  it should be complete
+  """
   alias MishkaInstaller.PluginState
 
   @spec plugin_activity(String.t(), PluginState.t(), String.t(), String.t()) ::

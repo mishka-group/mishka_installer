@@ -141,10 +141,8 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
   end
 
   defp file_write(app, version, downloaded_app_body) do
-    with {:error, posix} <-
-           File.write("#{extensions_path()}/#{app}-#{version}.tar.gz", downloaded_app_body) do
-      {:error, :file_write, posix}
-    else
+    case File.write("#{extensions_path()}/#{app}-#{version}.tar.gz", downloaded_app_body) do
+      {:error, posix} -> {:error, :file_write, posix}
       _ -> {:ok, :file_write}
     end
   end

@@ -495,14 +495,14 @@ defmodule MishkaInstaller.Hook do
   end
 
   def start(module: module_name, depends: :force) do
-    with {:ok, :get_record_by_field, :plugin, record_info} <-
-           Plugin.show_by_name("#{module_name}") do
-      # Create a GenServer with DynamicSupervisor
-      PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
-      # Save all event info into ETS, Existed-key is overwritten
-      PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
-      {:ok, :start, :force}
-    else
+    case Plugin.show_by_name("#{module_name}") do
+      {:ok, :get_record_by_field, :plugin, record_info} ->
+        # Create a GenServer with DynamicSupervisor
+        PluginState.push_call(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
+        # Save all event info into ETS, Existed-key is overwritten
+        PluginETS.push(plugin_state_struct(record_info) |> Map.merge(%{status: :started}))
+        {:ok, :start, :force}
+
       {:error, :get_record_by_field, :plugin} ->
         {:error, :start,
          Gettext.dgettext(
