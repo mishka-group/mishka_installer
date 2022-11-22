@@ -264,7 +264,11 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
     end
   after
     # Maybe a developer does not consider changed-path, so for preventing issues we back to the project path after each compiling
-    File.cd(MishkaInstaller.get_config(:project_path))
+    if Code.ensure_loaded?(MishkaInstaller) && function_exported?(MishkaInstaller, :get_config, 1) do
+      File.cd(MishkaInstaller.get_config(:project_path))
+    else
+      File.cd(System.get_env("INSTALLER_PROJECT_PATH"))
+    end
   end
 
   @doc """
@@ -354,7 +358,11 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
       System.cmd(operation, [command],
         into: IO.stream(),
         stderr_to_stdout: true,
-        env: [{"MIX_ENV", "#{Mix.env()}"}]
+        env: [
+          {"MIX_ENV", "#{Mix.env()}"},
+          {"INSTALLER_DB", "#{MishkaInstaller.repo()}"},
+          {"INSTALLER_PROJECT_PATH", "#{MishkaInstaller.get_config(:project_path)}"}
+        ]
       )
 
     if status == 0, do: :ok, else: {:error, fn_atom, app, operation: command, output: stream}
@@ -371,7 +379,11 @@ defmodule MishkaInstaller.Installer.RunTimeSourcing do
         :exit_status,
         args: [command],
         line: 1000,
-        env: [{'MIX_ENV', '#{Mix.env()}'}]
+        env: [
+          {'MIX_ENV', '#{Mix.env()}'},
+          {'INSTALLER_DB', '#{MishkaInstaller.repo()}'},
+          {'INSTALLER_PROJECT_PATH', '#{MishkaInstaller.get_config(:project_path)}'}
+        ]
       ])
 
     start_exec_satet([])

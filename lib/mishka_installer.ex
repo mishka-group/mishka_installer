@@ -58,9 +58,20 @@ defmodule MishkaInstaller do
   end
 
   def repo() do
+    env_db = "#{System.get_env("INSTALLER_DB")}" |> String.replace("Elixir.", "")
+
     case MishkaInstaller.get_config(:repo) do
-      nil -> if Mix.env() != :prod, do: Ecto.Integration.TestRepo, else: ensure_compiled(nil)
-      value -> value
+      nil ->
+        if Mix.env() == :test,
+          do: Ecto.Integration.TestRepo,
+          else:
+            if(env_db != "",
+              do: String.to_atom("Elixir.#{env_db}"),
+              else: ensure_compiled(nil)
+            )
+
+      value ->
+        value
     end
   end
 
@@ -79,7 +90,7 @@ defmodule MishkaInstaller do
         module
 
       {:error, _} ->
-        raise "This module does not exist or is not configured if it is related to Ecto. Please read the documentation at GitHub #{inspect(module)}."
+        raise "This module does not exist or is not configured if it is related to Ecto. Please read the documentation at GitHub. \n Output: #{inspect(module)}."
     end
   end
 
