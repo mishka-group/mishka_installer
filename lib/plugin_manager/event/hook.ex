@@ -1064,7 +1064,7 @@ defmodule MishkaInstaller.Hook do
       with {:module, module_name} <- Code.ensure_loaded(String.to_atom("Elixir.#{plg.name}")),
            {:application, ex} <- {:application, Application.get_application(module_name)},
            {:extension, true} <- {:extension, ex == extension} do
-        apply(__MODULE__, callback, module: plg.name)
+        apply(__MODULE__, callback, [[module: plg.name]])
       end
     end)
   end
