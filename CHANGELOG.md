@@ -1,3 +1,20 @@
+# Changelog for MishkaInstaller 0.0.5
+
+- [ ] Create events for each part of MishkaInstaller to let developers extend installer
+- [ ] Create middleware event for all plugins `call` method
+- [ ] Re-write all the tests about `Genserver` and another `OTP` stuff
+- [ ] Re-adding extensions based on priority
+- [ ] Update Phoenix `LiveView` to 0.18.2
+- [ ] Check how to use `Flame On` as a plugin for MishkaInstaller
+- [ ] Separate sub-dependencies with user installed-dependencies in GUI
+- [ ] Add JSON API for admin
+- [ ] Create events for each page to let developers extend installer
+- [ ] How to display the consumption of an application
+- [ ] Consolidate and rebuild all `‍activities` with a specific structure
+- [ ] Check `libgraph` for dependencies and plugin connections
+
+---
+
 # Changelog for MishkaInstaller 0.0.4
 
 - [x] Improve runtime sourcing module
@@ -15,7 +32,6 @@
 - [ ] Add English introduction video version 0.0.4
 - [ ] Add Persian introduction video version 0.0.4
 - [ ] Test version 0.0.4 with credo
-- [ ] Create events for each part of MishkaInstaller to let developers extend installer
 
 ---
 
