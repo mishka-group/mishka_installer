@@ -130,7 +130,6 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
       DepHandler.create_deps_json_file(File.cwd!())
       DepHandler.check_or_create_deps_json()
       [] = assert DepHandler.compare_dependencies_with_json()
-      # TODO: Add a test consider installed app
     end
 
     test "Compare sub dependencies with json", %{repo_data: _repo_data} do
@@ -147,8 +146,6 @@ defmodule MishkaInstallerTest.Installer.DepHandler do
           min_status: :lt
         }
       ] = assert DepHandler.compare_sub_dependencies_with_json()
-
-      # TODO: Add a test consider installed app with sub dependencies
     end
 
     test "Get deps from mix", %{repo_data: _repo_data} do

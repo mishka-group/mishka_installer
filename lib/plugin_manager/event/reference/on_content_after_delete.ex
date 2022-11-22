@@ -1,5 +1,4 @@
 defmodule MishkaInstaller.Reference.OnContentAfterDelete do
-  # TODO: it needs html render
   @moduledoc """
     With the help of this event, you can have information about the content that will be deleted in your plugin.
     This event has no return output. Please use the `operation: :no_return` flag.

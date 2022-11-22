@@ -2,8 +2,6 @@ defmodule MishkaInstaller.Helper.LibraryMaker do
   @moduledoc """
   You can find some utility functions in this module which help you to download dependencies from Hex and GitHub and prepare them as library.
 
-  # TODO: unziper into RunTimeSourcing module
-
   ### Testing resource
   - MishkaInstaller.Helper.Sender.package("hex", %{"app" => "req"})
   - https://hex.pm/api/packages/req/releases/0.1.0

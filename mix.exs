@@ -18,8 +18,9 @@ defmodule MishkaInstaller.MixProject do
       xref: [exclude: [EctoEnum.Use]],
       docs: [
         main: "MishkaInstaller",
+        source_ref: "master",
         extras: ["README.md"],
-        source_ref: "master"
+        source_url: "https://github.com/mishka-group/mishka_installer"
       ]
     ]
   end

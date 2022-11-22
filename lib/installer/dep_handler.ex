@@ -480,7 +480,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
     end
   end
 
-  # TODO: it needs to use reverse with output to be improved like `MishkaInstaller.Installer.RunTimeSourcing.do_deps_compile` function.
   @doc """
   With this function, you can check and create `extensions.json` and its path.
 
@@ -955,7 +954,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
           end
 
         {:error, action, :dependency, _repo_error} when action in [:add, :edit] ->
-          # TODO: save it in activities
           {:error,
            Gettext.dgettext(
              MishkaInstaller.gettext(),
@@ -964,7 +962,6 @@ defmodule MishkaInstaller.Installer.DepHandler do
            )}
 
         {:error, _action, reason, _error_tag} when reason in [:uuid, :get_record_by_id] ->
-          # TODO: save it in activities
           {:error,
            Gettext.dgettext(
              MishkaInstaller.gettext(),

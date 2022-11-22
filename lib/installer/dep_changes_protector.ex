@@ -171,7 +171,6 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info({_ref, {:installing_app, app_name, _move_apps, app_res}}, state) do
-    # TODO: problem with dependency_activity to store output of errors
     case app_res do
       {:ok, :application_ensure} ->
         notify_subscribers({:ok, app_res, app_name})
@@ -234,7 +233,6 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
 
   @impl true
   def handle_info(_param, state) do
-    # TODO: it should be loged
     Logger.info("We have an uncontrolled output")
     {:noreply, state}
   end
@@ -311,7 +309,6 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
            Dependency.change_dependency_type_with_app(app_name, dependency_type) do
       json_check_and_create()
 
-      # TODO: it should be changed to outofproject
       with {:ok, :compare_installed_deps_with_app_file, apps_list} <-
              DepHandler.compare_installed_deps_with_app_file("#{app_name}") do
         Task.Supervisor.async_nolink(DepChangesProtectorTask, fn ->
@@ -408,8 +405,6 @@ defmodule MishkaInstaller.Installer.DepChangesProtector do
   end
 
   defp add_extensions_when_server_reset(state) do
-    # TODO: add status for each app is active or stopped, not load them in next version
-    # TODO: save log and activity
     if Mix.env() != :test do
       Logger.warn("Try to re-add installed extensions")
 
