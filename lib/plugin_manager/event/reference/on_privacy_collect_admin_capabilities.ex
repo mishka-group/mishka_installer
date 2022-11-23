@@ -1,2 +1,0 @@
-defmodule MishkaInstaller.Reference.OnPrivacyCollectAdminCapabilities do
-end
