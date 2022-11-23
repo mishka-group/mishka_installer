@@ -172,7 +172,11 @@ And add these config in your project like `/config/config.exs`
 config :mishka_installer, :basic,
   repo: YOUR_Repo,
   pubsub: YOUR_PUBSUB or nil,
-  html_router: YOUR_WEBSITE_ROUTER_MODULE
+  html_router: YOUR_WEBSITE_ROUTER_MODULE,
+  project_path: YOUR_PROJECT_PATH,
+  mix: YOUR_MIX_MODULE,
+  mix_path: YOUR_MIX_EXS_PATH,
+  gettext: YOUR_GETTEXT
 ```
 
 > **Because there are a lot of moving elements in this plugin, you need to read the documentation before using it.**
