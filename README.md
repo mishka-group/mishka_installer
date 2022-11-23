@@ -8,7 +8,7 @@
 Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and `SMS`; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code. 
 > We have used this library in the [Mishka content management system](https://github.com/mishka-group/mishka-cms).
 
-**NOTICE: Do not use the master branch; this library is under heavy development.** Expect version 0.0.3, and for using the new features, please wait until a new release is out.
+**NOTICE: Do not use the master branch; this library is under heavy development.** Expect version 0.0.4, and for using the new features, please wait until a new release is out.
 
 ### Plugin management system theory and installation of Elixir libraries at `runtime`
 ---
