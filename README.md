@@ -179,6 +179,9 @@ config :mishka_installer, :basic,
   gettext: YOUR_GETTEXT
 ```
 
+> If you are using Phoenix as developer mode, please disable `live_reload` in `dev.exs`.
+> Please add `reloadable_apps: [:mishka_installer]` to your endpoint config in `config.exs` file.
+
 > **Because there are a lot of moving elements in this plugin, you need to read the documentation before using it.**
 
 You can see our recommendations and other colleagues in the [Proposal](https://github.com/mishka-group/Proposals) repository, and if you have a request or idea, send us the full description.
