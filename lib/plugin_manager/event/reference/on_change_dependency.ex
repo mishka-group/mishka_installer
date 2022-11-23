@@ -1,5 +1,7 @@
 defmodule MishkaInstaller.Reference.OnChangeDependency do
   @moduledoc """
+    **Note**: Please do not use it, it will be changed in the next version
+
     This event is kicked off anytime a plugin is moved into the installation or update stage of the process.
     In the event that a plugin from this area is carrying out the after completing all the above-mentioned procedures,
     the developer will have access to the output in real time.

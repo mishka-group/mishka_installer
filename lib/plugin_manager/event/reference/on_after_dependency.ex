@@ -1,12 +1,6 @@
 defmodule MishkaInstaller.Reference.OnAfterDependency do
   @moduledoc """
-    This event is kicked off anytime a plugin is moved into the installation or update stage of the process.
-    In the event that a plugin from this area is carrying out the after completing all the above-mentioned procedures,
-    the developer will have access to the output after processing finished.
-
-    **Note**: Treat this event as a no return flag while analyzing it.
-
-    It is currently being renovated, and in the future it might look different.
+    **Note**: Please do not use it, it will be changed in the next version
   """
   defstruct [:app, :status, :output]
 
