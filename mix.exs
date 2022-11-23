@@ -1,6 +1,6 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
-  @version "0.0.4-beta.4"
+  @version "0.0.4"
 
   def project do
     [

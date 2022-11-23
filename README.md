@@ -5,20 +5,22 @@
 ## Build purpose
 ---
 
-Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and SMS; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code. 
+Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and `SMS`; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code. 
 > We have used this library in the [Mishka content management system](https://github.com/mishka-group/mishka-cms).
 
 **NOTICE: Do not use the master branch; this library is under heavy development.** Expect version 0.0.3, and for using the new features, please wait until a new release is out.
 
-## Plugin management system implementation theory
+### Plugin management system theory and installation of Elixir libraries at `runtime`
 ---
-The library categorizes your whole software design structure into many parts; and has an appropriate dependency that is optional with `Genserver`; it considers a monitoring branch for each of your plugins, which results in fewer errors and `downtime`. The considered part:
+The functionality of this library can be conceptualized as an architectural potential that is composed of two primary components, which are as follows:
+1. Event management
+2. Managing removal and installation of Elixir plugins without `downtime`.
 
-1. Behaviors and events
-2. Recalling or `Hook` with priority
-3. `State` management and links to the database (`PostgreSQL` support)
+When a programmer uses this library for his own software development, we sought to ensure that in addition to the established capabilities, he also has access to a set of appropriate standards for software development that are based on preset behaviors that can be applied. This was our goal. It streamlines and organizes the work of a group working on a project while also facilitating the creation of software.
 
-Except from the 1st item, which can be redefined based on the developer's needs in his/her personal systems, the remaining items are almost constant, and a lot of functions will be handed to the developer to manage each plugin.
+Error control and tree structure, which enable us to develop a system that is robust and trustworthy, are two of the guiding ideas behind the construction of this library, which has garnered attention from people all around the world.
+The MishkaInstaller library can be created in various systems, and it provides fundamental capabilities such as the management of plugin states and the application of standard behaviors. These features can all be accessed by specified hooks in the library.
+
 
 ## Behaviors and events
 ---
@@ -30,11 +32,11 @@ This helps you have a regular and error-free system, and the library uses an alm
 In Mishka Elixir Plugin Management Library, a series of action or `hook` functions are given to the developer of the main plugin or software, which helps build plugins outside the system and convert software sections into separate `events`. Some of the functions of this module include the following:
 
 1. Registering a plugin outside of the system in database and ram `state`
-2. Removing plugin from database and `state`
-3. Restoring plugin
-4. Successful pause of plugin
-5. `Hook` plugin
-6. Search among the `events`
+3. Removing plugin from database and `state`
+4. Restoring plugin
+5. Successful pause of plugin
+6. `Hook` plugin
+7. Search among the `events`
 
 And other functions that help both the mother software become an event-driven system and the developer can build the desired plugin or extension for different parts of the software and install it on the system as a separate package. This package can also be published in `hex`.
 
@@ -44,6 +46,29 @@ And other functions that help both the mother software become an event-driven sy
 The `Hook` module manages a large part of this part, and the developer of the external plugin usually does not need it much. Still, this part creates a `state` on RAM for each plugin that is activated in a specific event and a dynamic supervisor for it. This allows us in case of an error in each plugin; the other plugins in the different events face no errors, and the system will try to restart with various strategies. 
 It should be noted for more stability and data storage after registering a plugin in the system; This section also maintains a backup copy of the database and strategies for recall in the event in case of an error. But to speed up the calling of each plugin, the website always uses `state`.
 
+---
+
+## Managing removal and installation of Elixir plugins without `downtime`
+
+Through the use of event management, you are able to convert any portion of your program into a standalone event based on the specific requirements of the strategy, and you are also able to activate an endless number of modules or plugins for each event. However, if you do not perform installation at runtime, you will need to ensure that you call all of the necessary plugins in addition to the primary source when you start the software. One example of this would be installing an Elixir library in the `mix.exs` file.
+
+By utilizing this capability, you will be able to add your program to the system and manage it after adding it, even if your software is already operating. The following are examples of management facilities that may be included:
+
+1. Register a plugin for a specified event
+2. Activate the plugin for the installation
+3. Put an end to the installation of plugins
+4. Resetting the configuration plugin used during installation
+5. Uninstall the currently active plugin.
+6. Manage the plugin's requirements after they have been installed.
+7. Keeping an eye on the graphic panel and demonstrating it to the site managers
+
+And there are other scenarios that are known as APIs or Hooks to the software developer and management, and making use of them is a pretty straightforward process.
+It is important to note that this capability does not involve Erlang's hot coding and that it can only be used to install an Elixir library. Additionally, it is still in the process of being developed and is now in an experimental stage. If you use the software, you need to make sure you have a backup of it. At the moment, it is merely in the testing phase of its development, which consists of trial and error.
+
+> **To use this section, please read the documentation of this library**
+
+---
+
 ## Installing the library:
 ---
 It should be noted that this library must be installed in two parts of the plugin and the software that wants to display the plugins, and due to its small dependencies, it does not cause any problems. To install, just add this library to your "mix.exs" in the "deps" function as follows:
@@ -51,12 +76,12 @@ It should be noted that this library must be installed in two parts of the plugi
 ```elixir
 def deps do
   [
-    {:mishka_installer, "~> 0.0.3"}
+    {:mishka_installer, "~> 0.0.4"}
   ]
 end
 ```
 
-## Using the library:
+## Using the library for extension creation and event activation:
 ---
 
 After installing this library, you must first install the required database of this package on your website, for which a `mix task` has been created, which is enough to load it once in your terminal, in the project path before the start.
@@ -149,6 +174,8 @@ config :mishka_installer, :basic,
   pubsub: YOUR_PUBSUB or nil,
   html_router: YOUR_WEBSITE_ROUTER_MODULE
 ```
+
+> **Because there are a lot of moving elements in this plugin, you need to read the documentation before using it.**
 
 You can see our recommendations and other colleagues in the [Proposal](https://github.com/mishka-group/Proposals) repository, and if you have a request or idea, send us the full description.
 
