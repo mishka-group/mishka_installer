@@ -1,17 +1,7 @@
 defmodule MishkaInstaller.Installer.PortHandler do
   @moduledoc false
-
-  # Elixir part of a generic port implementation. This module is meant to be used with a Java port
-  # powered by the `PortDriver` class. For example implementations, see `KafkaClient.Admin` or
-  # `KafkaClient.Consumer.Poller`.
-  #
-  # Basic usage:
-  #
-  # 1. `use KafkaClient.GenPort`. This implicitly injects `use GenServer` to the module, i.e.
-  #    the callback module will also be a GenServer.
-  # 2. Implement the `handle_port_message` callback.
-  # 3. Implement other GenServer callbacks, such as `init/1`, `handle_call`, etc.
-  # Based on https://github.com/happening-oss/kafka-client/blob/70ebc28f9ea99d43bf5754ff935e7f38afcb2554/lib/kafka_client/gen_port.ex
+  # Based on
+  # https://github.com/happening-oss/kafka-client/blob/develop/lib/kafka_client/gen_port.ex
 
   use GenServer
   require Logger
@@ -138,7 +128,7 @@ defmodule MishkaInstaller.Installer.PortHandler do
     duration = System.convert_time_unit(duration, :nanosecond, :native)
 
     :telemetry.execute(
-      [:kafka_client, :consumer, :port, :stop],
+      [:mishka_client, :consumer, :port, :stop],
       %{
         system_time: System.system_time(),
         transfer_time: transfer_time,
@@ -164,7 +154,7 @@ defmodule MishkaInstaller.Installer.PortHandler do
         packet: 4,
         args: [
           "-cp",
-          "#{Application.app_dir(:kafka_client)}/priv/kafka-client-1.0.jar",
+          "#{Application.app_dir(:mishka_client)}/priv/kafka-client-1.0.jar",
           "com.happening.kafka.#{main_class}" | encoded_args
         ]
       ]

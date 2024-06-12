@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.Helper.ModuleStateCompiler do
+defmodule MishkaInstaller.Event.ModuleStateCompiler do
   @state_dir "MishkaInstaller.Helper.ModuleStateCompiler.State."
 
   ####################################################################################

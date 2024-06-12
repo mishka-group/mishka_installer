@@ -26,7 +26,6 @@ defmodule MishkaInstaller.MixProject do
     ]
   end
 
-  # Run "mix help compile.app" to learn about applications.
   def application do
     [
       extra_applications: [:logger],
@@ -34,9 +33,17 @@ defmodule MishkaInstaller.MixProject do
     ]
   end
 
-  # Run "mix help deps" to learn about dependencies.
   defp deps do
-    []
+    [
+      {:phoenix_pubsub, "~> 2.1.3"},
+
+      # Extra tools
+      {:mishka_developer_tools, github: "mishka-group/mishka_developer_tools"},
+      {:telemetry, "~> 1.2.1"},
+
+      # Dev dependencies
+      {:ex_doc, "~> 0.34.0", only: :dev, runtime: false}
+    ]
   end
 
   defp elixirc_paths(:test), do: ["lib", "test/support"]

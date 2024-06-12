@@ -1,3 +1,23 @@
 defmodule MishkaInstaller do
   @moduledoc false
+  def broadcast(channel, status, data, broadcast \\ true) do
+    if broadcast do
+      MishkaInstaller.PubSub
+      |> Phoenix.PubSub.broadcast("mishka:plugin:#{channel}", %{
+        status: status,
+        channel: channel,
+        data: data
+      })
+    else
+      :ok
+    end
+  end
+
+  def subscribe(channel) do
+    Phoenix.PubSub.subscribe(MishkaInstaller.PubSub, "mishka:plugin:#{channel}")
+  end
+
+  def unsubscribe(channel) do
+    Phoenix.PubSub.unsubscribe(MishkaInstaller.PubSub, "mishka:plugin:#{channel}")
+  end
 end
