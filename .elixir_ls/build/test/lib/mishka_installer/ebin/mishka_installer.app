@@ -1,0 +1,9 @@
+{application,mishka_installer,
+             [{optional_applications,[]},
+              {applications,[kernel,stdlib,elixir,logger]},
+              {description,"mishka_installer"},
+              {modules,['Elixir.MishkaInstaller',
+                        'Elixir.MishkaInstaller.Application']},
+              {registered,[]},
+              {vsn,"0.1.0"},
+              {mod,{'Elixir.MishkaInstaller.Application',[]}}]}.
