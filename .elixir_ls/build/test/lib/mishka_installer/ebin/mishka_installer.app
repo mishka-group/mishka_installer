@@ -1,5 +1,7 @@
 {application,mishka_installer,
-             [{config_mtime,1718210483},
+             [{config_mtime,1718226658},
+              {compile_env,[{guarded_struct,[sanitize_derive],{ok,nil}},
+                            {guarded_struct,[validate_derive],{ok,nil}}]},
               {optional_applications,[]},
               {applications,[kernel,stdlib,elixir,logger,phoenix_pubsub,
                              mishka_developer_tools,telemetry]},

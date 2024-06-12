@@ -24,3 +24,13 @@ mishka_installer-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
+
+# Misc.
+.DS_Store
+/.zed/
+/.mnesia/
+/lib/example/
+.iex.exs
+/.mnesia
+/.elixir_ls
+/.elixir_ls/build
