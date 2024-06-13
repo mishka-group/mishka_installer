@@ -26,11 +26,10 @@ mishka_installer-*.tar
 /tmp/
 
 # Misc.
+/.elixir_ls/
 .DS_Store
 /.zed/
 /.mnesia/
 /lib/example/
 .iex.exs
 /.mnesia
-/.elixir_ls
-/.elixir_ls/build

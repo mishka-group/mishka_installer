@@ -5,6 +5,12 @@ defmodule MishkaInstaller.Event.Event do
   alias MnesiaAssistant.{Transaction, Query, Table}
   alias MnesiaAssistant.Error, as: MError
 
+  @mnesia_info [
+    type: :set,
+    index: [:name, :event, :extension],
+    record_name: __MODULE__,
+    storage_properties: [ets: [{:read_concurrency, true}, {:write_concurrency, true}]]
+  ]
   ####################################################################################
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
   ####################################################################################
@@ -41,14 +47,25 @@ defmodule MishkaInstaller.Event.Event do
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   @type okey_return :: {:ok, struct() | map() | module() | list(any())}
   @type builder_entry :: {:root, struct() | map(), :edit} | struct() | map()
+  ################################################################################
+  ######################## (▰˘◡˘▰) Init data (▰˘◡˘▰) #######################
+  ################################################################################
+  @doc false
+  @spec database_config() :: keyword()
+  if Mix.env() != :test do
+    def database_config(),
+      do: Keyword.merge(@mnesia_info, attributes: keys(), disc_copies: [node()])
+  else
+    def database_config(),
+      do: Keyword.merge(@mnesia_info, attributes: keys(), ram_copies: [node()])
+  end
+
   ###################################################################################
   ############################ (▰˘◡˘▰) Query (▰˘◡˘▰) ##########################
   ###################################################################################
   @spec get() :: list(map() | struct())
   def get() do
-    pattern =
-      ([__MODULE__] ++ Enum.map(1..length(keys()), fn _x -> :_ end))
-      |> List.to_tuple()
+    pattern = ([__MODULE__] ++ Enum.map(1..length(keys()), fn _x -> :_ end)) |> List.to_tuple()
 
     Transaction.transaction(fn -> Query.match_object(pattern) end)
     |> case do
@@ -57,20 +74,35 @@ defmodule MishkaInstaller.Event.Event do
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
+        []
     end
   end
 
-  @spec get(:name | :event, module() | String.t()) ::
+  @spec get(:name | :event | :extension, module() | String.t()) ::
           list(map() | struct()) | map() | struct() | nil
-  def get(field, value) when field in [:name, :event] do
+  def get(field, value) when field in [:name, :event, :extension] do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
         data = MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
-        if field == :event, do: data, else: List.first(data)
+        if field in [:event, :extension], do: data, else: List.first(data)
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
+        if field in [:event, :extension], do: [], else: nil
+    end
+  end
+
+  @spec get(String.t()) :: map() | struct() | nil
+  def get(id) do
+    Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
+    |> case do
+      {:atomic, res} ->
+        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
+
+      {:aborted, reason} ->
+        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
+        nil
     end
   end
 
@@ -95,6 +127,26 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
+  def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
+    selected = if field == :id, do: get(value), else: get(:name, value)
+
+    case selected do
+      nil ->
+        message =
+          "The ID of the record you want to update is incorrect or has already been deleted."
+
+        {:error, [%{message: message, field: :global, action: :not_exist}]}
+
+      data ->
+        map =
+          Map.merge(data, updated_to)
+          |> Map.merge(%{updated_at: Extra.get_unix_time()})
+
+        write({:root, map, :edit})
+    end
+  end
+
   @spec ides() :: list(String.t())
   def ides() do
     Transaction.ets(fn -> Table.all_keys(__MODULE__) end)
@@ -111,6 +163,29 @@ defmodule MishkaInstaller.Event.Event do
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "deleting", :global, :database)
+    end
+  end
+
+  @spec delete(atom(), String.t() | module()) :: error_return | okey_return
+  def delete(field, value) when field in [:id, :name] do
+    selected = if field == :id, do: get(value), else: get(:name, value)
+
+    case selected do
+      nil ->
+        message =
+          "The ID of the record you want to delete is incorrect or has already been deleted."
+
+        {:error, [%{message: message, field: :global, action: :not_exist}]}
+
+      data ->
+        Transaction.transaction(fn -> Query.delete(__MODULE__, Map.get(data, :id), :write) end)
+        |> case do
+          {:atomic, _res} ->
+            {:ok, data}
+
+          {:aborted, reason} ->
+            Transaction.transaction_error(reason, __MODULE__, "deleting", :global, :database)
+        end
     end
   end
 
