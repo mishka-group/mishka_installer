@@ -114,12 +114,167 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
-  @spec start() :: :ok | error_return()
+  @spec start() :: okey_return() | error_return()
   def start() do
     case group_events() do
       {:ok, events} ->
         sorted_events =
           Enum.map(events, &start(:event, &1))
+          |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
+
+        {:ok, sorted_events}
+
+      error ->
+        error
+    end
+  end
+
+  @spec restart(:name | :event, module() | String.t()) :: error_return | okey_return
+  def restart(:name, name) do
+    with {:ok, data} <- exist_record?(get(:name, name)),
+         deps_list <- allowed_events(data.depends),
+         {:ok, db_plg} <- write(:id, data.id, depends_status(deps_list, :restarted)),
+         :ok <- plugin_status(db_plg.status),
+         _ok <- EventHandler.do_compile(db_plg.event, :restart) do
+      {:ok, db_plg}
+    end
+  end
+
+  def restart(:event, event) do
+    case get(:event, event) do
+      [] ->
+        message =
+          "There are no plugins in the database that can be started for this event."
+
+        {:error, [%{message: message, field: :global, action: :restart_event}]}
+
+      data ->
+        sorted_plugins =
+          Enum.reduce(data, [], fn pl_item, acc ->
+            with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
+                 deps_list <- allowed_events(data.depends),
+                 {:ok, db_plg} <- write(:id, data.id, depends_status(deps_list, :restarted)),
+                 :ok <- plugin_status(db_plg.status) do
+              acc ++ [db_plg]
+            else
+              _ -> acc
+            end
+          end)
+          |> Enum.sort_by(&{&1.priority, &1.name})
+
+        EventHandler.do_compile(event, :restarted)
+        {:ok, sorted_plugins}
+    end
+  end
+
+  @spec restart() :: okey_return() | error_return()
+  def restart() do
+    case group_events() do
+      {:ok, events} ->
+        sorted_events =
+          Enum.map(events, &restart(:event, &1))
+          |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
+
+        {:ok, sorted_events}
+
+      error ->
+        error
+    end
+  end
+
+  @spec stop(:name | :event, module() | String.t()) :: okey_return() | error_return()
+  def stop(:name, name) do
+    with {:ok, data} <- exist_record?(get(:name, name)),
+         :ok <- plugin_status(data.status),
+         {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}),
+         _ok <- EventHandler.do_compile(db_plg.event, :stop) do
+      {:ok, db_plg}
+    end
+  end
+
+  def stop(:event, event) do
+    case get(:event, event) do
+      [] ->
+        message =
+          "There are no plugins in the database that can be started for this event."
+
+        {:error, [%{message: message, field: :global, action: :restart_event}]}
+
+      data ->
+        sorted_plugins =
+          Enum.reduce(data, [], fn pl_item, acc ->
+            with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
+                 :ok <- plugin_status(data.status),
+                 {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}) do
+              acc ++ [db_plg]
+            else
+              _ -> acc
+            end
+          end)
+          |> Enum.sort_by(&{&1.priority, &1.name})
+
+        EventHandler.do_compile(event, :stop)
+        {:ok, sorted_plugins}
+    end
+  end
+
+  @spec stop() :: okey_return() | error_return()
+  def stop() do
+    case group_events() do
+      {:ok, events} ->
+        sorted_events =
+          Enum.map(events, &stop(:event, &1))
+          |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
+
+        {:ok, sorted_events}
+
+      error ->
+        error
+    end
+  end
+
+  @spec unregister(:name | :event, module() | String.t()) :: okey_return() | error_return()
+  def unregister(:name, name) do
+    with {:ok, db_plg} <- delete(:name, name),
+         :ok <- GenServer.call(db_plg.name, :unsubscribe),
+         :ok <- GenServer.stop(name, :normal),
+         _ok <- EventHandler.do_compile(db_plg.event, :unregister) do
+      {:ok, db_plg}
+    end
+  end
+
+  def unregister(:event, event) do
+    case get(:event, event) do
+      [] ->
+        message =
+          "There are no plugins in the database that can be started for this event."
+
+        {:error, [%{message: message, field: :global, action: :restart_event}]}
+
+      data ->
+        sorted_plugins =
+          Enum.reduce(data, [], fn pl_item, acc ->
+            with {:ok, db_plg} <- delete(:name, pl_item.name),
+                 :ok <- GenServer.call(db_plg.name, :unsubscribe),
+                 :ok <- GenServer.stop(pl_item.name, :normal) do
+              acc ++ [db_plg]
+            else
+              _ -> acc
+            end
+          end)
+          |> Enum.sort_by(&{&1.priority, &1.name})
+
+        EventHandler.do_compile(event, :unregister)
+        {:ok, sorted_plugins}
+    end
+  end
+
+  @spec unregister() :: okey_return() | error_return()
+  def unregister() do
+    case group_events() do
+      {:ok, events} ->
+        sorted_events =
+          Enum.map(events, &unregister(:event, &1))
           |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
 
         {:ok, sorted_events}
@@ -278,9 +433,10 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @spec allowed_events(list()) :: list()
   def allowed_events(deps_list) do
     Enum.reduce(deps_list, [], fn item, acc ->
-      with struct when not is_nil(struct) and not is_tuple(struct) <- get(:name, item),
+      with struct when not is_nil(struct) <- get(:name, item),
            true <- struct.status not in [:registered, :stopped, :held] do
         acc
       else

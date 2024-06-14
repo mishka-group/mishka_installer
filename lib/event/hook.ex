@@ -30,12 +30,15 @@ defmodule MishkaInstaller.Event.Hook do
       end
 
       def restart() do
+        Event.restart(:name, config(:__plugin__))
       end
 
       def stop() do
+        Event.stop(:name, config(:__plugin__))
       end
 
       def unregister() do
+        Event.unregister(:name, config(:__plugin__))
       end
 
       def get() do
