@@ -18,7 +18,8 @@ defmodule MishkaInstaller.Event.EventHandler do
   ####################################################################################
   ######################## (▰˘◡˘▰) Public APIs (▰˘◡˘▰) #########################
   ####################################################################################
-  def do_compile() do
+  def do_compile(_event, status) do
+    MishkaInstaller.broadcast("event", status, %{})
   end
 
   def get_running() do

@@ -4,6 +4,7 @@ defmodule MishkaInstaller.Event.Event do
   import MnesiaAssistant, only: [er: 1, erl_fields: 4]
   alias MnesiaAssistant.{Transaction, Query, Table}
   alias MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Event.EventHandler
 
   @mnesia_info [
     type: :set,
@@ -58,6 +59,74 @@ defmodule MishkaInstaller.Event.Event do
   else
     def database_config(),
       do: Keyword.merge(@mnesia_info, attributes: keys(), ram_copies: [node()])
+  end
+
+  ####################################################################################
+  ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
+  ####################################################################################
+  @spec register(module(), String.t(), map()) :: error_return | okey_return
+  def register(name, event, initial) do
+    with {:ok, _module} <- ensure_loaded(name),
+         merged <- Map.merge(initial, %{name: name, extension: name.config(:app), event: event}),
+         {:ok, struct} <- builder(merged),
+         deps_list <- allowed_events(struct.depends),
+         {:ok, db_plg} <-
+           write(Map.merge(struct, depends_status(deps_list, struct.status))),
+         :ok <- MishkaInstaller.broadcast("event", :register, db_plg) do
+      {:ok, db_plg}
+    end
+  end
+
+  @spec start(:name | :event, module() | String.t()) :: error_return | okey_return
+  def start(:name, name) do
+    with {:ok, data} <- exist_record?(get(:name, name)),
+         :ok <- plugin_status(data.status),
+         :ok <- allowed_events?(data.depends),
+         {:ok, db_plg} <- write(:id, data.id, %{status: :started}),
+         _ok <- EventHandler.do_compile(db_plg.event, :start) do
+      {:ok, db_plg}
+    end
+  end
+
+  def start(:event, event) do
+    case get(:event, event) do
+      [] ->
+        message =
+          "There are no plugins in the database that can be started for this event."
+
+        {:error, [%{message: message, field: :global, action: :start_event}]}
+
+      data ->
+        sorted_plugins =
+          Enum.reduce(data, [], fn pl_item, acc ->
+            with :ok <- plugin_status(pl_item.status),
+                 :ok <- allowed_events?(pl_item.depends),
+                 {:ok, db_plg} <- write(:id, pl_item.id, %{status: :started}) do
+              acc ++ [db_plg]
+            else
+              _ -> acc
+            end
+          end)
+          |> Enum.sort_by(&{&1.priority, &1.name})
+
+        EventHandler.do_compile(event, :start)
+        {:ok, sorted_plugins}
+    end
+  end
+
+  @spec start() :: :ok | error_return()
+  def start() do
+    case group_events() do
+      {:ok, events} ->
+        sorted_events =
+          Enum.map(events, &start(:event, &1))
+          |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
+
+        {:ok, sorted_events}
+
+      error ->
+        error
+    end
   end
 
   ###################################################################################
@@ -136,7 +205,7 @@ defmodule MishkaInstaller.Event.Event do
         message =
           "The ID of the record you want to update is incorrect or has already been deleted."
 
-        {:error, [%{message: message, field: :global, action: :not_exist}]}
+        {:error, [%{message: message, field: :global, action: :write}]}
 
       data ->
         map =
@@ -175,7 +244,7 @@ defmodule MishkaInstaller.Event.Event do
         message =
           "The ID of the record you want to delete is incorrect or has already been deleted."
 
-        {:error, [%{message: message, field: :global, action: :not_exist}]}
+        {:error, [%{message: message, field: :global, action: :delete}]}
 
       data ->
         Transaction.transaction(fn -> Query.delete(__MODULE__, Map.get(data, :id), :write) end)
@@ -208,4 +277,52 @@ defmodule MishkaInstaller.Event.Event do
       {:error, [%{message: message, field: :global, action: :ensure_loaded}]}
     end
   end
+
+  def allowed_events(deps_list) do
+    Enum.reduce(deps_list, [], fn item, acc ->
+      with struct when not is_nil(struct) and not is_tuple(struct) <- get(:name, item),
+           true <- struct.status not in [:registered, :stopped, :held] do
+        acc
+      else
+        _ -> acc ++ [item]
+      end
+    end)
+  end
+
+  @spec allowed_events?(list(any())) :: :ok | error_return()
+  def allowed_events?(deps_list) do
+    if allowed_events(deps_list) != [] do
+      message = "This plugin has dependencies that are not yet activated in the system"
+      {:error, [%{message: message, field: :global, action: :hold_statuses}]}
+    else
+      :ok
+    end
+  end
+
+  ####################################################################################
+  ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
+  ####################################################################################
+  @doc false
+
+  defp depends_status([], status), do: %{status: status}
+
+  defp depends_status(_deps, _status), do: %{status: :held}
+
+  @doc false
+  @spec plugin_status(:stopped | :held) :: :ok | error_return()
+  def plugin_status(status) when status in [:stopped, :held] do
+    message = "The status of the plugin is not allowed."
+    {:error, [%{message: message, field: :global, action: :plugin_status}]}
+  end
+
+  def plugin_status(_status), do: :ok
+
+  defp exist_record?(nil) do
+    message =
+      "The ID of the record you want is incorrect or has already been deleted."
+
+    {:error, [%{message: message, field: :global, action: :exist_record?}]}
+  end
+
+  defp exist_record?(data), do: {:ok, data}
 end

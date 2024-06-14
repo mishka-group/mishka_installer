@@ -16,7 +16,9 @@
                         'Elixir.MishkaInstaller.Installer.PortHandler',
                         'Elixir.MishkaInstaller.Installer.RunTimeSourcing',
                         'Elixir.MishkaInstaller.MnesiaRepo',
-                        'Elixir.MishkaInstaller.MnesiaRepo.State']},
+                        'Elixir.MishkaInstaller.MnesiaRepo.State',
+                        'Elixir.MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender',
+                        'Elixir.MishkaInstallerTest.Support.MishkaPlugin.RegisterOTPSender']},
               {registered,[]},
               {vsn,"0.1.0"},
               {mod,{'Elixir.MishkaInstaller.Application',[]}}]}.
