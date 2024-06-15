@@ -75,6 +75,21 @@ defmodule MishkaInstaller.Event.Hook do
 
         {:ok, new_state}
       end
+
+      @impl true
+      def handle_call(:get, _from, state) do
+        {:reply, state, state}
+      end
+
+      @impl true
+      def handle_call(_reason, _from, state) do
+        {:reply, state, state}
+      end
+
+      @impl true
+      def handle_info(_reason, state) do
+        {:noreply, state}
+      end
     end
   end
 

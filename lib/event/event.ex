@@ -236,7 +236,6 @@ defmodule MishkaInstaller.Event.Event do
   @spec unregister(:name | :event, module() | String.t()) :: okey_return() | error_return()
   def unregister(:name, name) do
     with {:ok, db_plg} <- delete(:name, name),
-         :ok <- GenServer.call(db_plg.name, :unsubscribe),
          :ok <- GenServer.stop(name, :normal),
          _ok <- EventHandler.do_compile(db_plg.event, :unregister) do
       {:ok, db_plg}
@@ -255,7 +254,6 @@ defmodule MishkaInstaller.Event.Event do
         sorted_plugins =
           Enum.reduce(data, [], fn pl_item, acc ->
             with {:ok, db_plg} <- delete(:name, pl_item.name),
-                 :ok <- GenServer.call(db_plg.name, :unsubscribe),
                  :ok <- GenServer.stop(pl_item.name, :normal) do
               acc ++ [db_plg]
             else

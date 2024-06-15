@@ -4,6 +4,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
   alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
 
   setup do
+    # Got the idea from: https://github.com/Schultzer/ecto_qlc/blob/main/test/support/data_case.ex
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
@@ -200,6 +201,38 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :start, data: _data}
 
       # TODO: initialize and test event state module
+    end
+
+    test "Restart a plugin" do
+      %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
+      |> Event.write()
+
+      {:ok, _data} = Event.restart(:name, RegisterEmailSender)
+
+      {:ok, _struct} =
+        assert Event.write(:name, RegisterEmailSender, %{depends: [RegisterEmailSender1]})
+
+      {:error, _error} = assert Event.restart(:name, RegisterEmailSender)
+      {:error, _error1} = assert Event.restart(:name, RegisterEmailSender1)
+
+      {:ok, _struct1} = assert Event.write(:name, RegisterEmailSender, %{depends: []})
+      {:ok, _struct2} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
+    end
+
+    test "Stop a plugin" do
+      create = fn ->
+        %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
+        |> Event.write()
+      end
+
+      {:ok, data} = assert create.()
+
+      {:ok, %Event{extension: :mishka_installer, status: :stopped}} =
+        assert Event.stop(:name, data.name)
+
+      {:error, _errors} = assert Event.stop(:name, RegisterEmailSender1)
+
+      {:error, _errors1} = assert Event.stop(:name, RegisterEmailSender)
     end
   end
 end

@@ -5,12 +5,22 @@ defmodule MishkaInstaller.Application do
 
   @impl true
   def start(_type, _args) do
-    children = [
-      {Phoenix.PubSub, name: MishkaInstaller.PubSub}
-      # MishkaInstaller.MnesiaRepo
-    ]
+    children =
+      [
+        {Phoenix.PubSub, name: MishkaInstaller.PubSub}
+      ] ++ supervised_children()
 
     opts = [strategy: :one_for_one, name: MishkaInstaller.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  if Mix.env() == :test do
+    def supervised_children() do
+      []
+    end
+  else
+    def supervised_children() do
+      [MishkaInstaller.MnesiaRepo]
+    end
   end
 end
