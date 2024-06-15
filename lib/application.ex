@@ -20,7 +20,7 @@ defmodule MishkaInstaller.Application do
     end
   else
     def supervised_children() do
-      [MishkaInstaller.MnesiaRepo]
+      [MishkaInstaller.Event.EventHandler, MishkaInstaller.MnesiaRepo]
     end
   end
 end

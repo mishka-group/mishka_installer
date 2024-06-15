@@ -70,7 +70,7 @@ defmodule MishkaInstaller.MnesiaRepo do
 
       essential_tables(Keyword.get(config, :essential))
 
-      MishkaInstaller.broadcast("mnesia", :started, %{
+      MishkaInstaller.broadcast("mnesia", :synchronized, %{
         identifier: :mishka_mnesia_repo,
         local_tables: :mnesia.system_info(:local_tables),
         schemas: schemas()

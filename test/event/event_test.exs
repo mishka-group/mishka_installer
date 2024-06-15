@@ -25,7 +25,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
     MishkaInstaller.subscribe("event")
     start_supervised!(MishkaInstaller.MnesiaRepo)
 
-    assert_receive %{status: :started, channel: "mnesia", data: _data}
+    assert_receive %{status: :synchronized, channel: "mnesia", data: _data}
     :ok
   end
 

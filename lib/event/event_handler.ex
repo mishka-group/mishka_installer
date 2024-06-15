@@ -1,6 +1,7 @@
 defmodule MishkaInstaller.Event.EventHandler do
   use GenServer
   require Logger
+  alias MishkaInstaller.Event.Event
 
   ################################################################################
   ######################## (▰˘◡˘▰) Init data (▰˘◡˘▰) #######################
@@ -12,6 +13,7 @@ defmodule MishkaInstaller.Event.EventHandler do
   @impl true
   @spec init(keyword()) :: {:ok, keyword()}
   def init(state \\ []) do
+    MishkaInstaller.subscribe("mnesia")
     {:ok, Keyword.merge([running: [], queues: [], status: :starting], state)}
   end
 
@@ -83,6 +85,23 @@ defmodule MishkaInstaller.Event.EventHandler do
   @impl true
   def handle_call(_action, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def handle_info(%{status: :synchronized, channel: "mnesia"}, state) do
+    new_state =
+      case Event.start() do
+        {:ok, _sorted_events} ->
+          :persistent_term.put(:event_status, "ready")
+          Logger.info("Identifier: #{inspect(__MODULE__)} ::: Plugins are Synchronized...")
+
+          Keyword.merge(state, status: :synchronized)
+
+        _ ->
+          state
+      end
+
+    {:noreply, new_state}
   end
 
   @impl true
