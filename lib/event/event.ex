@@ -162,7 +162,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        EventHandler.do_compile(event, :restarted)
+        EventHandler.do_compile(event, :restart)
         {:ok, sorted_plugins}
     end
   end

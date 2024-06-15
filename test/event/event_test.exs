@@ -219,6 +219,64 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:ok, _struct2} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
     end
 
+    test "Restart an event" do
+      create = fn name, status, deps, event, priority ->
+        %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
+        |> Map.put(:event, event)
+        |> Map.put(:status, status)
+        |> Event.write()
+      end
+
+      deps = [MishkaPluginTest.Email1, MishkaPluginTest.Email2, MishkaPluginTest.Email3]
+
+      create.(MishkaPluginTest.Email, :registered, deps, "after_login_test", 100)
+      create.(MishkaPluginTest.Email1, :started, [], "after_login_test", 60)
+      create.(MishkaPluginTest.Email2, :started, [], "after_login_test", 50)
+      create.(MishkaPluginTest.Email3, :started, [], "before_login_test", 10)
+
+      {:ok, _sorted_events} = assert Event.start()
+
+      assert_receive %{status: :start, data: _data}
+
+      assert_receive %{status: :start, data: _data}
+
+      {:ok, _data} = Event.restart(:event, "after_login_test")
+
+      assert_receive %{status: :restart, data: _data}
+
+      {:ok, _data} = Event.restart(:event, "before_login_test")
+
+      assert_receive %{status: :restart, data: _data}
+    end
+
+    test "Restart all events" do
+      create = fn name, status, deps, event, priority ->
+        %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
+        |> Map.put(:event, event)
+        |> Map.put(:status, status)
+        |> Event.write()
+      end
+
+      deps = [MishkaPluginTest.Email1, MishkaPluginTest.Email2, MishkaPluginTest.Email3]
+
+      create.(MishkaPluginTest.Email, :registered, deps, "after_login_test", 100)
+      create.(MishkaPluginTest.Email1, :started, [], "after_login_test", 60)
+      create.(MishkaPluginTest.Email2, :started, [], "after_login_test", 50)
+      create.(MishkaPluginTest.Email3, :started, [], "before_login_test", 10)
+
+      {:ok, _sorted_events} = assert Event.start()
+
+      assert_receive %{status: :start, data: _data}
+
+      assert_receive %{status: :start, data: _data}
+
+      {:ok, _data} = Event.restart()
+
+      assert_receive %{status: :restart, data: _data}
+
+      assert_receive %{status: :restart, data: _data}
+    end
+
     test "Stop a plugin" do
       create = fn ->
         %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
@@ -233,6 +291,70 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:error, _errors} = assert Event.stop(:name, RegisterEmailSender1)
 
       {:error, _errors1} = assert Event.stop(:name, RegisterEmailSender)
+    end
+
+    test "Stop an event" do
+      create = fn name, status, deps, event, priority ->
+        %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
+        |> Map.put(:event, event)
+        |> Map.put(:status, status)
+        |> Event.write()
+      end
+
+      deps = [MishkaPluginTest.Email1, MishkaPluginTest.Email2, MishkaPluginTest.Email3]
+
+      create.(MishkaPluginTest.Email, :registered, deps, "after_login_test", 100)
+      create.(MishkaPluginTest.Email1, :started, [], "after_login_test", 60)
+      create.(MishkaPluginTest.Email2, :started, [], "after_login_test", 50)
+      create.(MishkaPluginTest.Email3, :started, [], "before_login_test", 10)
+
+      {:ok, _sorted_events} = assert Event.start()
+
+      assert_receive %{status: :start, data: _data}
+
+      assert_receive %{status: :start, data: _data}
+
+      # TODO: initialize and test event state module
+      {:ok, _data} = assert Event.stop(:event, "after_login_test")
+
+      assert_receive %{status: :stop, data: _data}
+
+      {:ok, _data} = assert Event.stop(:event, "before_login_test")
+
+      assert_receive %{status: :stop, data: _data}
+
+      # TODO: initialize and test event state module
+    end
+
+    test "Stop all events" do
+      create = fn name, status, deps, event, priority ->
+        %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
+        |> Map.put(:event, event)
+        |> Map.put(:status, status)
+        |> Event.write()
+      end
+
+      deps = [MishkaPluginTest.Email1, MishkaPluginTest.Email2, MishkaPluginTest.Email3]
+
+      create.(MishkaPluginTest.Email, :registered, deps, "after_login_test", 100)
+      create.(MishkaPluginTest.Email1, :started, [], "after_login_test", 60)
+      create.(MishkaPluginTest.Email2, :started, [], "after_login_test", 50)
+      create.(MishkaPluginTest.Email3, :started, [], "before_login_test", 10)
+
+      {:ok, _sorted_events} = assert Event.start()
+
+      assert_receive %{status: :start, data: _data}
+
+      assert_receive %{status: :start, data: _data}
+
+      # TODO: initialize and test event state module
+      {:ok, _data} = assert Event.stop()
+
+      assert_receive %{status: :stop, data: _data}
+
+      assert_receive %{status: :stop, data: _data}
+
+      # TODO: initialize and test event state module
     end
   end
 end
