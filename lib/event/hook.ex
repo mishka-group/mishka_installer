@@ -192,6 +192,12 @@ defmodule MishkaInstaller.Event.Hook do
     end
   end
 
+  @spec call!(String.t(), any(), keyword()) :: any()
+  def call!(event, data, args \\ []) do
+    module = ModuleStateCompiler.module_event_name(event)
+    module.call(data, args)
+  end
+
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
