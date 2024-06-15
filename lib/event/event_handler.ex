@@ -94,7 +94,7 @@ defmodule MishkaInstaller.Event.EventHandler do
         {:ok, _sorted_events} ->
           :persistent_term.put(:event_status, "ready")
           Logger.info("Identifier: #{inspect(__MODULE__)} ::: Plugins are Synchronized...")
-
+          MishkaInstaller.broadcast("mnesia", :event_status, "ready")
           Keyword.merge(state, status: :synchronized)
 
         _ ->

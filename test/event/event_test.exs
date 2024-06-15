@@ -1,5 +1,5 @@
 defmodule MishkaInstallerTest.Event.EventTest do
-  use ExUnit.Case, async: true
+  use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
   alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
 
