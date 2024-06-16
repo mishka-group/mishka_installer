@@ -1,6 +1,7 @@
 defmodule MishkaInstaller.MnesiaRepo do
   use GenServer
   require Logger
+  alias MishkaInstaller.Event.Event
   alias MnesiaAssistant.Error, as: MError
 
   @env_mod Mix.env()
@@ -68,7 +69,7 @@ defmodule MishkaInstaller.MnesiaRepo do
 
       Logger.info("Identifier: #{inspect(@identifier)} ::: Mnesia tables Synchronized...")
 
-      essential_tables(Keyword.get(config, :essential))
+      essential_tables(Keyword.get(config, :essential, [Event]))
 
       MishkaInstaller.broadcast("mnesia", :synchronized, %{
         identifier: :mishka_mnesia_repo,

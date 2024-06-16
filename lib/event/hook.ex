@@ -220,12 +220,20 @@ defmodule MishkaInstaller.Event.Hook do
   @doc false
   @spec register_start_helper(module(), keyword()) :: keyword()
   def register_start_helper(module, state) do
-    case module.register() do
-      {:ok, reg_db_plg} ->
-        start_helper(module, state, reg_db_plg)
+    db_plg = Event.get(:name, module)
 
-      _error ->
-        state
+    if is_nil(db_plg) do
+      case module.register() do
+        {:ok, reg_db_plg} ->
+          start_helper(module, state, reg_db_plg)
+
+        error ->
+          MishkaInstaller.broadcast("event", :register_error, error)
+          state
+      end
+    else
+      MishkaInstaller.broadcast("event", :register, db_plg)
+      Keyword.merge(state, status: db_plg.status)
     end
   end
 end

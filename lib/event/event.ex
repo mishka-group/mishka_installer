@@ -417,6 +417,18 @@ defmodule MishkaInstaller.Event.Event do
     |> MError.error_description(__MODULE__)
   end
 
+  def unique(field, value) do
+    case get(field, value) do
+      nil ->
+        :ok
+
+      _data ->
+        message = "This event already exists in the database."
+        {:error, [%{message: message, field: :global, action: :unique}]}
+    end
+  end
+
+  def unique?(field, value), do: is_nil(get(field, value))
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################

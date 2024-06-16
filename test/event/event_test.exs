@@ -12,9 +12,14 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
     on_exit(fn ->
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
+      pid1 = Process.whereis(MishkaInstaller.Event.EventHandler)
 
       if !is_nil(pid) and Process.alive?(pid) do
         GenServer.stop(MishkaInstaller.MnesiaRepo)
+      end
+
+      if !is_nil(pid1) and Process.alive?(pid1) do
+        GenServer.stop(MishkaInstaller.Event.EventHandler)
       end
     end)
 
@@ -23,9 +28,13 @@ defmodule MishkaInstallerTest.Event.EventTest do
     Application.put_env(:mishka, Mishka.MnesiaRepo, mnesia_dir: mnesia_dir, essential: [Event])
     MishkaInstaller.subscribe("mnesia")
     MishkaInstaller.subscribe("event")
+    start_supervised!(MishkaInstaller.Event.EventHandler)
     start_supervised!(MishkaInstaller.MnesiaRepo)
 
+    assert_receive %{status: :event_status, channel: "mnesia", data: _data}
+
     assert_receive %{status: :synchronized, channel: "mnesia", data: _data}
+
     :ok
   end
 
@@ -363,30 +372,27 @@ defmodule MishkaInstallerTest.Event.EventTest do
         |> Event.write()
       end
 
-      {:ok, data} = assert create.()
+      {:ok, _data} = assert create.()
 
       {:ok, _struct} = assert Event.write(:name, RegisterEmailSender, %{depends: []})
 
-      {:ok, struct1} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
+      {:ok, _struct1} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
 
-      {:ok, %Event{extension: :mishka_installer, status: :started, name: RegisterEmailSender}} =
-        assert Event.start(:name, struct1.name)
+      start_supervised!(RegisterEmailSender)
 
-      assert_receive %{status: :start, data: _data}
+      assert_receive %{status: :register, data: _data}
 
-      start_supervised!(data.name)
-
-      pid = Process.whereis(data.name)
+      pid = Process.whereis(RegisterEmailSender)
 
       assert Process.alive?(pid)
 
-      {:ok, _data} = assert Event.unregister(:name, struct1.name)
+      {:ok, _unregister_data} = assert Event.unregister(:name, RegisterEmailSender)
 
       assert_receive %{status: :unregister, data: _data}
 
       assert !Process.alive?(pid)
 
-      assert is_nil(Event.get(:name, struct1.name))
+      assert is_nil(Event.get(:name, RegisterEmailSender))
 
       # TODO: initialize and test event state module
     end
@@ -403,12 +409,9 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, struct1} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
 
-      {:ok, %Event{extension: :mishka_installer, status: :started, name: RegisterEmailSender}} =
-        assert Event.start(:name, struct1.name)
-
-      assert_receive %{status: :start, data: _data}
-
       start_supervised!(data.name)
+
+      assert_receive %{status: :register, data: _data}
 
       pid = Process.whereis(data.name)
 
@@ -421,7 +424,6 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert !Process.alive?(pid)
 
       assert is_nil(Event.get(:name, struct1.name))
-
       # TODO: initialize and test event state module
     end
 
@@ -437,12 +439,9 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, struct1} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
 
-      {:ok, %Event{extension: :mishka_installer, status: :started, name: RegisterEmailSender}} =
-        assert Event.start(:name, struct1.name)
-
-      assert_receive %{status: :start, data: _data}
-
       start_supervised!(data.name)
+
+      assert_receive %{status: :register, data: _data}
 
       pid = Process.whereis(data.name)
 
@@ -455,7 +454,6 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert !Process.alive?(pid)
 
       assert is_nil(Event.get(:name, struct1.name))
-
       # TODO: initialize and test event state module
     end
   end

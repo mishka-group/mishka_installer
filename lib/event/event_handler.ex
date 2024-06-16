@@ -14,14 +14,14 @@ defmodule MishkaInstaller.Event.EventHandler do
   @spec init(keyword()) :: {:ok, keyword()}
   def init(state \\ []) do
     MishkaInstaller.subscribe("mnesia")
-    {:ok, Keyword.merge([running: [], queues: [], status: :starting], state)}
+    {:ok, Keyword.merge([running: [], queues: QueueAssistant.new(), status: :starting], state)}
   end
 
   ####################################################################################
   ######################## (▰˘◡˘▰) Public APIs (▰˘◡˘▰) #########################
   ####################################################################################
-  def do_compile(_event, status) do
-    MishkaInstaller.broadcast("event", status, %{})
+  def do_compile(event, status) do
+    GenServer.cast(__MODULE__, {:do_compile, event, status})
   end
 
   def get_running() do
@@ -48,7 +48,8 @@ defmodule MishkaInstaller.Event.EventHandler do
   end
 
   @impl true
-  def handle_cast({:do_compile, _event}, state) do
+  def handle_cast({:do_compile, _event, status}, state) do
+    MishkaInstaller.broadcast("event", status, %{})
     {:noreply, state}
   end
 
@@ -93,7 +94,7 @@ defmodule MishkaInstaller.Event.EventHandler do
       case Event.start() do
         {:ok, _sorted_events} ->
           :persistent_term.put(:event_status, "ready")
-          Logger.info("Identifier: #{inspect(__MODULE__)} ::: Plugins are Synchronized...")
+          Logger.debug("Identifier: #{inspect(__MODULE__)} ::: Plugins are Synchronized...")
           MishkaInstaller.broadcast("mnesia", :event_status, "ready")
           Keyword.merge(state, status: :synchronized)
 

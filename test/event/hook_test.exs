@@ -20,7 +20,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
       end
 
       if !is_nil(pid1) and Process.alive?(pid1) do
-        GenServer.stop(MishkaInstaller.MnesiaRepo)
+        GenServer.stop(MishkaInstaller.Event.EventHandler)
       end
     end)
 
