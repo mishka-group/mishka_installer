@@ -1,4 +1,5 @@
 defmodule MishkaInstaller.Event.EventHandler do
+  @moduledoc false
   use GenServer
   require Logger
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
@@ -21,14 +22,17 @@ defmodule MishkaInstaller.Event.EventHandler do
   ####################################################################################
   ######################## (▰˘◡˘▰) Public APIs (▰˘◡˘▰) #########################
   ####################################################################################
+  @spec do_compile(String.t(), atom()) :: :ok
   def do_compile(event, status) do
     GenServer.cast(__MODULE__, {:do_compile, event, status})
   end
 
+  @spec get() :: keyword()
   def get() do
     GenServer.call(__MODULE__, :get)
   end
 
+  @spec do_clean() :: :ok
   def do_clean() do
     GenServer.cast(__MODULE__, :do_clean)
   end

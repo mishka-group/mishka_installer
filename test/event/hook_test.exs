@@ -100,6 +100,8 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
+      assert_receive %{status: :purge_create, data: _data}, 3000
+
       {:ok, _db_plg} = assert Bulk.EventCSocial.stop()
 
       assert_receive %{status: :stop, data: _data}
@@ -109,6 +111,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
       assert module.initialize?()
+      %{module: _, plugins: []} = assert module.initialize()
     end
 
     test "Unregister a plugin" do
