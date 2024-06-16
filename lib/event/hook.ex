@@ -8,6 +8,8 @@ defmodule MishkaInstaller.Event.Hook do
       alias MishkaInstaller.Event.{Event, Hook, EventHandler}
       alias MishkaInstaller.Event.ModuleStateCompiler, as: MSE
 
+      @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
+      @type okey_return :: {:ok, struct() | map() | module() | list(any())}
       # Based on https://elixirforum.com/t/59168/5
       @app_config Mix.Project.config()
       @plugin_event Keyword.get(opts, :event)
@@ -17,31 +19,39 @@ defmodule MishkaInstaller.Event.Hook do
       @after_compile __MODULE__
       @checking Keyword.get(opts, :checking, 1000)
 
+      @spec config() :: keyword()
       def config(),
         do: Keyword.merge(@app_config, __plugin__: @plugin_name, __event__: @plugin_event)
 
+      @spec config(atom()) :: any()
       def config(key), do: Keyword.get(config(), key)
 
+      @spec register() :: okey_return | error_return
       def register() do
         Event.register(config(:__plugin__), config(:__event__), @initial)
       end
 
+      @spec start() :: okey_return | error_return
       def start() do
         Event.start(:name, config(:__plugin__))
       end
 
+      @spec restart() :: okey_return | error_return
       def restart() do
         Event.restart(:name, config(:__plugin__))
       end
 
+      @spec stop() :: okey_return | error_return
       def stop() do
         Event.stop(:name, config(:__plugin__))
       end
 
+      @spec unregister() :: okey_return | error_return
       def unregister() do
         Event.unregister(:name, config(:__plugin__))
       end
 
+      @spec get() :: keyword()
       def get() do
         GenServer.call(__MODULE__, :get)
       end
@@ -63,6 +73,7 @@ defmodule MishkaInstaller.Event.Hook do
         end
       end
 
+      @spec start_link() :: :ignore | {:error, any()} | {:ok, pid()}
       def start_link(args \\ []) do
         GenServer.start_link(@plugin_name, args, name: @plugin_name)
       end
@@ -119,6 +130,7 @@ defmodule MishkaInstaller.Event.Hook do
         {:noreply, new_state}
       end
 
+      @impl true
       def handle_info(%{status: status, data: data}, state)
           when status in [:start, :stop, :unregister] do
         event = Keyword.get(state, :event)
@@ -142,6 +154,7 @@ defmodule MishkaInstaller.Event.Hook do
         {:noreply, new_state}
       end
 
+      @impl true
       def handle_info(%{status: :re_event, data: _data}, state) do
         new_state =
           case Event.get(:name, state[:name]) do
@@ -152,6 +165,7 @@ defmodule MishkaInstaller.Event.Hook do
         {:noreply, state}
       end
 
+      @impl true
       def handle_info(:status, state) do
         Process.send_after(__MODULE__, :status, @checking)
 
