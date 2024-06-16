@@ -181,6 +181,8 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       Event.start(:event, "before_login_test")
 
+      assert_receive %{status: :start, data: _data}
+
       assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
@@ -210,9 +212,9 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, _sorted_events} = assert Event.start()
 
-      assert_receive %{status: :start, data: _data}
+      assert_receive %{status: :start, data: _data}, 3000
 
-      assert_receive %{status: :start, data: _data}
+      assert_receive %{status: :start, data: _data}, 3000
 
       assert_receive %{status: :purge_create, data: _data}
 
@@ -297,6 +299,8 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:ok, _data} = Event.restart()
 
       assert_receive %{status: :restart, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}
 
       assert_receive %{status: :restart, data: _data}
     end
@@ -390,9 +394,9 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}
+      assert_receive %{status: :purge_create, data: _data}, 3000
 
-      assert_receive %{status: :purge_create, data: _data}
+      assert_receive %{status: :purge_create, data: _data}, 3000
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
 

@@ -1,7 +1,6 @@
 defmodule MishkaInstallerTest.Event.HookTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.Event
-  # alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
+  alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
   alias MishkaInstallerTest.Support.MishkaPlugin.Bulk
 
   setup do
@@ -46,12 +45,14 @@ defmodule MishkaInstallerTest.Event.HookTest do
       {:ok, _pid} = assert Bulk.EventCSocial.start_link()
 
       assert_receive %{status: :register, data: _data}
+
       assert_receive %{status: :start, data: _data}
 
-      # TODO:
-      # module = ModuleStateCompiler.module_event_name("event_c")
-      # assert Code.ensure_loaded?(module)
-      # assert module.initialize?()
+      assert_receive %{status: :purge_create, data: _data}, 3000
+
+      module = ModuleStateCompiler.module_event_name("event_c")
+      assert Code.ensure_loaded?(module)
+      assert module.initialize?()
     end
 
     test "Start a plugin" do
@@ -69,20 +70,64 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      # TODO:
-      # module = ModuleStateCompiler.module_event_name("event_c")
-      # assert Code.ensure_loaded?(module)
-      # assert module.initialize?()
+      assert_receive %{status: :purge_create, data: _data}, 3000
+
+      module = ModuleStateCompiler.module_event_name("event_c")
+      assert Code.ensure_loaded?(module)
+      assert module.initialize?()
     end
 
     test "Restart a plugin" do
       {:ok, _pid} = assert Bulk.EventCSocial.start_link()
       assert_receive %{status: :register, data: _data}
+
       assert_receive %{status: :start, data: _data}
 
       {:ok, _db_plg} = assert Bulk.EventCSocial.restart()
 
       assert_receive %{status: :restart, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}, 3000
+
+      module = ModuleStateCompiler.module_event_name("event_c")
+      assert Code.ensure_loaded?(module)
+      assert module.initialize?()
+    end
+
+    test "Stop a plugin" do
+      {:ok, _pid} = assert Bulk.EventCSocial.start_link()
+      assert_receive %{status: :register, data: _data}
+
+      assert_receive %{status: :start, data: _data}
+
+      {:ok, _db_plg} = assert Bulk.EventCSocial.stop()
+
+      assert_receive %{status: :stop, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}, 3000
+
+      module = ModuleStateCompiler.module_event_name("event_c")
+      assert Code.ensure_loaded?(module)
+      assert module.initialize?()
+    end
+
+    test "Unregister a plugin" do
+      {:ok, _pid} = assert Bulk.EventCSocial.start_link()
+      assert_receive %{status: :register, data: _data}
+
+      assert_receive %{status: :start, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}, 3000
+
+      {:ok, _db_plg} = assert Bulk.EventCSocial.unregister()
+
+      assert_receive %{status: :unregister, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}, 3000
+
+      module = ModuleStateCompiler.module_event_name("event_c")
+      assert Code.ensure_loaded?(module)
+      %{module: _, plugins: []} = assert module.initialize()
     end
   end
 end
