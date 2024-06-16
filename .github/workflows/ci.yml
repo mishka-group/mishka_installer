@@ -1,0 +1,47 @@
+name: MishkaInstaller CI
+
+on:
+  push:
+    branches:
+      - pristance_mnesia_installer
+  pull_request:
+    branches:
+      - pristance_mnesia_installer
+
+jobs:
+  ci:
+    env:
+      GITHUB_ACTION: true
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - pair:
+              elixir: "1.17.0"
+              otp: "27.0"
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: ${{matrix.pair.otp}}
+          elixir-version: ${{matrix.pair.elixir}}
+
+      - name: Elixir and Erlang Dependencies
+        run: |
+          mix local.hex --force
+          mix local.rebar --force
+
+      - name: Source Compiling
+
+        run: |
+          mix deps.get
+          mix deps.compile
+
+      - name: Run test with temporary information
+        run: |
+          mix test --trace
