@@ -1,5 +1,5 @@
 defmodule MishkaInstaller.Event.ModuleStateCompiler do
-  @state_dir "MishkaInstaller.Helper.ModuleStateCompiler.State."
+  @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
 
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
@@ -17,7 +17,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
             performed =
               unquote(Macro.escape(plugins))
-              |> MishkaInstaller.Helper.ModuleStateCompiler.perform({:reply, state})
+              |> MishkaInstaller.Event.ModuleStateCompiler.perform({:reply, state})
 
             if !is_nil(return_status) do
               state

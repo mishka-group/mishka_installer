@@ -468,8 +468,6 @@ defmodule MishkaInstaller.Event.Event do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
-  @doc false
-
   defp depends_status([], status), do: %{status: status}
 
   defp depends_status(_deps, _status), do: %{status: :held}

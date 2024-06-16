@@ -172,20 +172,25 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert_receive %{status: :start, data: _data}
 
-      # TODO:
-      # module = ModuleStateCompiler.module_event_name("after_login_test")
-      # assert module.initialize?()
+      assert_receive %{status: :purge_create, data: _data}
 
-      # assert length(module.initialize().plugins) == 3
+      module = ModuleStateCompiler.module_event_name("after_login_test")
+      assert module.initialize?()
+
+      assert length(module.initialize().plugins) == 3
+
+      Event.start(:event, "before_login_test")
+
+      assert_receive %{status: :purge_create, data: _data}
+
+      module = ModuleStateCompiler.module_event_name("before_login_test")
+      assert module.initialize?()
+
       module = ModuleStateCompiler.module_event_name("before_none_login_test")
 
       assert_raise UndefinedFunctionError, fn ->
         assert module.initialize?()
       end
-
-      # TODO:
-      # module = ModuleStateCompiler.module_event_name("before_login_test")
-      # assert module.initialize?()
     end
 
     test "Start all events" do

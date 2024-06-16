@@ -159,11 +159,9 @@ defmodule MishkaInstaller.Event.Hook do
           with "ready" <- :persistent_term.get(:event_status, nil),
                {:module, module} <- Code.ensure_loaded(MSE.module_event_name(@plugin_event)),
                data when not is_nil(data) <-
-                 Enum.find(module.initialize().plugins, &(&1.name == @plugin_name)) do
-            case Event.get(:name, @plugin_name) do
-              nil -> state
-              plugin -> Keyword.merge(state, status: plugin.status)
-            end
+                 Enum.find(module.initialize().plugins, &(&1.name == @plugin_name)),
+               plugin <- Event.get(:name, @plugin_name) do
+            if is_nil(plugin), do: state, else: Keyword.merge(state, status: plugin.status)
           else
             _ -> state
           end
@@ -207,10 +205,6 @@ defmodule MishkaInstaller.Event.Hook do
     case module.start() do
       {:ok, st_db_plg} ->
         Keyword.merge(state, status: st_db_plg.status, depends: st_db_plg.depends)
-
-      {:error, [%{field: :event, action: :compile}]} ->
-        Process.send_after(module, :start_again, 1000)
-        Keyword.merge(state, status: :held, depends: reg_db_plg.depends)
 
       _error ->
         Keyword.merge(state, status: reg_db_plg.status, depends: reg_db_plg.depends)
