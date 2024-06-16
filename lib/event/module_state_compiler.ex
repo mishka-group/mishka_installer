@@ -1,9 +1,11 @@
 defmodule MishkaInstaller.Event.ModuleStateCompiler do
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
 
+  @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  @spec create(list(struct()), String.t()) :: :ok | error_return
   def create(plugins, event) do
     module = module_event_name(event)
     escaped_plugins = Macro.escape(plugins)
@@ -78,11 +80,13 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
   end
 
+  @spec purge_create(list(struct()), String.t()) :: :ok | error_return
   def purge_create(plugins, event) do
     purge(event)
     create(plugins, event)
   end
 
+  @spec purge(list(String.t()) | String.t()) :: :ok
   def purge(events) when is_list(events) do
     Enum.each(events, &purge(&1))
     :ok
@@ -98,6 +102,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
+  @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
     event
     |> String.trim()
@@ -108,8 +113,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     |> then(&Module.concat([&1]))
   end
 
+  @spec initialize?(String.t()) :: boolean()
   def initialize?(event), do: module_event_name(event).initialize?
 
+  @spec rescue_initialize?(String.t()) :: boolean()
   def rescue_initialize?(event) do
     module = module_event_name(event)
     module.initialize?
@@ -117,16 +124,19 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     _ -> false
   end
 
+  @spec compile_initialize?(String.t()) :: boolean()
   def compile_initialize?(event) do
     module = module_event_name(event)
     Code.ensure_loaded?(module)
   end
 
+  @spec safe_initialize?(String.t()) :: boolean()
   def safe_initialize?(event) do
     module = module_event_name(event)
     function_exported?(module, :initialize?, 0)
   end
 
+  @spec perform(list(), {:reply, any()} | {:reply, :halt, any()}) :: any()
   def perform([], {:reply, state}), do: state
 
   def perform(_plugins, {:reply, :halt, state}), do: state
