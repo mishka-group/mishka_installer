@@ -37,11 +37,6 @@ defmodule MishkaInstaller.Event.EventHandler do
   ########################## (▰˘◡˘▰) Callback (▰˘◡˘▰) ##########################
   ####################################################################################
   @impl true
-  def handle_cast(:do_compile, state) do
-    {:noreply, state}
-  end
-
-  @impl true
   def handle_cast({:do_compile, event, status}, state) do
     MishkaInstaller.broadcast("event", status, %{})
     queues = Keyword.get(state, :queues, QueueAssistant.new())
@@ -149,9 +144,8 @@ defmodule MishkaInstaller.Event.EventHandler do
     sorted_plugins =
       Enum.reduce(plugins, [], fn pl_item, acc ->
         with :ok <- Event.plugin_status(pl_item.status),
-             :ok <- Event.allowed_events?(pl_item.depends),
-             {:ok, db_plg} <- Event.write(:id, pl_item.id, %{status: :restarted}) do
-          acc ++ [db_plg]
+             :ok <- Event.allowed_events?(pl_item.depends) do
+          acc ++ [pl_item]
         else
           _ -> acc
         end

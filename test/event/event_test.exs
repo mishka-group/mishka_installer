@@ -214,7 +214,15 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert_receive %{status: :start, data: _data}
 
-      # TODO: initialize and test event state module
+      assert_receive %{status: :purge_create, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}
+
+      module = ModuleStateCompiler.module_event_name("after_login_test")
+      assert module.initialize?()
+
+      module = ModuleStateCompiler.module_event_name("before_login_test")
+      assert module.initialize?()
     end
 
     test "Restart a plugin" do
@@ -223,14 +231,16 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, _data} = Event.restart(:name, RegisterEmailSender)
 
+      assert_receive %{status: :restart, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}
+
       {:ok, _struct} =
         assert Event.write(:name, RegisterEmailSender, %{depends: [RegisterEmailSender1]})
 
-      {:error, _error} = assert Event.restart(:name, RegisterEmailSender)
       {:error, _error1} = assert Event.restart(:name, RegisterEmailSender1)
 
-      {:ok, _struct1} = assert Event.write(:name, RegisterEmailSender, %{depends: []})
-      {:ok, _struct2} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
+      {:error, _error} = assert Event.restart(:name, RegisterEmailSender)
     end
 
     test "Restart an event" do
@@ -328,16 +338,35 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert_receive %{status: :start, data: _data}
 
-      # TODO: initialize and test event state module
+      assert_receive %{status: :purge_create, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}
+
+      module = ModuleStateCompiler.module_event_name("after_login_test")
+      assert module.initialize?()
+
+      module = ModuleStateCompiler.module_event_name("before_login_test")
+      assert module.initialize?()
+
       {:ok, _data} = assert Event.stop(:event, "after_login_test")
 
       assert_receive %{status: :stop, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}
+
+      module = ModuleStateCompiler.module_event_name("after_login_test")
+
+      %{module: _, plugins: []} = assert module.initialize()
 
       {:ok, _data} = assert Event.stop(:event, "before_login_test")
 
       assert_receive %{status: :stop, data: _data}
 
-      # TODO: initialize and test event state module
+      assert_receive %{status: :purge_create, data: _data}
+
+      module = ModuleStateCompiler.module_event_name("before_login_test")
+
+      %{module: _, plugins: []} = assert module.initialize()
     end
 
     test "Stop all events" do
@@ -361,14 +390,37 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert_receive %{status: :start, data: _data}
 
-      # TODO: initialize and test event state module
+      assert_receive %{status: :purge_create, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}
+
+      module = ModuleStateCompiler.module_event_name("after_login_test")
+
+      %{module: _, plugins: plugins} = assert module.initialize()
+
+      assert length(plugins) > 0
+
+      module = ModuleStateCompiler.module_event_name("before_login_test")
+
+      %{module: _, plugins: plugins} = assert module.initialize()
+
+      assert length(plugins) > 0
+
       {:ok, _data} = assert Event.stop()
 
       assert_receive %{status: :stop, data: _data}
 
       assert_receive %{status: :stop, data: _data}
 
-      # TODO: initialize and test event state module
+      assert_receive %{status: :purge_create, data: _data}
+
+      assert_receive %{status: :purge_create, data: _data}
+
+      module = ModuleStateCompiler.module_event_name("after_login_test")
+      %{module: _, plugins: []} = assert module.initialize()
+
+      module = ModuleStateCompiler.module_event_name("before_login_test")
+      %{module: _, plugins: []} = assert module.initialize()
     end
 
     test "Unregister a plugin" do
@@ -393,13 +445,16 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, _unregister_data} = assert Event.unregister(:name, RegisterEmailSender)
 
-      assert_receive %{status: :unregister, data: _data}
+      assert_receive %{status: :unregister, data: _data}, 3000
+
+      assert_receive %{status: :purge_create, data: _data}, 3000
 
       assert !Process.alive?(pid)
 
       assert is_nil(Event.get(:name, RegisterEmailSender))
 
-      # TODO: initialize and test event state module
+      module = ModuleStateCompiler.module_event_name("after_success_login")
+      %{module: _, plugins: []} = assert module.initialize()
     end
 
     test "Unregister an events" do
@@ -429,7 +484,6 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert !Process.alive?(pid)
 
       assert is_nil(Event.get(:name, struct1.name))
-      # TODO: initialize and test event state module
     end
 
     test "Unregister all events" do
@@ -442,7 +496,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, _struct} = assert Event.write(:name, RegisterEmailSender, %{depends: []})
 
-      {:ok, struct1} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
+      {:ok, _struct1} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
 
       start_supervised!(data.name)
 
@@ -458,8 +512,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert !Process.alive?(pid)
 
-      assert is_nil(Event.get(:name, struct1.name))
-      # TODO: initialize and test event state module
+      assert is_nil(Event.get(:name, RegisterEmailSender))
     end
   end
 end
