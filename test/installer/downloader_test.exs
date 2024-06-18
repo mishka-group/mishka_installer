@@ -16,6 +16,18 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
 
     {:ok, %{"latest_stable_version" => "0.0.4"}} =
       assert Downloader.get_mix(:hex, %{app: "mishka_installer"})
+
+    Req.Test.stub(Downloader, fn conn ->
+      conn
+      |> Plug.Conn.put_status(401)
+      |> Req.Test.json(%{"tag_name" => "0.0.4"})
+    end)
+
+    {:error, _error} =
+      assert Downloader.get_mix(:hex, %{app: "mishka_installer", tag: "0.0.4"})
+
+    {:error, _error} =
+      assert Downloader.get_mix(:hex, %{app: "mishka_installer"})
   end
 
   test "Github release/tag test" do
@@ -28,6 +40,18 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
 
     {:ok, "mix file"} =
       assert Downloader.get_mix(:github_tag, %{path: "mishka_installer", tag: "0.0.4"})
+
+    Req.Test.stub(Downloader, fn conn ->
+      conn
+      |> Plug.Conn.put_status(401)
+      |> Req.Test.text("mix file")
+    end)
+
+    {:error, _error} =
+      assert Downloader.get_mix(:github_release, %{path: "mishka_installer", release: "0.0.4"})
+
+    {:error, _error} =
+      assert Downloader.get_mix(:github_tag, %{path: "mishka_installer", tag: "0.0.4"})
   end
 
   test "Github test" do
@@ -38,6 +62,15 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
     end)
 
     {:ok, %{"download_url" => ^url}} =
+      assert Downloader.get_mix(:github, %{path: "mishka-group/mishka_developer_tools"})
+
+    Req.Test.stub(Downloader, fn conn ->
+      conn
+      |> Plug.Conn.put_status(401)
+      |> Req.Test.json(%{"tag_name" => "0.0.4"})
+    end)
+
+    {:error, _error} =
       assert Downloader.get_mix(:github, %{path: "mishka-group/mishka_developer_tools"})
   end
 
@@ -50,6 +83,17 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
       assert Downloader.get_mix(:github_latest_release, %{
                path: "mishka-group/mishka_developer_tools"
              })
+
+    Req.Test.stub(Downloader, fn conn ->
+      conn
+      |> Plug.Conn.put_status(401)
+      |> Req.Test.json(%{"tag_name" => "0.0.4"})
+    end)
+
+    {:error, _error} =
+      assert Downloader.get_mix(:github_latest_release, %{
+               path: "mishka-group/mishka_developer_tools"
+             })
   end
 
   test "Github latest tag test" do
@@ -58,6 +102,15 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
     end)
 
     {:ok, [%{"name" => "0.0.4"}]} =
+      assert Downloader.get_mix(:github_latest_tag, %{path: "mishka-group/mishka_developer_tools"})
+
+    Req.Test.stub(Downloader, fn conn ->
+      conn
+      |> Plug.Conn.put_status(401)
+      |> Req.Test.json([%{"name" => "0.0.4"}])
+    end)
+
+    {:error, _} =
       assert Downloader.get_mix(:github_latest_tag, %{path: "mishka-group/mishka_developer_tools"})
   end
 
@@ -69,5 +122,13 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
     end)
 
     {:ok, ^url} = assert Downloader.get_mix(:url, %{path: url})
+
+    Req.Test.stub(Downloader, fn conn ->
+      conn
+      |> Plug.Conn.put_status(401)
+      |> Req.Test.text(url)
+    end)
+
+    {:error, _error} = assert Downloader.get_mix(:url, %{path: url})
   end
 end
