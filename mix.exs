@@ -36,6 +36,7 @@ defmodule MishkaInstaller.MixProject do
   defp deps do
     [
       {:phoenix_pubsub, "~> 2.1.3"},
+      {:req, "~> 0.5.0"},
 
       # Extra tools
       {:mishka_developer_tools, github: "mishka-group/mishka_developer_tools"},
