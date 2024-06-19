@@ -1,7 +1,6 @@
 defmodule MishkaInstaller.Installer.PortHandler do
   @moduledoc false
-  # Based on
-  # https://github.com/happening-oss/kafka-client/blob/develop/lib/kafka_client/gen_port.ex
+  # Based on https://github.com/happening-oss/kafka-client/blob/develop/lib/kafka_client/gen_port.ex
 
   use GenServer
   require Logger

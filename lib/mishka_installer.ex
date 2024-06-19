@@ -13,10 +13,12 @@ defmodule MishkaInstaller do
     end
   end
 
+  @doc false
   def subscribe(channel) do
     Phoenix.PubSub.subscribe(MishkaInstaller.PubSub, "mishka:plugin:#{channel}")
   end
 
+  @doc false
   def unsubscribe(channel) do
     Phoenix.PubSub.unsubscribe(MishkaInstaller.PubSub, "mishka:plugin:#{channel}")
   end

@@ -43,7 +43,7 @@ defmodule MishkaInstaller.MixProject do
       {:mishka_developer_tools, github: "mishka-group/mishka_developer_tools"},
       {:telemetry, "~> 1.2.1"},
 
-      # Dev dependencies
+      # Dev and Test dependencies
       {:ex_doc, "~> 0.34.0", only: :dev, runtime: false}
     ]
   end

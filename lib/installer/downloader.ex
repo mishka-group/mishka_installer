@@ -1,4 +1,7 @@
 defmodule MishkaInstaller.Installer.Downloader do
+  @moduledoc """
+
+  """
   @hex_path "https://hex.pm/api/packages"
   @hex_preview_path "https://repo.hex.pm/preview"
   @github_path "https://raw.githubusercontent.com"
@@ -29,6 +32,9 @@ defmodule MishkaInstaller.Installer.Downloader do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  @doc """
+
+  """
   @spec download(download_type, pkg) :: okey_return | error_return
   def download(:hex, %{app: app, tag: tag_name}) do
     case build_url("https://repo.hex.pm/tarballs/#{app}-#{tag_name}.tar") do
@@ -114,6 +120,9 @@ defmodule MishkaInstaller.Installer.Downloader do
   # ************************************************************
   # ************************************************************
   # ************************************************************
+  @doc """
+
+  """
   @spec get_mix(download_type, pkg) :: okey_return | error_return
   def get_mix(:hex, %{app: app, tag: tag_name}) do
     get_mix(:url, %{path: "#{@hex_preview_path}/#{app}/#{tag_name}/mix.exs"})

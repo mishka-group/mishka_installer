@@ -1,10 +1,16 @@
 defmodule MishkaInstaller.Event.ModuleStateCompiler do
+  @moduledoc """
+
+  """
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  @doc """
+
+  """
   @spec create(list(struct()), String.t()) :: :ok | error_return
   def create(plugins, event) do
     module = module_event_name(event)
@@ -80,12 +86,18 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
   end
 
+  @doc """
+
+  """
   @spec purge_create(list(struct()), String.t()) :: :ok | error_return
   def purge_create(plugins, event) do
     purge(event)
     create(plugins, event)
   end
 
+  @doc """
+
+  """
   @spec purge(list(String.t()) | String.t()) :: :ok
   def purge(events) when is_list(events) do
     Enum.each(events, &purge(&1))
@@ -102,6 +114,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
+  @doc false
   @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
     event
@@ -113,9 +126,15 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     |> then(&Module.concat([&1]))
   end
 
+  @doc """
+
+  """
   @spec initialize?(String.t()) :: boolean()
   def initialize?(event), do: module_event_name(event).initialize?
 
+  @doc """
+
+  """
   @spec rescue_initialize?(String.t()) :: boolean()
   def rescue_initialize?(event) do
     module = module_event_name(event)
@@ -124,18 +143,25 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     _ -> false
   end
 
+  @doc """
+
+  """
   @spec compile_initialize?(String.t()) :: boolean()
   def compile_initialize?(event) do
     module = module_event_name(event)
     Code.ensure_loaded?(module)
   end
 
+  @doc """
+
+  """
   @spec safe_initialize?(String.t()) :: boolean()
   def safe_initialize?(event) do
     module = module_event_name(event)
     function_exported?(module, :initialize?, 0)
   end
 
+  @doc false
   @spec perform(list(), {:reply, any()} | {:reply, :halt, any()}) :: any()
   def perform([], {:reply, state}), do: state
 

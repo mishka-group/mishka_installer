@@ -1,4 +1,7 @@
 defmodule MishkaInstaller.Event.Hook do
+  @moduledoc """
+
+  """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 
   @spec __using__(keyword()) :: Macro.t()
@@ -193,6 +196,9 @@ defmodule MishkaInstaller.Event.Hook do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  @doc """
+
+  """
   @spec call(String.t(), any(), keyword()) :: any()
   def call(event, data, args \\ []) do
     module = ModuleStateCompiler.module_event_name(event)
@@ -204,6 +210,9 @@ defmodule MishkaInstaller.Event.Hook do
     end
   end
 
+  @doc """
+
+  """
   @spec call!(String.t(), any(), keyword()) :: any()
   def call!(event, data, args \\ []) do
     module = ModuleStateCompiler.module_event_name(event)
@@ -213,8 +222,8 @@ defmodule MishkaInstaller.Event.Hook do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
-  @spec start_helper(module(), keyword(), any()) :: keyword()
   @doc false
+  @spec start_helper(module(), keyword(), any()) :: keyword()
   def start_helper(module, state, reg_db_plg) do
     case module.start() do
       {:ok, st_db_plg} ->

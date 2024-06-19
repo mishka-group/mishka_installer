@@ -1,4 +1,44 @@
 defmodule MishkaInstaller.Event.Event do
+  @moduledoc """
+  The `MishkaInstaller.Event.Event` module is the core of events, which comprises pre-prepared
+  strategies for the implementation and management of plugins introduced to the system
+  around various events.
+  These implementation and management strategies are included in the Event module.
+
+  > #### Use cases information {: .tip}
+  >
+  > The fundamental criteria of the same system serve as the basis for the specification of
+  > these strategies, which are aimed at common systems.
+  > Therefore, you are not permitted to utilize this module if you believe that
+  > your technique is different.
+
+  In addition, it is important to remember that the other part of this module is
+  connected to the queries that are required to be made to the **Erlang runtime database**,
+  which is known as `Mnesia`.
+
+  Using this functionality, you will be able to store the information that is
+  associated with each plugin in it.
+
+  > Note that all storages are based on the name of an event. See `MishkaInstaller.Event.Hook` module.
+
+  ---
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+
+  ### Note:
+
+  When you are writing, you should always make an effort to be more careful because
+  you might get reconditioned during times of high traffic.
+  When it comes to reading and running all plugins, this problem only occurs when a
+  module is being created and destroyed during the compilation process.
+  """
   use GuardedStruct
   alias MishkaDeveloperTools.Helper.{Extra, UUID}
   import MnesiaAssistant, only: [er: 1, erl_fields: 4]
@@ -64,6 +104,40 @@ defmodule MishkaInstaller.Event.Event do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  @doc """
+  If you want to store a plugin for a particular event, this function is a predefined strategy
+  that you can use. Additionally, it performs a check on the integrity of the plugin module and
+  gathers other information that is necessary while it is being stored in `Mnesia`.
+
+  Inputs for this function include the **name of the plugin**, **the name of the event**, and some
+  **fundamental information**.
+  Checking the `struct` of this module is one way to add the `initial event` to the modules.
+
+  See: `%MishkaInstaller.Event.Event{}`
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+  >
+  > It is not appropriate for the user to have any direct influence on this function because
+  > it is intended for the use of the programmer. It should be brought to your attention that
+  > this particular function, which incorporates the `Write` activity, should often be utilized
+  > only once at the beginning of the project.
+
+  ## Example:
+
+  ```elixir
+  register(TestApp.User.Auth, "after_login", %{priority: 2})
+  ```
+
+  > This function is only responsible for registering the plugin; it does not carry
+  > out any activities related to execution. Please refer to function `start/2` in order to execute
+  """
   @spec register(module(), String.t(), map()) :: error_return | okey_return
   def register(name, event, initial) do
     with {:ok, _module} <- ensure_loaded(name),
@@ -77,6 +151,39 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  A pre-made strategy for starting a plugin is what this method is clearly named.
+  Keep in mind that you'll need to register this plugin ahead of time.
+
+  The requested Event will be compiled once more in the event that the
+  plugin is able to start properly. **This is a heavy write activity**
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+  >
+  > It is not appropriate for the user to have any direct influence on this function because
+  > it is intended for the use of the programmer. It should be brought to your attention that
+  > this particular function, which incorporates the `Write` activity, should often be utilized
+  > only once at the beginning of the project.
+
+  ##### Compile path: `MishkaInstaller.Event.ModuleStateCompiler.State.YourEvent`.
+
+  ## Example:
+
+  ```elixir
+  # Start a plugin
+  start(:name, TestApp.User.Auth)
+
+  # Start all plugins of an event
+  start(:event, "after_login")
+  ```
+  """
   @spec start(:name | :event, module() | String.t()) :: error_return | okey_return
   def start(:name, name) do
     with {:ok, data} <- exist_record?(get(:name, name)),
@@ -114,6 +221,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  This function starts all events, For more information please see `start/2`.
+  """
   @spec start() :: okey_return() | error_return()
   def start() do
     case group_events() do
@@ -129,6 +239,51 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  A pre-made strategy for restarting a plugin is what this method is clearly named.
+  Keep in mind that you'll need to register and start this plugin ahead of time.
+
+  The requested Event will be compiled once more in the event that the
+  plugin is able to restart properly. **This is a heavy write activity**
+
+
+  > #### Use cases information {: .tip}
+  >
+  > The `start/2` function and this idea are often mistaken. Actually, this function does
+  > the same operations as the start function, but it re-examines the conditions.
+  > You can tailor your own function to meet the specific needs of your system, and there's
+  > already a plan in place. The `MishkaInstaller.Event.Hook` module decides on this potential.
+
+
+  ---
+
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+  >
+  > It is not appropriate for the user to have any direct influence on this function because
+  > it is intended for the use of the programmer. It should be brought to your attention that
+  > this particular function, which incorporates the `Write` activity, should often be utilized
+  > only once at the beginning of the project.
+
+  ##### Compile path: `MishkaInstaller.Event.ModuleStateCompiler.State.YourEvent`.
+
+  ## Example:
+
+  ```elixir
+  # Restart a plugin
+  restart(:name, TestApp.User.Auth)
+
+  # Restart all plugins of an event
+  restart(:event, "after_login")
+  ```
+  """
   @spec restart(:name | :event, module() | String.t()) :: error_return | okey_return
   def restart(:name, name) do
     with {:ok, data} <- exist_record?(get(:name, name)),
@@ -167,6 +322,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  This function restarts all events, For more information please see `restart/2`.
+  """
   @spec restart() :: okey_return() | error_return()
   def restart() do
     case group_events() do
@@ -182,6 +340,46 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  A pre-made strategy for stopping a plugin is what this method is clearly named.
+  Keep in mind that you'll need to register and start this plugin ahead of time.
+
+  The requested Event will be compiled once more in the event that the
+  plugin is able to stop properly. **This is a heavy write activity**
+
+  > #### Use cases information {: .tip}
+  >
+  > Keep in mind that the only thing that happens when you stop a plugin is that its database status
+  > changes to `stopped` and it is removed from the list of compiled modules
+  > of the event in question. However, its modules, notably `GenServer`,
+  > will still be operational and will not be entirely removed from the system.
+
+  ---
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+  >
+  > It is not appropriate for the user to have any direct influence on this function because
+  > it is intended for the use of the programmer. It should be brought to your attention that
+  > this particular function, which incorporates the `Write` activity, should often be utilized
+  > only once at the beginning of the project.
+
+  ## Example:
+
+  ```elixir
+  # Stop a plugin
+  stop(:name, TestApp.User.Auth)
+
+  # Stop all plugins of an event
+  stop(:event, "after_login")
+  ```
+  """
   @spec stop(:name | :event, module() | String.t()) :: okey_return() | error_return()
   def stop(:name, name) do
     with {:ok, data} <- exist_record?(get(:name, name)),
@@ -218,6 +416,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  This function stops all events, For more information please see `stop/2`.
+  """
   @spec stop() :: okey_return() | error_return()
   def stop() do
     case group_events() do
@@ -233,6 +434,38 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  This function removes the plugin from the database and **kills** all processes associated to it,
+  in addition to doing the exact same thing as the `stop/2` function.
+
+
+  The requested Event will be compiled once more in the event that the
+  plugin is able to unregister properly. **This is a heavy write activity**
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+  >
+  > It is not appropriate for the user to have any direct influence on this function because
+  > it is intended for the use of the programmer. It should be brought to your attention that
+  > this particular function, which incorporates the `Write` activity, should often be utilized
+  > only once at the beginning of the project.
+
+  ## Example:
+
+  ```elixir
+  # Unregister a plugin
+  unregister(:name, TestApp.User.Auth)
+
+  # Unregister all plugins of an event
+  unregister(:event, "after_login")
+  ```
+  """
   @spec unregister(:name | :event, module() | String.t()) :: okey_return() | error_return()
   def unregister(:name, name) do
     with {:ok, db_plg} <- delete(:name, name),
@@ -267,6 +500,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  This function stops all unregisters, For more information please see `unregister/2`.
+  """
   @spec unregister() :: okey_return() | error_return()
   def unregister() do
     case group_events() do
@@ -285,6 +521,9 @@ defmodule MishkaInstaller.Event.Event do
   ###################################################################################
   ############################ (▰˘◡˘▰) Query (▰˘◡˘▰) ##########################
   ###################################################################################
+  @doc """
+
+  """
   @spec get() :: list(map() | struct())
   def get() do
     pattern = ([__MODULE__] ++ Enum.map(1..length(keys()), fn _x -> :_ end)) |> List.to_tuple()
@@ -300,6 +539,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   @spec get(:name | :event | :extension, module() | String.t()) ::
           list(map() | struct()) | map() | struct() | nil
   def get(field, value) when field in [:name, :event, :extension] do
@@ -315,6 +557,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   @spec get(String.t()) :: map() | struct() | nil
   def get(id) do
     Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
@@ -328,6 +573,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   @spec write(builder_entry) :: error_return | okey_return
   def write(data) do
     case builder(data) do
@@ -349,6 +597,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
   def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
     selected = if field == :id, do: get(value), else: get(:name, value)
@@ -369,11 +620,17 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   @spec ides() :: list(String.t())
   def ides() do
     Transaction.ets(fn -> Table.all_keys(__MODULE__) end)
   end
 
+  @doc """
+
+  """
   @spec group_events(list(atom())) :: error_return() | okey_return()
   def group_events(key \\ [:event]) do
     Transaction.transaction(fn ->
@@ -388,6 +645,9 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   @spec delete(atom(), String.t() | module()) :: error_return | okey_return
   def delete(field, value) when field in [:id, :name] do
     selected = if field == :id, do: get(value), else: get(:name, value)
@@ -411,12 +671,18 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   @spec drop() :: {:ok, :atomic} | {:error, any(), charlist()}
   def drop() do
     Table.clear_table(__MODULE__)
     |> MError.error_description(__MODULE__)
   end
 
+  @doc """
+
+  """
   def unique(field, value) do
     case get(field, value) do
       nil ->
@@ -428,11 +694,15 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+
+  """
   def unique?(field, value), do: is_nil(get(field, value))
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
   # Just should be used when you need one time or in compile time
+  @doc false
   @spec ensure_loaded(module()) :: error_return | okey_return
   def ensure_loaded(module) do
     if Code.ensure_loaded?(module) do
@@ -443,6 +713,7 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc false
   @spec allowed_events(list()) :: list()
   def allowed_events(deps_list) do
     Enum.reduce(deps_list, [], fn item, acc ->
@@ -455,6 +726,7 @@ defmodule MishkaInstaller.Event.Event do
     end)
   end
 
+  @doc false
   @spec allowed_events?(list(any())) :: :ok | error_return()
   def allowed_events?(deps_list) do
     if allowed_events(deps_list) != [] do

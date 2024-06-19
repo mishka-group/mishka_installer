@@ -1,4 +1,5 @@
 defmodule MishkaInstaller.MnesiaRepo do
+  @moduledoc false
   use GenServer
   require Logger
   alias MishkaInstaller.Event.Event
