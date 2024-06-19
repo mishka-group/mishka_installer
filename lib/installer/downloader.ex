@@ -3,6 +3,7 @@ defmodule MishkaInstaller.Installer.Downloader do
   @hex_preview_path "https://repo.hex.pm/preview"
   @github_path "https://raw.githubusercontent.com"
   @github_api_path "https://api.github.com/repos"
+  @github_codeload_path "https://codeload.github.com"
 
   @type download_type ::
           :hex
@@ -37,28 +38,30 @@ defmodule MishkaInstaller.Installer.Downloader do
   end
 
   def download(:github, %{path: path, branch: {branch, git: true}}) do
-    case build_url("https://codeload.github.com/#{path}/legacy.tar.gz/refs/heads/#{branch}") do
+    case build_url(
+           "#{@github_codeload_path}/#{String.trim(path)}/legacy.tar.gz/refs/heads/#{branch}"
+         ) do
       %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
     end
   end
 
   def download(:github, %{path: path, branch: branch}) do
-    case build_url("https://github.com/#{path}/archive/refs/heads/#{branch}.tar.gz") do
+    case build_url("https://github.com/#{String.trim(path)}/archive/refs/heads/#{branch}.tar.gz") do
       %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
     end
   end
 
   def download(:github, %{path: path, release: release}) do
-    case build_url("https://github.com/#{path}/archive/refs/tags/#{release}.tar.gz") do
+    case build_url("https://github.com/#{String.trim(path)}/archive/refs/tags/#{release}.tar.gz") do
       %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
     end
   end
 
   def download(:github, %{path: path, tag: tag}) do
-    case build_url("https://github.com/#{path}/archive/refs/tags/#{tag}.tar.gz") do
+    case build_url("https://github.com/#{String.trim(path)}/archive/refs/tags/#{tag}.tar.gz") do
       %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
     end
@@ -75,7 +78,7 @@ defmodule MishkaInstaller.Installer.Downloader do
   end
 
   def download(:github, %{path: path}) do
-    case build_url("#{@github_api_path}/#{path}") do
+    case build_url("#{@github_api_path}/#{String.trim(path)}") do
       %Req.Response{status: 200, body: %{"default_branch" => branch_name}} ->
         download(:github, %{path: path, branch: branch_name})
 
@@ -152,7 +155,7 @@ defmodule MishkaInstaller.Installer.Downloader do
       %Req.Response{status: 200, body: %{"tag_name" => tag_name}} ->
         get_mix(:github_tag, %{path: path, tag: tag_name})
 
-      _ ->
+      _e ->
         mix_global_err()
     end
   end
