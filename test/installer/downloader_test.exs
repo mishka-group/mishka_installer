@@ -17,6 +17,11 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
 
       {:ok, "file body"} =
         assert Downloader.download(:hex, %{app: "mishka_installer", tag: "0.0.4"})
+
+      Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
+
+      {:error, _error} =
+        assert Downloader.download(:hex, %{app: "mishka_installer", tag: "0.0.4"})
     end
 
     test "Downloade github branch" do
@@ -32,6 +37,18 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
 
       {:ok, "file body"} =
         assert Downloader.download(:github, %{path: "mishka_installer", branch: "master"})
+
+      Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
+      Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
+
+      {:error, _error} =
+        assert Downloader.download(:github, %{
+                 path: "mishka_installer",
+                 branch: {"master", git: true}
+               })
+
+      {:error, _error} =
+        assert Downloader.download(:github, %{path: "mishka_installer", branch: "master"})
     end
 
     test "Downloade github release/tag" do
@@ -43,6 +60,15 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
         assert Downloader.download(:github, %{path: "mishka_installer", release: "0.0.4"})
 
       {:ok, "file body"} =
+        assert Downloader.download(:github, %{path: "mishka_installer", tag: "0.0.4"})
+
+      Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
+      Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
+
+      {:error, _error} =
+        assert Downloader.download(:github, %{path: "mishka_installer", release: "0.0.4"})
+
+      {:error, _error} =
         assert Downloader.download(:github, %{path: "mishka_installer", tag: "0.0.4"})
     end
 
@@ -56,6 +82,10 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
       Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 200, "body string"))
 
       {:ok, "body string"} = assert Downloader.download(:hex, %{app: "mishka_installer"})
+
+      Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
+
+      {:error, _error} = assert Downloader.download(:hex, %{app: "mishka_installer"})
     end
   end
 
