@@ -1,6 +1,167 @@
 defmodule MishkaInstaller.Event.Hook do
   @moduledoc """
+  The `MishkaInstaller.Event.Hook` module provides a set of functionalities to manage event hooks
+  within the Mishka Installer system.
 
+  It leverages `GenServer` to handle asynchronous event-driven operations and offers a set of
+  macros and functions for registering, starting, stopping, and managing hooks dynamically.
+
+  In addition to being one of the most significant modules of the MishkaInstaller library,
+  the Hook module gives you the ability to make the library as a whole,
+  as well as the projects that make use of this library, more modular.
+
+  It is essential to comprehend that you may treat any action performed independently
+  as an event and register an unlimited number of plugins for that event.
+
+  You can do this by considering that action to be done separately.
+  Each plugin has the potential to have its own individual inputs and outputs,
+  and depending on the architecture of the area that you want to use Hook in,
+  you may even be able to change the output and send it to other plugins.
+
+  Throughout all of the many parts that have been built for this module,
+  it has been attempted to have a flexible approach to dealing with errors
+  and to provide the programmer with a wide variety of options.
+
+  With the additional functions at her disposal, the programmer can actually create a
+  gateway in their projects, where the data flow must pass through several gates,
+  whether it changes or remains unchanged, and a series of operations are performed.
+
+  For illustration's sake, let's suppose you want the registration system to allow users
+  to sign up for social networks on Twitter and Google.
+
+  When you use this library, it is conceivable that you can quickly display HTML
+  or even operate in the background before registering after registering.
+
+  This is a significant improvement over the standard practice,
+  in which you are required to modify the primary codes of your project. Create a separate plugin.
+
+  It is interesting to notice that these facilities are quite basic and convenient for the admin user.
+
+  If this opportunity is provided, the management can manage its own plugins in different ways
+  if it has a dashboard.
+
+  It is crucial to highlight that each plugin is its own `GenServer`; in addition,
+  it is dynamically supervised, and the information is stored in the database as well as in Mnesia.
+
+  Furthermore, this section is very useful even if the programmer wants to perform many tasks
+  that are not associated with Perform defined functions.
+
+  The fact that the programmers have to introduce each plugin to the system based on a specific
+  behavior is one of the exciting aspects of using this section. Additionally,
+  the system has prepared some default behaviors to force the programmers
+  to introduce the plugins in the order specified by the system.
+
+  The use of custom behaviors on the part of the programmer and MishkaInstaller itself makes debugging easier;
+  however, this library does not leave the programmer to fend for themselves in this significant matter;
+  rather, a straightforward error storage system is prepared based on the particular activities being performed.
+
+  Should prevent any unpredictable behavior at any costs.
+
+  ---
+
+  ## Build purpose
+  ---
+
+  Imagine you are going to make an application that will have many plugins built for it in the future.
+  But the fact that many manipulations will be made on your source code makes it
+  difficult to maintain the application.
+
+  For example, you present a content management system for your users, and now they need to
+  activate a section for registration and SMS; the system allows you to present your desired
+  `input/output` absolutely plugin oriented to your users and makes it possible for the
+  developers to write their required applications beyond the core source code.
+
+  ---
+
+  The library categorizes your whole software design structure into many parts;
+  and has an appropriate dependency that is optional with `GenServer`;
+  it considers a monitoring branch for each of your plugins, which results in fewer errors and `downtime`.
+
+  The considered part:
+
+  1. Behaviors and events
+  2. Recalling or `Hook` with priority
+  3. `State` management and links to the database (`Mnesia` support)
+
+  > Most of the sections mentioned can be fully customized to suit your needs.
+  > This library offers a range of predefined strategies for public use, which might
+  > be sufficient for your requirements.
+
+  In Mishka Elixir Plugin Management Library, a series of action or `hook` functions are given
+  to the developer of the main plugin or software, which helps build plugins outside the system
+  and convert software sections into separate `events`.
+
+  Some of the functions of this module include the following:
+
+  - `config/0` - Retrieves the merged configuration for the hook module.
+  - `config/1` - Retrieves a specific configuration value by key.
+  - `register/0` - Register a plugin for a specific event.
+  - `start/0` - Start a plugin of a specific event.
+  - `restart/0` - Restart a plugin of a specific event.
+  - `stop/0` - Stop a plugin of a specific event.
+  - `unregister/0` - Unregister a plugin of a specific event.
+  - `get/0` - Retrieves a Plugin `GenServer` state.
+
+  ### Example:
+
+  ```elixir
+  defmodule RegisterEmailSender do
+    use MishkaInstaller.Event.Hook, event: "after_success_login"
+
+    def call(entries) do
+      {:reply, entries}
+    end
+  end
+  ```
+
+  If you want to change a series of default information, do this:
+
+  ```elixir
+  use MishkaInstaller.Event.Hook,
+    event: "after_success_login",
+    initial: %{depends: [SomeEvent], priority: 20}
+  ```
+
+  > There should be one main functions in each plugin, namely `call`. In this function,
+  > whenever the action function calls this special event for which the plugin is written,
+  > based on priority. This plugin is also called. But what is important is the final output
+  > of the `call` function.
+  > This output may be the input of other plugins with higher priorities.
+  > The order of the plugins is from small to large, and if several plugins are registered for a number,
+  > it is sorted by name in the second parameter. And it should be noted that in any case,
+  > if you did not want this `state` to go to other plugins and the last output is returned in the same plugin,
+  > and you can replace `{:reply, :halt, new_state}` with `{:reply, new_state}`.
+
+
+  **Note: If you want your plugin to execute automatically,
+  all you need to do is send the name of the module in which you utilized
+  the `MishkaInstaller.Event.Hook` to the Application module.***
+
+  ```elixir
+  children = [
+    ...
+    RegisterEmailSender
+  ]
+
+  ...
+  opts = [strategy: :one_for_one, name: SomeModule.Supervisor]
+  Supervisor.start_link(children, opts)
+  ```
+
+  #### You can call all plugins of an event:
+
+  ```elixir
+  alias MishkaInstaller.Event.Hook
+
+  # Normal call an event plugins
+  Hook.call("after_success_login", params)
+
+  # If you want certain entries not to change
+  Hook.call("after_success_login", params, [private: something_based_on_your_data])
+
+  # If you want the initial entry to be displayed at the end
+  Hook.call("after_success_login", params, [return: true])
+  ```
   """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 
@@ -197,7 +358,20 @@ defmodule MishkaInstaller.Event.Hook do
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
   @doc """
+  Invokes the `call/2` function of the specified event module.
 
+  ## Parameters
+  - `event` (String.t()): The name of the event.
+  - `data` (any()): The data to be passed to the event module.
+  - `args` (keyword()): Additional arguments for the call (`private`, `return`).
+
+  ## Returns
+  - `any()`: The result of the event module's `call/2` function.
+
+  ## Examples
+  ```elixir
+  MishkaInstaller.Event.Hook.call("my_event", %{}, [])
+  ```
   """
   @spec call(String.t(), any(), keyword()) :: any()
   def call(event, data, args \\ []) do
@@ -211,7 +385,10 @@ defmodule MishkaInstaller.Event.Hook do
   end
 
   @doc """
-
+  The only difference between this function and the `call/3` function is that the former
+  does not check in a single step whether the required event has been compiled or not.
+  When you are 100% certain that the event you want is present in the system,
+  using it is the best option.
   """
   @spec call!(String.t(), any(), keyword()) :: any()
   def call!(event, data, args \\ []) do

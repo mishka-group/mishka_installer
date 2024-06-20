@@ -19,6 +19,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   > This module is a read-only in-memory storage optimized for the fastest possible read times
   > not for write strategies.
 
+  ##### Compile path: `MishkaInstaller.Event.ModuleStateCompiler.State.YourEvent`.
+
   ### Note:
 
   When you are writing, you should always make an effort to be more careful because
