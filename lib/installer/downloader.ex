@@ -1,6 +1,16 @@
 defmodule MishkaInstaller.Installer.Downloader do
   @moduledoc """
+  The `MishkaInstaller.Installer.Downloader` module provides functions for downloading packages
+  from various sources such as `Hex.pm` and `GitHub`.
 
+  It supports different download types and can fetch specific **versions** or the **latest releases**.
+  This module also includes functions for retrieving `mix.exs` files from these sources.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
   """
   @hex_path "https://hex.pm/api/packages"
   @hex_preview_path "https://repo.hex.pm/preview"
@@ -33,7 +43,26 @@ defmodule MishkaInstaller.Installer.Downloader do
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
   @doc """
+  Downloads a package from the specified source.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ### Example:
+  ```elixir
+  download(:hex, %{app: app, tag: tag_name})
+  download(:github, %{path: path, branch: {branch, git: true}})
+  download(:github, %{path: path, branch: branch})
+  download(:github, %{path: path, release: release})
+  download(:github, %{path: path, tag: tag})
+  download(:hex, %{app: app})
+  download(:github, %{path: path})
+  download(:github_latest_release, %{path: path})
+  download(:github_latest_tag, %{path: path})
+  ```
   """
   @spec download(download_type, pkg) :: okey_return | error_return
   def download(:hex, %{app: app, tag: tag_name}) do
@@ -121,7 +150,25 @@ defmodule MishkaInstaller.Installer.Downloader do
   # ************************************************************
   # ************************************************************
   @doc """
+  Retrieves the `mix.exs` file for the specified package.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ### Example:
+  ```elixir
+  get_mix(:hex, %{app: app, tag: tag_name})
+  get_mix(:github_release, %{path: path, release: tag_name})
+  get_mix(:github_tag, %{path: path, tag: tag_name})
+  get_mix(:hex, %{app: app})
+  get_mix(:github, %{path: path})
+  get_mix(:github_latest_release, %{path: path})
+  get_mix(:github_latest_tag, %{path: path})
+  get_mix(:url, %{path: path})
+  ```
   """
   @spec get_mix(download_type, pkg) :: okey_return | error_return
   def get_mix(:hex, %{app: app, tag: tag_name}) do
