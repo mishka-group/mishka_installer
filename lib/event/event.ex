@@ -524,6 +524,12 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   To get all plugins information from Mnesia database.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
   ## Example:
 
   ```elixir
@@ -547,6 +553,13 @@ defmodule MishkaInstaller.Event.Event do
 
   @doc """
   To get all plugins or one plugin information from Mnesia database.
+
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
 
   ## Example:
 
@@ -579,6 +592,12 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   To get a plugin information from Mnesia database by id.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
   ## Example:
 
   ```elixir
@@ -600,6 +619,12 @@ defmodule MishkaInstaller.Event.Event do
 
   @doc """
   To Add or edit a plugin information from Mnesia database.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
 
   ## Example:
 
@@ -633,6 +658,12 @@ defmodule MishkaInstaller.Event.Event do
 
   > The first input can only be name and ID `[:id, :name]`.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
   ## Example:
 
   ```elixir
@@ -664,6 +695,12 @@ defmodule MishkaInstaller.Event.Event do
 
   ## Example:
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
   ```elixir
   ids()
   ```
@@ -675,6 +712,12 @@ defmodule MishkaInstaller.Event.Event do
 
   @doc """
   To get all the events defined in the Mnesia database (Only unique items are returned).
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
 
   ## Example:
 
@@ -698,6 +741,12 @@ defmodule MishkaInstaller.Event.Event do
 
   @doc """
   To delete a plugin from Mnesia database by id or name.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
 
   ## Example:
 
@@ -733,6 +782,12 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   To drop all plugins from Mnesia database.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
   ## Example:
 
   ```elixir
@@ -750,6 +805,12 @@ defmodule MishkaInstaller.Event.Event do
 
   > It returns `:ok`, or `{:error, reason}`. Note that if the requested plugin does not exist,
   > it means it is unique, and if it is already in the database, it means it is not unique
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
 
   ## Example:
 
@@ -770,6 +831,12 @@ defmodule MishkaInstaller.Event.Event do
 
   @doc """
   This function is exactly like `unique/2` function, except that its output is a Boolean
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
 
   ## Example:
 
