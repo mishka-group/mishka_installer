@@ -22,6 +22,14 @@ defmodule MishkaInstaller.MixProject do
         source_ref: "master",
         extras: ["README.md"],
         source_url: @source_url
+      ],
+      test_coverage: [
+        ignore_modules: [
+          MishkaInstaller.MnesiaRepo.State,
+          MishkaInstaller.Installer.PortHandler,
+          MishkaInstaller.MnesiaRepo,
+          ~r/\.Support.MishkaPlugin\./
+        ]
       ]
     ]
   end
