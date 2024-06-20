@@ -162,6 +162,11 @@ defmodule MishkaInstaller.Event.Hook do
   # If you want the initial entry to be displayed at the end
   Hook.call("after_success_login", params, [return: true])
   ```
+
+  > #### Use cases information {: .tip}
+  >
+  > Module `MishkaInstaller.Event.Event` has all of the preset functionalities, and it is
+  > simple for you to build and implement your own strategy because of this.
   """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 
