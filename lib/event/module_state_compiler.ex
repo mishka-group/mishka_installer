@@ -1,6 +1,30 @@
 defmodule MishkaInstaller.Event.ModuleStateCompiler do
   @moduledoc """
+  `The MishkaInstaller.Event.ModuleStateCompiler` module is designed to dynamically create and manage
+  event-driven modules that handle state and plugins within the Mishka Installer system.
+  This module provides functions to create, purge, and verify the initialization state of these event modules.
 
+  **In fact, this system creates a runtime module for each event based on system
+  requirements and conditions in the `MishkaInstaller.Event.Event` and `MishkaInstaller.Event.Hook` modules,
+  which also contains a series of essential functions.**
+
+  ---
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+
+  ### Note:
+
+  When you are writing, you should always make an effort to be more careful because
+  you might get reconditioned during times of high traffic.
+  When it comes to reading and running all plugins, this problem only occurs when a
+  module is being created and destroyed during the compilation process.
   """
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
 
@@ -9,7 +33,24 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
   @doc """
+  Creates a new module based on the provided event name and plugins.
 
+  ## Parameters
+  - `plugins` (list): A list of plugin(`ishkaInstaller.Event.Event`) structs to be included in the
+  new module.
+  - `event` (String.t()): The name of the event for which the module is created.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measure
+
+  ## Examples
+  ```elixir
+  alias MishkaInstaller.Event.Event
+  create([%Event{name: MyPlugin}], "event_name")
+  ```
   """
   @spec create(list(struct()), String.t()) :: :ok | error_return
   def create(plugins, event) do
@@ -87,7 +128,19 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
+  Purges (`purge/1`) an existing module and creates a new one (`create/2`) with the provided plugins and event name.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measure
+
+  ## Examples
+  ```elixir
+  alias MishkaInstaller.Event.Event
+  purge_create([%Event{name: MyPlugin}], "event_name")
+  ```
   """
   @spec purge_create(list(struct()), String.t()) :: :ok | error_return
   def purge_create(plugins, event) do
@@ -96,7 +149,18 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
+  Purges the specified event modules or a module.
 
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measure
+
+  ## Examples
+  ```elixir
+  purge("event_name")
+  ```
   """
   @spec purge(list(String.t()) | String.t()) :: :ok
   def purge(events) when is_list(events) do
@@ -114,7 +178,20 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
-  @doc false
+  @doc """
+  Generates a module name based on the event name.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measure
+
+  ## Examples
+  ```elixir
+  module_event_name("event_name")
+  ```
+  """
   @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
     event
@@ -127,13 +204,23 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
+  Checks if the event module is initialized.
 
+  ## Examples
+  ```elixir
+  initialize?("event_name")
+  ```
   """
   @spec initialize?(String.t()) :: boolean()
   def initialize?(event), do: module_event_name(event).initialize?
 
   @doc """
+  Safely checks if the event module is initialized, rescuing any errors.
 
+  ## Examples
+  ```elixir
+  rescue_initialize?("event_name")
+  ```
   """
   @spec rescue_initialize?(String.t()) :: boolean()
   def rescue_initialize?(event) do
@@ -144,7 +231,14 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
+  Checks if the event module is compiled and loaded.
 
+  > Just should be used when you need one time or in compile time
+
+  ## Examples
+  ```elixir
+  compile_initialize?("event_name")
+  ```
   """
   @spec compile_initialize?(String.t()) :: boolean()
   def compile_initialize?(event) do
@@ -153,7 +247,12 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
+  Checks if the event module has an `initialize?` function exported.
 
+  ## Examples
+  ```elixir
+  safe_initialize?("event_name")
+  ```
   """
   @spec safe_initialize?(String.t()) :: boolean()
   def safe_initialize?(event) do
