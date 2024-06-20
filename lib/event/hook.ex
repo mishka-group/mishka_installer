@@ -167,6 +167,9 @@ defmodule MishkaInstaller.Event.Hook do
   >
   > Module `MishkaInstaller.Event.Event` has all of the preset functionalities, and it is
   > simple for you to build and implement your own strategy because of this.
+  >
+  > You can override these functions:
+  > `register: 0`, `start: 0`, `restart: 0`, `stop: 0`, `unregister: 0`, `get: 0`
   """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 
