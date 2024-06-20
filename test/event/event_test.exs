@@ -86,7 +86,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}
       |> Event.write()
 
-      assert length(Event.ides()) == 1
+      assert length(Event.ids()) == 1
     end
 
     test "Unique? plugin Record by name" do

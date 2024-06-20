@@ -522,7 +522,13 @@ defmodule MishkaInstaller.Event.Event do
   ############################ (▰˘◡˘▰) Query (▰˘◡˘▰) ##########################
   ###################################################################################
   @doc """
+  To get all plugins information from Mnesia database.
 
+  ## Example:
+
+  ```elixir
+  get()
+  ```
   """
   @spec get() :: list(map() | struct())
   def get() do
@@ -540,7 +546,20 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To get all plugins or one plugin information from Mnesia database.
 
+  ## Example:
+
+  ```elixir
+  # All plugins of an event
+  get(:event, "after_login")
+
+  # All plugins of an extension
+  get(:extension, :mishka_developer_tools)
+
+  # Get a plugin
+  get(:name, TestApp.User.Auth)
+  ```
   """
   @spec get(:name | :event | :extension, module() | String.t()) ::
           list(map() | struct()) | map() | struct() | nil
@@ -558,7 +577,13 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To get a plugin information from Mnesia database by id.
 
+  ## Example:
+
+  ```elixir
+  get("c63aea42-209a-40fb-b5c6-a0d28ee7e25b")
+  ```
   """
   @spec get(String.t()) :: map() | struct() | nil
   def get(id) do
@@ -574,7 +599,13 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To Add or edit a plugin information from Mnesia database.
 
+  ## Example:
+
+  ```elixir
+  write(%MishkaInstaller.Event.Event{name: TestApp.User.Auth, event: "after_login", extension: :test_app})
+  ```
   """
   @spec write(builder_entry) :: error_return | okey_return
   def write(data) do
@@ -598,7 +629,15 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To edit a specific field/fields of a plugin from the Mnesia database.
 
+  > The first input can only be name and ID `[:id, :name]`.
+
+  ## Example:
+
+  ```elixir
+  write(:name, TestApp.User.Auth, %{status: :started})
+  ```
   """
   @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
   def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
@@ -621,15 +660,27 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To get all plugins ids from Mnesia database.
 
+  ## Example:
+
+  ```elixir
+  ids()
+  ```
   """
-  @spec ides() :: list(String.t())
-  def ides() do
+  @spec ids() :: list(String.t())
+  def ids() do
     Transaction.ets(fn -> Table.all_keys(__MODULE__) end)
   end
 
   @doc """
+  To get all the events defined in the Mnesia database (Only unique items are returned).
 
+  ## Example:
+
+  ```elixir
+  group_events()
+  ```
   """
   @spec group_events(list(atom())) :: error_return() | okey_return()
   def group_events(key \\ [:event]) do
@@ -646,7 +697,15 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To delete a plugin from Mnesia database by id or name.
 
+  ## Example:
+
+  ```elixir
+  delete(:name, TestApp.User.Auth)
+
+  delete(:id, "c63aea42-209a-40fb-b5c6-a0d28ee7e25b")
+  ```
   """
   @spec delete(atom(), String.t() | module()) :: error_return | okey_return
   def delete(field, value) when field in [:id, :name] do
@@ -672,7 +731,13 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To drop all plugins from Mnesia database.
 
+  ## Example:
+
+  ```elixir
+  drop()
+  ```
   """
   @spec drop() :: {:ok, :atomic} | {:error, any(), charlist()}
   def drop() do
@@ -681,7 +746,16 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  To check is a plugin unique or not in Mnesia database.
 
+  > It returns `:ok`, or `{:error, reason}`. Note that if the requested plugin does not exist,
+  > it means it is unique, and if it is already in the database, it means it is not unique
+
+  ## Example:
+
+  ```elixir
+  unique(:name, TestApp.User.Auth)
+  ```
   """
   def unique(field, value) do
     case get(field, value) do
@@ -695,7 +769,13 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  This function is exactly like `unique/2` function, except that its output is a Boolean
 
+  ## Example:
+
+  ```elixir
+  unique?(:name, TestApp.User.Auth)
+  ```
   """
   def unique?(field, value), do: is_nil(get(field, value))
   ####################################################################################
