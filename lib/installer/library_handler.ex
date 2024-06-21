@@ -1,21 +1,47 @@
-defmodule MishkaInstaller.Installer.LibraryReader do
-  # Based on https://github.com/mishka-group/mishka_installer/blob/master/lib/helper/library_maker.ex
-  @doc """
-  With this function, you can extract some basic information from a `mix` file by AST.
+defmodule MishkaInstaller.Installer.LibraryHandler do
+  @moduledoc """
 
-  ## Examples
-
-  ```elixir
-  alias MishkaInstaller.Installer.LibraryReader
-
-  LibraryReader.ast_mix_file_basic_information(ast, [:app, :version, :source_url], [{:tag, tag}])
-  ```
-
-  ### Reference
-
-  - https://elixirforum.com/t/48231/7
   """
-  def ast_mix_file_basic_information(ast, selection, extra \\ []) do
+  @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
+
+  @type okey_return :: {:ok, struct() | map()}
+
+  @type app :: String.t() | atom()
+
+  @type runtime_type :: :add | :force_update | :uninstall
+
+  @type compile_time_type :: :cmd | :port | :mix
+  ####################################################################################
+  ######################## (▰˘◡˘▰) Public API (▰˘◡˘▰) ##########################
+  ####################################################################################
+  @spec do_runtime(app, runtime_type) :: any()
+  def do_runtime(_app, :add) do
+  end
+
+  def do_runtime(_app, :force_update) do
+  end
+
+  def do_runtime(_app, :uninstall) do
+  end
+
+  @spec do_runtime(app, compile_time_type) :: any()
+  def do_compile_time(_app, type) when type in [:cmd, :port, :mix] do
+  end
+
+  ####################################################################################
+  ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
+  ####################################################################################
+  @spec compare_dependencies([tuple()], [String.t()]) :: [String.t()]
+  def compare_dependencies(installed_apps \\ Application.loaded_applications(), files_list) do
+    installed_apps =
+      Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
+
+    Enum.reduce(files_list, [], fn app_name, acc ->
+      if Map.fetch(installed_apps, app_name) == :error, do: acc ++ [app_name], else: acc
+    end)
+  end
+
+  def get_basic_information_from_mix_ast(ast, selection, extra \\ []) do
     Enum.map(selection, fn item ->
       {_ast, acc} =
         Macro.postwalk(ast, %{"#{item}": nil, attributes: %{}}, fn
