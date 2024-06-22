@@ -2,30 +2,37 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   @moduledoc """
 
   """
+  alias MishkaInstaller.Installer.Installer
+
+  @type posix :: :file.posix()
+
+  @type io_device :: :file.io_device()
+
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
 
-  @type okey_return :: {:ok, struct() | map()}
+  @type okey_return :: {:ok, struct() | map() | binary()}
 
-  @type app :: String.t() | atom()
+  @type app :: Installer.t()
 
   @type runtime_type :: :add | :force_update | :uninstall
 
   @type compile_time_type :: :cmd | :port | :mix
+
   ####################################################################################
   ######################## (▰˘◡˘▰) Public API (▰˘◡˘▰) ##########################
   ####################################################################################
   @spec do_runtime(app, runtime_type) :: any()
-  def do_runtime(_app, :add) do
+  def do_runtime(%Installer{} = _app, :add) do
   end
 
-  def do_runtime(_app, :force_update) do
+  def do_runtime(%Installer{} = _app, :force_update) do
   end
 
-  def do_runtime(_app, :uninstall) do
+  def do_runtime(%Installer{} = _app, :uninstall) do
   end
 
   @spec do_runtime(app, compile_time_type) :: any()
-  def do_compile_time(_app, type) when type in [:cmd, :port, :mix] do
+  def do_compile_time(%Installer{} = _app, type) when type in [:cmd, :port, :mix] do
   end
 
   ####################################################################################
@@ -62,19 +69,23 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end) ++ extra
   end
 
-  # TODO: should be changed
-  # erl_tar:extract("rel/project-1.0.tar.gz", [compressed]);
-  @spec extract(:tar, String.t()) :: {:error, :extract} | {:ok, :extract}
+  @spec extract(:tar, binary()) :: :ok | error_return()
   def extract(:tar, archived_file) do
     extract_output =
       :erl_tar.extract(
-        ~c'#{extensions_path()}/#{archived_file}.tar.gz',
-        [:compressed, {:cwd, ~c'#{extensions_path()}/#{archived_file}'}]
+        ~c'#{archived_file}',
+        [:compressed, {:cwd, ~c'#{extensions_path()}'}]
       )
 
     case extract_output do
-      :ok -> {:ok, :extract}
-      {:error, term} -> {:error, :extract, term}
+      :ok ->
+        :ok
+
+      {:error, term} ->
+        message =
+          "There is a problem in extracting the compressed file of the ready-made library."
+
+        {:error, [%{message: message, field: :path, action: :move, source: term}]}
     end
   end
 
@@ -95,6 +106,25 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     |> checksum()
     |> Kernel.==(Map.get(app_info, :checksum))
   end
+
+  @spec move(Installer.t(), binary()) :: okey_return() | error_return()
+  def move(app, archived_file) do
+    with {:mkdir_p, :ok} <- {:mkdir_p, File.mkdir_p(extensions_path())},
+         {:ok, path} <- write_downloaded_lib(app, archived_file) do
+      {:ok, path}
+    else
+      {:mkdir_p, {:error, error}} ->
+        message = "An error occurred in downloading and transferring the library file you want."
+        {:error, [%{message: message, field: :path, action: :move, source: error}]}
+
+      error ->
+        error
+    end
+  end
+
+  ####################################################################################
+  ########################## (▰˘◡˘▰) Callback (▰˘◡˘▰) ##########################
+  ####################################################################################
 
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
@@ -120,8 +150,26 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
   defp convert_mix_ast_output(_), do: {:error, :package, :convert_mix_ast_output}
 
+  defp write_downloaded_lib(app, extracted) do
+    open_file =
+      File.open("#{extensions_path()}/#{app.app}-#{app.version}.tar", [:read, :write], fn file ->
+        IO.binwrite(file, extracted)
+        File.close(file)
+      end)
+
+    case open_file do
+      {:ok, _ress} ->
+        {:ok, "#{extensions_path()}/#{app.app}-#{app.version}.tar"}
+
+      error ->
+        message = "An error occurred in downloading and transferring the library file you want."
+        {:error, [%{message: message, field: :path, action: :move, source: error}]}
+    end
+  end
+
   # TODO: should be changed
-  defp extensions_path() do
-    Path.join("project_path", ["deployment/", "extensions"])
+  def extensions_path() do
+    info = MishkaInstaller.__information__()
+    Path.join(info.path, ["deployment/", "#{info.env}/", "extensions"])
   end
 end

@@ -37,7 +37,7 @@ defmodule MishkaInstaller.Installer.Downloader do
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
 
-  @type okey_return :: {:ok, struct() | map()}
+  @type okey_return :: {:ok, struct() | map() | binary()}
 
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
@@ -81,21 +81,21 @@ defmodule MishkaInstaller.Installer.Downloader do
     end
   end
 
-  def download(:github, %{path: path, branch: branch}) do
+  def download(:github, %{path: path, branch: branch}) when not is_nil(branch) do
     case build_url("https://github.com/#{String.trim(path)}/archive/refs/heads/#{branch}.tar.gz") do
       %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
     end
   end
 
-  def download(:github, %{path: path, release: release}) do
+  def download(:github, %{path: path, release: release}) when not is_nil(release) do
     case build_url("https://github.com/#{String.trim(path)}/archive/refs/tags/#{release}.tar.gz") do
       %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
     end
   end
 
-  def download(:github, %{path: path, tag: tag}) do
+  def download(:github, %{path: path, tag: tag}) when not is_nil(tag) do
     case build_url("https://github.com/#{String.trim(path)}/archive/refs/tags/#{tag}.tar.gz") do
       %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
@@ -146,9 +146,18 @@ defmodule MishkaInstaller.Installer.Downloader do
     end
   end
 
-  # ************************************************************
-  # ************************************************************
-  # ************************************************************
+  def download(:url, %{path: path}) do
+    case build_url(path) do
+      %Req.Response{status: 200, body: body} -> body
+      _ -> mix_global_err()
+    end
+  end
+
+  def download(_, _) do
+    message = "The information sent to download the desired library is wrong!"
+    {:error, [%{message: message, field: :path, action: :download}]}
+  end
+
   @doc """
   Retrieves the `mix.exs` file for the specified package.
 
@@ -241,8 +250,8 @@ defmodule MishkaInstaller.Installer.Downloader do
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   defp mix_global_err(msg \\ nil) do
-    message = msg || "There is a problem downloading the mix.exs file."
-    {:error, [%{message: message, field: :path, action: :package}]}
+    message = msg || "There is a problem downloading the mix.exs/project."
+    {:error, [%{message: message, field: :path, action: :download}]}
   end
 
   # Based on https://hexdocs.pm/req/Req.Test.html#module-example

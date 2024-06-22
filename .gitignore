@@ -33,3 +33,4 @@ mishka_installer-*.tar
 /lib/example/
 .iex.exs
 /.mnesia
+/deployment/
