@@ -74,7 +74,7 @@ defmodule MishkaInstaller.Installer.Downloader do
             {:ok, converted["contents.tar.gz"]}
 
           {:error, _reason} ->
-            mix_global_err()
+            mix_global_err("The format of this file is not correct. Use standard format.")
         end
 
       _ ->
@@ -158,7 +158,7 @@ defmodule MishkaInstaller.Installer.Downloader do
 
   def download(:url, %{path: path}) do
     case build_url(path) do
-      %Req.Response{status: 200, body: body} -> body
+      %Req.Response{status: 200, body: body} -> {:ok, body}
       _ -> mix_global_err()
     end
   end
