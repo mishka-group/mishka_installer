@@ -80,16 +80,39 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
         if "mix.exs" in files_list do
           File.rename(temp_path, ~c'#{extensions_path()}/#{name}')
-        end
+          :ok
+        else
+          dirs_list =
+            File.ls!(temp_path)
+            |> Enum.filter(&File.dir?("#{extensions_path()}/temp-#{name}/#{&1}"))
 
-        # TODO: Go to temp file and check is there any mix.exs
-        # TODO: If yes, change the temp dir to ext name
-        # TODO: if not, get the first dir and if there is not
-        # TODO: return error, if yes check is there any mix file!!
-        # TODO: if not delete temp and return error
-        # TODO: if yes change name and move to ext root dir and delete tmp
-        # We do not check nested file
-        :ok
+          finding_mix =
+            Enum.find(
+              dirs_list,
+              &("mix.exs" in File.ls!("#{extensions_path()}/temp-#{name}/#{&1}"))
+            )
+
+          if is_nil(finding_mix) do
+            message =
+              "There is a problem in extracting the compressed file of the ready-made library."
+
+            {:error,
+             [%{message: message, field: :path, action: :extract, source: :bad_structure}]}
+          else
+            temp_file_path = "#{extensions_path()}/temp-#{name}/#{finding_mix}"
+
+            case File.rename(temp_file_path, "#{extensions_path()}/#{name}") do
+              :ok ->
+                File.rm_rf!("#{extensions_path()}/temp-#{name}")
+                :ok
+
+              {:error, source} ->
+                File.rm_rf!("#{extensions_path()}/temp-#{name}")
+                message = "There was a problem moving the file."
+                {:error, [%{message: message, field: :path, action: :extract, source: source}]}
+            end
+          end
+        end
 
       {:error, term} ->
         message =
