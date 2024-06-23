@@ -9,14 +9,20 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
 
   describe "Download Mock Test ===>" do
     test "Downloade hex with version" do
+      tar_file_path = "test/support/mishka_developer_tools-0.1.5.tar"
+      tar_binary = File.read!(tar_file_path)
+
       Req.Test.expect(Downloader, fn conn ->
         conn
-        |> Plug.Conn.put_resp_content_type("application/text")
-        |> Plug.Conn.send_resp(200, "file body")
+        |> Plug.Conn.put_resp_content_type("application/octet-stream")
+        |> Plug.Conn.put_resp_header(
+          "content-disposition",
+          "attachment; filename=\"#{Path.basename(tar_file_path)}\""
+        )
+        |> Plug.Conn.send_resp(200, tar_binary)
       end)
 
-      {:ok, "file body"} =
-        assert Downloader.download(:hex, %{app: "mishka_installer", tag: "0.0.4"})
+      {:ok, _body} = Downloader.download(:hex, %{app: "mishka_installer", tag: "0.0.4"})
 
       Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
 
@@ -79,9 +85,21 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
         |> Plug.Conn.send_resp(200, Jason.encode!(%{"latest_stable_version" => "0.0.4"}))
       end)
 
-      Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 200, "body string"))
+      tar_file_path = "test/support/mishka_developer_tools-0.1.5.tar"
+      tar_binary = File.read!(tar_file_path)
 
-      {:ok, "body string"} = assert Downloader.download(:hex, %{app: "mishka_installer"})
+      Req.Test.expect(Downloader, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/octet-stream")
+        |> Plug.Conn.put_resp_header(
+          "content-disposition",
+          "attachment; filename=\"#{Path.basename(tar_file_path)}\""
+        )
+        |> Plug.Conn.send_resp(200, tar_binary)
+      end)
+
+      {:ok, _body} =
+        assert Downloader.download(:hex, %{app: "mishka_installer"})
 
       Req.Test.expect(Downloader, &Plug.Conn.send_resp(&1, 400, "file body"))
 
