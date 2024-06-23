@@ -67,24 +67,22 @@ defmodule MishkaInstaller.Installer.Installer do
     with {:ok, data} <- __MODULE__.builder(app),
          {:ok, archived_file} <- Downloader.download(Map.get(data, :type), data),
          {:ok, path} <- LibraryHandler.move(app, archived_file),
-         :ok <- LibraryHandler.extract(:tar, path) do
-      {:ok,
-       %{
-         download: path,
-         extensions: data,
-         dir: "#{LibraryHandler.extensions_path()}/#{app.app}-#{app.version}"
-       }}
+         :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
+         ext_path <- LibraryHandler.extensions_path() do
+      {:ok, %{download: path, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
     end
 
     # TODO: Create an item inside LibraryHandler queue
-    # |__ TODO: CheckSum file if exist
     # |__ TODO: Do compile based on strategy developer wants
     # |__ TODO: Store builded files for re-start project
     # |__ TODO: Do runtime steps
     # |__ TODO: Update all stuff in mnesia db
     # |__ TODO: Re-cover if the process not correct, especially mix manipulating
   after
-    File.cd!("/Users/shahryar/Documents/Programming/Elixir/mishka_installer")
+    File.cd!(MishkaInstaller.__information__().path)
+  end
+
+  def update() do
   end
 
   def uninstall(%__MODULE__{} = _app) do

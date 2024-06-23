@@ -65,10 +65,14 @@ defmodule MishkaInstaller.Installer.Downloader do
   ```
   """
   @spec download(download_type, pkg) :: okey_return | error_return
-  def download(:hex, %{app: app, tag: tag_name}) do
+  def download(:hex, %{app: app, tag: tag_name}) when not is_nil(tag_name) do
     case build_url("https://repo.hex.pm/tarballs/#{app}-#{tag_name}.tar") do
-      %Req.Response{status: 200, body: body} -> {:ok, body}
-      _ -> mix_global_err()
+      %Req.Response{status: 200, body: body} ->
+        converted = Map.new(body, fn {key, value} -> {to_string(key), value} end)
+        {:ok, converted["contents.tar.gz"]}
+
+      _ ->
+        mix_global_err()
     end
   end
 
@@ -258,6 +262,7 @@ defmodule MishkaInstaller.Installer.Downloader do
   defp build_url(location) do
     [base_url: location]
     |> Keyword.merge(Application.get_env(:mishka_installer, :downloader_req_options, []))
+    |> Keyword.merge(Application.get_env(:mishka_installer, :proxy, []))
     |> Req.request!()
   end
 end

@@ -69,16 +69,26 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end) ++ extra
   end
 
-  @spec extract(:tar, binary()) :: :ok | error_return()
-  def extract(:tar, archived_file) do
-    extract_output =
-      :erl_tar.extract(
-        ~c'#{archived_file}',
-        [:compressed, {:cwd, ~c'#{extensions_path()}'}]
-      )
+  @spec extract(:tar, binary(), String.t()) :: :ok | error_return()
+  def extract(:tar, archived, name) do
+    temp_path = ~c'#{extensions_path()}/temp-#{name}'
 
-    case extract_output do
+    :erl_tar.extract(~c'#{archived}', [:compressed, {:cwd, ~c'#{temp_path}'}])
+    |> case do
       :ok ->
+        files_list = File.ls!(temp_path)
+
+        if "mix.exs" in files_list do
+          File.rename(temp_path, ~c'#{extensions_path()}/#{name}')
+        end
+
+        # TODO: Go to temp file and check is there any mix.exs
+        # TODO: If yes, change the temp dir to ext name
+        # TODO: if not, get the first dir and if there is not
+        # TODO: return error, if yes check is there any mix file!!
+        # TODO: if not delete temp and return error
+        # TODO: if yes change name and move to ext root dir and delete tmp
+        # We do not check nested file
         :ok
 
       {:error, term} ->
@@ -90,8 +100,8 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   end
 
   # TODO: should be changed
-  @spec checksum(String.t(), integer()) :: String.t()
-  def checksum(file_path, size \\ 2048) do
+  @spec checksum!(Path.t(), integer()) :: String.t()
+  def checksum!(file_path, size \\ 2048) do
     File.stream!(file_path, size)
     |> Enum.reduce(:crypto.hash_init(:sha256), fn line, acc -> :crypto.hash_update(acc, line) end)
     |> :crypto.hash_final()
@@ -99,13 +109,21 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     |> String.downcase()
   end
 
-  # TODO: should be changed
-  @spec checksum?(map()) :: boolean()
-  def checksum?(app_info) do
-    "#{extensions_path()}/#{Map.get(app_info, :app)}-#{Map.get(app_info, :version)}.tar.gz"
-    |> checksum()
-    |> Kernel.==(Map.get(app_info, :checksum))
+  def checksum(checksum, file_path) do
+    if !checksum?(checksum, file_path) do
+      message =
+        "Unfortunately, the Checksum of the downloaded file is not the same as the number stored in the database."
+
+      {:error, [%{message: message, field: :path, action: :checksum}]}
+    else
+      :ok
+    end
   end
+
+  @spec checksum?(nil | integer(), Path.t()) :: boolean()
+  def checksum?(nil, _file_path), do: true
+
+  def checksum?(checksum, file_path), do: checksum!(file_path) |> Kernel.==(checksum)
 
   @spec move(Installer.t(), binary()) :: okey_return() | error_return()
   def move(app, archived_file) do
@@ -150,10 +168,10 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
   defp convert_mix_ast_output(_), do: {:error, :package, :convert_mix_ast_output}
 
-  defp write_downloaded_lib(app, extracted) do
+  defp write_downloaded_lib(app, archived_file) do
     open_file =
       File.open("#{extensions_path()}/#{app.app}-#{app.version}.tar", [:read, :write], fn file ->
-        IO.binwrite(file, extracted)
+        IO.binwrite(file, archived_file)
         File.close(file)
       end)
 
