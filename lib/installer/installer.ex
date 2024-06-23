@@ -98,6 +98,21 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ########################## (▰˘◡˘▰) Query (▰˘◡˘▰) ############################
   ####################################################################################
+  @spec get() :: list(map() | struct())
+  def get() do
+    pattern = ([__MODULE__] ++ Enum.map(1..length(keys()), fn _x -> :_ end)) |> List.to_tuple()
+
+    Transaction.transaction(fn -> Query.match_object(pattern) end)
+    |> case do
+      {:atomic, res} ->
+        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+
+      {:aborted, reason} ->
+        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
+        []
+    end
+  end
+
   @spec get(String.t()) :: struct() | nil
   def get(id) do
     Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
