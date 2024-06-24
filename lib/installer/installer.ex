@@ -16,6 +16,8 @@ defmodule MishkaInstaller.Installer.Installer do
 
   @type dep_type :: :none | :force_update
 
+  @type com_type :: :none | :cmd | :port | :mix
+
   @type branch :: String.t() | {String.t(), [git: boolean()]}
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
@@ -34,8 +36,9 @@ defmodule MishkaInstaller.Installer.Installer do
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
   ####################################################################################
   guardedstruct do
-    @ext_type "hex::github::github_latest_release::github_latest_tag::url"
+    @ext_type "hex::github::github_latest_release::github_latest_tag::url::extracted"
     @dep_type "enum=Atom[none::force_update]"
+    @compile_type "enum=Atom[none::cmd::port::mix]"
 
     field(:id, UUID.t(), auto: {UUID, :generate}, derive: "validate(uuid)")
     field(:app, String.t(), enforce: true, derive: "validate(not_empty_string)")
@@ -47,8 +50,8 @@ defmodule MishkaInstaller.Installer.Installer do
     field(:branch, branch(), derive: "validate(either=[tuple, not_empty_string])")
     field(:custom_command, String.t(), derive: "validate(not_empty_string)")
     field(:dependency_type, dep_type(), default: :none, derive: "validate(#{@dep_type})")
+    field(:compile_type, com_type(), default: :cmd, derive: "validate(#{@compile_type})")
     field(:depends, list(String.t()), default: [], derive: "validate(list)")
-    field(:checksum, String.t(), derive: "validate(not_empty_string)")
     # This type can be used when you want to introduce an event inserted_at unix time(timestamp).
     field(:inserted_at, DateTime.t(), auto: {Extra, :get_unix_time})
     # This type can be used when you want to introduce an event updated_at unix time(timestamp).
@@ -71,8 +74,22 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  def install(app) when app.type == :extracted do
+    with {:ok, data} <- __MODULE__.builder(app),
+         :ok <- unique(:app, data.app),
+         :ok <- mix_exist(data.path),
+         :ok <- allowed_extract_path(data.path),
+         ext_path <- LibraryHandler.extensions_path(),
+         :ok <- rename_dir(data.path, "#{ext_path}/#{app.app}-#{app.version}") do
+      {:ok, %{download: nil, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
+    end
+  after
+    File.cd!(MishkaInstaller.__information__().path)
+  end
+
   def install(app) do
     with {:ok, data} <- __MODULE__.builder(app),
+         :ok <- unique(:app, data.app),
          {:ok, archived_file} <- Downloader.download(Map.get(data, :type), data),
          {:ok, path} <- LibraryHandler.move(app, archived_file),
          :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
@@ -232,4 +249,40 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
+  defp mix_exist(path) do
+    with true <- File.dir?(path),
+         files_list <- File.ls!(path),
+         true <- "mix.exs" in files_list do
+      :ok
+    else
+      _ ->
+        message =
+          "There is no mix.exs file in the specified path (directory). Please use Elixir standard library."
+
+        {:error, [%{message: message, field: :global, action: :mix_exist}]}
+    end
+  end
+
+  defp rename_dir(path, name_path) do
+    case File.rename(path, name_path) do
+      :ok ->
+        File.rm_rf!(path)
+        :ok
+
+      {:error, source} ->
+        File.rm_rf!(path)
+        message = "There was a problem moving the file."
+        {:error, [%{message: message, field: :path, action: :rename_dir, source: source}]}
+    end
+  end
+
+  defp allowed_extract_path(extract_path) do
+    if String.starts_with?(extract_path, LibraryHandler.extensions_path()) do
+      :ok
+    else
+      message = "Your library extraction path is not correct."
+      allowed = LibraryHandler.extensions_path()
+      {:error, [%{message: message, field: :path, action: :rename_dir, allowed: allowed}]}
+    end
+  end
 end

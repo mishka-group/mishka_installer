@@ -122,32 +122,6 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
-  # TODO: should be changed
-  @spec checksum!(Path.t(), integer()) :: String.t()
-  def checksum!(file_path, size \\ 2048) do
-    File.stream!(file_path, size)
-    |> Enum.reduce(:crypto.hash_init(:sha256), fn line, acc -> :crypto.hash_update(acc, line) end)
-    |> :crypto.hash_final()
-    |> Base.encode16()
-    |> String.downcase()
-  end
-
-  def checksum(checksum, file_path) do
-    if !checksum?(checksum, file_path) do
-      message =
-        "Unfortunately, the Checksum of the downloaded file is not the same as the number stored in the database."
-
-      {:error, [%{message: message, field: :path, action: :checksum}]}
-    else
-      :ok
-    end
-  end
-
-  @spec checksum?(nil | integer(), Path.t()) :: boolean()
-  def checksum?(nil, _file_path), do: true
-
-  def checksum?(checksum, file_path), do: checksum!(file_path) |> Kernel.==(checksum)
-
   @spec move(Installer.t(), binary()) :: okey_return() | error_return()
   def move(app, archived_file) do
     with {:mkdir_p, :ok} <- {:mkdir_p, File.mkdir_p(extensions_path())},
