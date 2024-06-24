@@ -66,22 +66,32 @@ defmodule MishkaInstaller.Installer.Downloader do
   """
   @spec download(download_type, pkg) :: okey_return | error_return
   def download(:hex, %{app: app, tag: tag_name}) when not is_nil(tag_name) do
-    case build_url("https://repo.hex.pm/tarballs/#{app}-#{tag_name}.tar", decode_body: false) do
+    case build_url("https://repo.hex.pm/tarballs/#{app}-#{tag_name}.tar") do
       %Req.Response{status: 200, body: body} ->
-        case :erl_tar.extract({:binary, body}, [:memory]) do
-          {:ok, files} ->
-            converted = Map.new(files, fn {key, value} -> {to_string(key), value} end)
-            {:ok, converted["contents.tar.gz"]}
-
-          {:error, _reason} ->
-            mix_global_err("The format of this file is not correct. Use standard format.")
-        end
+        converted = Map.new(body, fn {key, value} -> {to_string(key), value} end)
+        {:ok, converted["contents.tar.gz"]}
 
       _ ->
         mix_global_err()
     end
   end
 
+  # def download(:hex, %{app: app, tag: tag_name}) when not is_nil(tag_name) do
+  #   case build_url("https://repo.hex.pm/tarballs/#{app}-#{tag_name}.tar", decode_body: false) do
+  #     %Req.Response{status: 200, body: body} ->
+  #       case :erl_tar.extract({:binary, body}, [:memory]) do
+  #         {:ok, files} ->
+  #           converted = Map.new(files, fn {key, value} -> {to_string(key), value} end)
+  #           {:ok, converted["contents.tar.gz"]}
+
+  #         {:error, _reason} ->
+  #           mix_global_err("The format of this file is not correct. Use standard format.")
+  #       end
+
+  #     _ ->
+  #       mix_global_err()
+  #   end
+  # end
   def download(:github, %{path: path, branch: {branch, git: true}}) do
     case build_url(
            "#{@github_codeload_path}/#{String.trim(path)}/legacy.tar.gz/refs/heads/#{branch}"

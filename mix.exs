@@ -44,7 +44,7 @@ defmodule MishkaInstaller.MixProject do
   defp deps do
     [
       {:phoenix_pubsub, "~> 2.1.3"},
-      {:req, "~> 0.5.0"},
+      {:req, "~> 0.5.1"},
       {:plug, "~> 1.16"},
 
       # Extra tools
@@ -52,7 +52,8 @@ defmodule MishkaInstaller.MixProject do
       {:telemetry, "~> 1.2.1"},
 
       # Dev and Test dependencies
-      {:ex_doc, "~> 0.34.0", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.34.0", only: :dev, runtime: false},
+      {:hex_core, "~> 0.10.2", only: :test}
     ]
   end
 
