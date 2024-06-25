@@ -2,7 +2,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   @moduledoc """
 
   """
-  alias MishkaInstaller.Installer.Installer
+  alias MishkaInstaller.Installer.{Installer, Collect}
 
   @type posix :: :file.posix()
 
@@ -146,10 +146,23 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
     {stream, status} =
       System.cmd(operation, [command],
-        into: IO.stream(),
+        into: %Collect{
+          callback: fn line, _acc ->
+            MishkaInstaller.broadcast("library_handler", :cmd_messaging, %{
+              operation: command,
+              message: "#{inspect(line)}",
+              status: :looping
+            })
+
+            IO.puts("[stdout] #{line}")
+          end
+        },
         stderr_to_stdout: true,
         env: [{"MIX_ENV", "#{info.env}"}, {"PROJECT_PATH", "#{info.path}"}]
       )
+
+    return_exist = %{operation: command, output: stream, status: status}
+    MishkaInstaller.broadcast("library_handler", :cmd_stopped, return_exist)
 
     if status == 0 do
       :ok
