@@ -38,10 +38,11 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
-  @spec compare_dependencies([tuple()], [String.t()]) :: [String.t()]
-  def compare_dependencies(installed_apps \\ Application.loaded_applications(), files_list) do
+  @spec compare_dependencies([String.t()]) :: [String.t()]
+  def compare_dependencies(files_list) do
     installed_apps =
-      Map.new(installed_apps, fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
+      Application.loaded_applications()
+      |> Map.new(fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
 
     Enum.reduce(files_list, [], fn app_name, acc ->
       if Map.fetch(installed_apps, app_name) == :error, do: acc ++ [app_name], else: acc
@@ -139,6 +140,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
   # Ref: https://hexdocs.pm/elixir/Port.html#module-spawn_executable
   # Ref: https://elixirforum.com/t/48336/
+  @spec command_execution(:cmd | :port, String.t(), String.t()) :: :ok | error_return()
   def command_execution(type, command, operation \\ "mix")
 
   def command_execution(:cmd, command, operation) do
@@ -195,6 +197,44 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
       message = "There is a pre-ready error when executing the system command as a Port."
       source = %{command: command, output: output}
       {:error, [%{message: message, field: :port, action: :command_execution, source: source}]}
+    end
+  end
+
+  def consult_app_file(bin) do
+    # The path could be located in an .ez archive, so we use the prim loader.
+    with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)) do
+      :erl_parse.parse_term(tokens)
+    end
+  end
+
+  @doc """
+  Reads the given app from path in an optimized format and returns its contents.
+
+  Based on:
+  https://github.com/elixir-lang/elixir/blob/f0fcd64f937af8ccdd98e086c107c3902485d404/lib/mix/lib/mix/app_loader.ex#L59-L75
+  """
+  @spec read_app(atom(), Path.t()) :: {:ok, any()} | error_return()
+  def read_app(app, app_path) do
+    case File.read(app_path) do
+      {:ok, bin} ->
+        with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)),
+             {:ok, {:application, ^app, properties}} <- :erl_parse.parse_term(tokens) do
+          {:ok, properties}
+        else
+          {:ok, _data} ->
+            message = "The sent app is in conflict with the path of the ebin file."
+            {:error, [%{message: message, field: :erl_scan, action: :read_app}]}
+
+          error ->
+            message = "There is a problem in parsing the application."
+            {:error, [%{message: message, field: :erl_scan, action: :read_app, source: error}]}
+        end
+
+      {:error, error} ->
+        message =
+          "The path sent from the ebin file is not correct or you do not have access to it."
+
+        {:error, [%{message: message, field: :ebin_path, action: :read_app, source: error}]}
     end
   end
 
