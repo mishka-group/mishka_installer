@@ -80,7 +80,8 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- mix_exist(data.path),
          :ok <- allowed_extract_path(data.path),
          ext_path <- LibraryHandler.extensions_path(),
-         :ok <- rename_dir(data.path, "#{ext_path}/#{app.app}-#{app.version}") do
+         :ok <- rename_dir(data.path, "#{ext_path}/#{app.app}-#{app.version}"),
+         :ok <- LibraryHandler.do_compile(data) do
       {:ok, %{download: nil, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
     end
   after
@@ -93,12 +94,12 @@ defmodule MishkaInstaller.Installer.Installer do
          {:ok, archived_file} <- Downloader.download(Map.get(data, :type), data),
          {:ok, path} <- LibraryHandler.move(app, archived_file),
          :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
-         ext_path <- LibraryHandler.extensions_path() do
+         ext_path <- LibraryHandler.extensions_path(),
+         :ok <- LibraryHandler.do_compile(data) do
       {:ok, %{download: path, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
     end
 
     # TODO: Create an item inside LibraryHandler queue
-    # |__ TODO: Do compile based on strategy developer wants
     # |__ TODO: Store builded files for re-start project
     # |__ TODO: Do runtime steps
     # |__ TODO: Update all stuff in mnesia db

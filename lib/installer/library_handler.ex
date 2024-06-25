@@ -21,18 +21,17 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   ####################################################################################
   ######################## (▰˘◡˘▰) Public API (▰˘◡˘▰) ##########################
   ####################################################################################
-  @spec do_runtime(app, runtime_type) :: any()
-  def do_runtime(%Installer{} = _app, :add) do
-  end
-
-  def do_runtime(%Installer{} = _app, :force_update) do
-  end
-
-  def do_runtime(%Installer{} = _app, :uninstall) do
-  end
-
-  @spec do_runtime(app, compile_time_type) :: any()
-  def do_compile_time(%Installer{} = _app, type) when type in [:cmd, :port, :mix] do
+  @spec do_compile(app) :: :ok | error_return()
+  def do_compile(app) when app.compile_type in [:cmd, :port, :mix] do
+    with ext_path <- extensions_path(),
+         :ok <- change_dir("#{ext_path}/#{app.app}-#{app.version}"),
+         :ok <- command_execution(app.compile_type, "deps.get"),
+         :ok <- command_execution(app.compile_type, "deps.compile"),
+         :ok <- command_execution(app.compile_type, "compile") do
+      :ok
+    end
+  after
+    File.cd!(MishkaInstaller.__information__().path)
   end
 
   ####################################################################################
@@ -137,10 +136,66 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  # Ref: https://hexdocs.pm/elixir/Port.html#module-spawn_executable
+  # Ref: https://elixirforum.com/t/48336/
+  def command_execution(type, command, operation \\ "mix")
+
+  def command_execution(:cmd, command, operation) do
+    info = MishkaInstaller.__information__()
+
+    {stream, status} =
+      System.cmd(operation, [command],
+        into: IO.stream(),
+        stderr_to_stdout: true,
+        env: [{"MIX_ENV", "#{info.env}"}, {"PROJECT_PATH", "#{info.path}"}]
+      )
+
+    if status == 0 do
+      :ok
+    else
+      message = "There is a pre-ready error when executing the system command."
+      source = %{command: command, output: stream}
+      {:error, [%{message: message, field: :cmd, action: :command_execution, source: source}]}
+    end
+  end
+
+  def command_execution(:port, command, operation) do
+    info = MishkaInstaller.__information__()
+    path = System.find_executable("#{operation}")
+
+    port =
+      Port.open({:spawn_executable, path}, [
+        :binary,
+        :exit_status,
+        args: [command],
+        line: 1000,
+        env: [{~c"MIX_ENV", ~c"#{info.env}"}, {~c"PROJECT_PATH", ~c"#{info.path}"}]
+      ])
+
+    start_exec_satet([])
+    %{status: status, output: output} = loop(port, command)
+
+    if status == 0 do
+      :ok
+    else
+      message = "There is a pre-ready error when executing the system command as a Port."
+      source = %{command: command, output: output}
+      {:error, [%{message: message, field: :port, action: :command_execution, source: source}]}
+    end
+  end
+
   ####################################################################################
   ########################## (▰˘◡˘▰) Callback (▰˘◡˘▰) ##########################
   ####################################################################################
+  defp start_exec_satet(initial_value),
+    do: Agent.start_link(fn -> initial_value end, name: __MODULE__)
 
+  defp update_exec_satet(new_value),
+    do: Agent.get_and_update(__MODULE__, fn state -> {state, state ++ new_value} end)
+
+  defp get_exec_state(), do: Agent.get(__MODULE__, & &1)
+
+  defp stop_exec_state(), do: Agent.stop(__MODULE__)
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
@@ -182,9 +237,52 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
-  # TODO: should be changed
   def extensions_path() do
     info = MishkaInstaller.__information__()
     Path.join(info.path, ["deployment/", "#{info.env}/", "extensions"])
+  end
+
+  defp change_dir(path) do
+    case File.cd(path) do
+      {:error, posix} ->
+        message = "No such directory exists or you do not have access to it."
+        {:error, [%{message: message, field: :path, action: :rename_dir, source: posix}]}
+
+      _ ->
+        :ok
+    end
+  end
+
+  defp loop(port, command) do
+    receive do
+      {^port, {:data, {:eol, msg}}} when is_binary(msg) ->
+        update_exec_satet([msg])
+
+        MishkaInstaller.broadcast("library_handler", :port_messaging, %{
+          operation: command,
+          message: msg,
+          status: :looping
+        })
+
+        loop(port, command)
+
+      {^port, {:data, data}} ->
+        update_exec_satet([data])
+
+        MishkaInstaller.broadcast("library_handler", :port_messaging, %{
+          operation: command,
+          message: data,
+          status: :looping
+        })
+
+        loop(port, command)
+
+      {^port, {:exit_status, exit_status}} ->
+        output = get_exec_state()
+        stop_exec_state()
+        return_exist = %{operation: command, output: output, status: exit_status}
+        MishkaInstaller.broadcast("library_handler", :port_stopped, return_exist)
+        return_exist
+    end
   end
 end
