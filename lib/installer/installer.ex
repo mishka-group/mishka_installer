@@ -74,9 +74,12 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  # TODO: Create an item inside LibraryHandler queue
+  # |__ TODO: Store builded files for re-start project
+  # |__ TODO: Update all stuff in mnesia db
+  # TODO: Add some broadcasting to know what is the state of installing
   def install(app) when app.type == :extracted do
     with {:ok, data} <- __MODULE__.builder(app),
-         :ok <- unique(:app, data.app),
          :ok <- mix_exist(data.path),
          :ok <- allowed_extract_path(data.path),
          ext_path <- LibraryHandler.extensions_path(),
@@ -90,7 +93,6 @@ defmodule MishkaInstaller.Installer.Installer do
 
   def install(app) do
     with {:ok, data} <- __MODULE__.builder(app),
-         :ok <- unique(:app, data.app),
          {:ok, archived_file} <- Downloader.download(Map.get(data, :type), data),
          {:ok, path} <- LibraryHandler.move(app, archived_file),
          :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
@@ -98,15 +100,8 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- install_and_compile_steps(data) do
       {:ok, %{download: path, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
     end
-
-    # TODO: Create an item inside LibraryHandler queue
-    # |__ TODO: Store builded files for re-start project
-    # |__ TODO: Update all stuff in mnesia db
   after
     File.cd!(MishkaInstaller.__information__().path)
-  end
-
-  def update() do
   end
 
   def uninstall(app) do
