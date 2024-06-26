@@ -101,7 +101,6 @@ defmodule MishkaInstaller.Installer.Installer do
 
     # TODO: Create an item inside LibraryHandler queue
     # |__ TODO: Store builded files for re-start project
-    # |__ TODO: Do runtime steps
     # |__ TODO: Update all stuff in mnesia db
   after
     File.cd!(MishkaInstaller.__information__().path)
@@ -299,7 +298,10 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  defp install_and_compile_steps(data) do
+  defp install_and_compile_steps(struct_data) do
+    # Fix Dialyzer and LSP in editor
+    data = struct(__MODULE__, struct_data)
+
     with :ok <- LibraryHandler.do_compile(data),
          {:ok, moved_files} <- LibraryHandler.move_and_replace_build_files(data),
          :ok <- LibraryHandler.prepend_compiled_apps(moved_files),
