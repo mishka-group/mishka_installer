@@ -81,7 +81,7 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- allowed_extract_path(data.path),
          ext_path <- LibraryHandler.extensions_path(),
          :ok <- rename_dir(data.path, "#{ext_path}/#{app.app}-#{app.version}"),
-         :ok <- LibraryHandler.do_compile(data) do
+         :ok <- install_and_compile_steps(data) do
       {:ok, %{download: nil, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
     end
   after
@@ -95,7 +95,7 @@ defmodule MishkaInstaller.Installer.Installer do
          {:ok, path} <- LibraryHandler.move(app, archived_file),
          :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
          ext_path <- LibraryHandler.extensions_path(),
-         :ok <- LibraryHandler.do_compile(data) do
+         :ok <- install_and_compile_steps(data) do
       {:ok, %{download: path, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
     end
 
@@ -110,7 +110,19 @@ defmodule MishkaInstaller.Installer.Installer do
   def update() do
   end
 
-  def uninstall(%__MODULE__{} = _app) do
+  def uninstall(app) do
+    Application.stop(app.app)
+    Application.unload(app.app)
+    info = MishkaInstaller.__information__()
+    File.rm_rf!("#{info.path}/_build/#{info.env}/lib/#{app.app}")
+    :ok
+  end
+
+  def uninstall(app, custom_path) do
+    Application.stop(app)
+    Application.unload(app)
+    File.rm_rf!(custom_path)
+    :ok
   end
 
   ####################################################################################
@@ -284,6 +296,16 @@ defmodule MishkaInstaller.Installer.Installer do
       message = "Your library extraction path is not correct."
       allowed = LibraryHandler.extensions_path()
       {:error, [%{message: message, field: :path, action: :rename_dir, allowed: allowed}]}
+    end
+  end
+
+  defp install_and_compile_steps(data) do
+    with :ok <- LibraryHandler.do_compile(data),
+         {:ok, moved_files} <- LibraryHandler.move_and_replace_build_files(data),
+         :ok <- LibraryHandler.prepend_compiled_apps(moved_files),
+         :ok <- LibraryHandler.unload(String.to_atom(data.app)),
+         :ok <- LibraryHandler.application_ensure(String.to_atom(data.app)) do
+      :ok
     end
   end
 end

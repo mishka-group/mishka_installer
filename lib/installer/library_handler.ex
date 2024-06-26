@@ -38,15 +38,20 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
-  @spec compare_dependencies([String.t()]) :: [String.t()]
-  def compare_dependencies(files_list) do
-    installed_apps =
-      Application.loaded_applications()
-      |> Map.new(fn {app, _des, _ver} = item -> {Atom.to_string(app), item} end)
+  def prepend_compiled_apps(files_list) do
+    prepend =
+      Enum.reduce(files_list, [], fn {app_name, path}, acc ->
+        if Code.prepend_path(path), do: acc, else: acc ++ [{app_name, path}]
+      end)
 
-    Enum.reduce(files_list, [], fn app_name, acc ->
-      if Map.fetch(installed_apps, app_name) == :error, do: acc ++ [app_name], else: acc
-    end)
+    if prepend == [] do
+      :ok
+    else
+      message = "Some routes cannot be prepended."
+
+      {:error,
+       [%{message: message, field: :path, action: :prepend_compiled_apps, source: prepend}]}
+    end
   end
 
   def get_basic_information_from_mix_ast(ast, selection, extra \\ []) do
@@ -123,7 +128,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
-  @spec move(Installer.t(), binary()) :: okey_return() | error_return()
+  @spec move(Installer.t(), binary() | Path.t()) :: okey_return() | error_return()
   def move(app, archived_file) do
     with {:mkdir_p, :ok} <- {:mkdir_p, File.mkdir_p(extensions_path())},
          {:ok, path} <- write_downloaded_lib(app, archived_file) do
@@ -135,6 +140,35 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
       error ->
         error
+    end
+  end
+
+  # 1. delete and unload old app
+  # 2. move new app
+  # 3. return list of moved apps
+  def move_and_replace_build_files(app) do
+    path = extensions_path()
+    info = MishkaInstaller.__information__()
+    build_path = "#{path}/#{app.app}-#{app.version}/_build/#{info.env}/lib"
+
+    moved_files =
+      File.ls!(build_path)
+      |> Enum.reduce([], fn sub_app, acc ->
+        with app_build <- "#{build_path}/#{sub_app}/ebin/#{sub_app}.app",
+             {:ok, properties} <- read_app(String.to_atom(sub_app), app_build),
+             :ok <- compare_version_with_installed_app(String.to_atom(sub_app), properties[:vsn]),
+             sub_path <- "#{info.path}/_build/#{info.env}/lib/#{sub_app}",
+             :ok <- Installer.uninstall(String.to_atom(sub_app), sub_path) do
+          File.cp_r("#{build_path}/#{sub_app}", "#{info.path}/_build/#{info.env}/lib")
+          acc ++ [{String.to_atom(sub_app), "#{build_path}/#{sub_app}"}]
+        end
+      end)
+
+    if length(moved_files) > 0 do
+      {:ok, moved_files}
+    else
+      message = "There is no app to be replicated in the requested path."
+      {:error, [%{message: message, field: :app, action: :move_and_replace_build_files}]}
     end
   end
 
@@ -238,6 +272,37 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  def application_ensure(app_name) do
+    with {:load, :ok} <- {:load, Application.load(app_name)},
+         {:all, {:ok, _apps}} <- {:all, Application.ensure_all_started(app_name)} do
+      :ok
+    else
+      {:load, error} ->
+        message = "There was an error loading the application you are looking for."
+        {:error, [%{message: message, field: :app, action: :application_ensure, source: error}]}
+
+      {:all, {:error, error}} ->
+        message =
+          "An error occurred in loading the application in the sub-set and related to the application you sent."
+
+        {:error, [%{message: message, field: :app, action: :application_ensure, source: error}]}
+    end
+  end
+
+  def unload(app) do
+    case Application.unload(app) do
+      {:error, {:not_loaded, ^app}} ->
+        :ok
+
+      {:error, error} ->
+        message = "An error occurred in deactivating the app."
+        {:error, [%{message: message, field: :app, action: :unload, source: error}]}
+
+      _ ->
+        :ok
+    end
+  end
+
   ####################################################################################
   ########################## (▰˘◡˘▰) Callback (▰˘◡˘▰) ##########################
   ####################################################################################
@@ -337,6 +402,24 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
         return_exist = %{operation: command, output: output, status: exit_status}
         MishkaInstaller.broadcast("library_handler", :port_stopped, return_exist)
         return_exist
+    end
+  end
+
+  defp compare_version_with_installed_app(app, version) do
+    ver = Application.spec(app, :vsn)
+
+    cond do
+      is_nil(ver) ->
+        :ok
+
+      Version.compare("#{version}", "#{ver}") == :gt ->
+        :ok
+
+      true ->
+        message =
+          "In the path of installed apps, there is an app of the same name with the same or higher version."
+
+        {:error, [%{message: message, field: :app, action: :compare_version_with_installed_app}]}
     end
   end
 end
