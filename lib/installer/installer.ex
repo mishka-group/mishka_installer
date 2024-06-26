@@ -78,6 +78,7 @@ defmodule MishkaInstaller.Installer.Installer do
   # |__ TODO: Store builded files for re-start project
   # |__ TODO: Update all stuff in mnesia db
   # TODO: Add some broadcasting to know what is the state of installing
+  @spec install(t()) :: error_return() | okey_return()
   def install(app) when app.type == :extracted do
     with {:ok, data} <- __MODULE__.builder(app),
          :ok <- mix_exist(data.path),
@@ -104,6 +105,7 @@ defmodule MishkaInstaller.Installer.Installer do
     File.cd!(MishkaInstaller.__information__().path)
   end
 
+  @spec uninstall(atom()) :: :ok
   def uninstall(app) do
     Application.stop(app.app)
     Application.unload(app.app)
@@ -112,6 +114,7 @@ defmodule MishkaInstaller.Installer.Installer do
     :ok
   end
 
+  @spec uninstall(atom(), Path.t()) :: :ok
   def uninstall(app, custom_path) do
     Application.stop(app)
     Application.unload(app)

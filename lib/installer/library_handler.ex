@@ -10,9 +10,9 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
 
-  @type okey_return :: {:ok, struct() | map() | binary()}
+  @type okey_return :: {:ok, struct() | map() | binary() | list(any())}
 
-  @type app :: Installer.t()
+  @type app :: Installer.t() | map()
 
   @type runtime_type :: :add | :force_update | :uninstall
 
@@ -38,6 +38,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  @spec prepend_compiled_apps(list(tuple())) :: :ok | error_return()
   def prepend_compiled_apps(files_list) do
     prepend =
       Enum.reduce(files_list, [], fn {app_name, path}, acc ->
@@ -146,6 +147,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   # 1. delete and unload old app
   # 2. move new app
   # 3. return list of moved apps
+  @spec move_and_replace_build_files(Installer.t()) :: okey_return() | error_return()
   def move_and_replace_build_files(app) do
     path = extensions_path()
     info = MishkaInstaller.__information__()
@@ -164,7 +166,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
         end
       end)
 
-    if length(moved_files) > 0 do
+    if moved_files != [] do
       {:ok, moved_files}
     else
       message = "There is no app to be replicated in the requested path."
@@ -234,6 +236,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  @spec consult_app_file(Path.t()) :: {:ok, term()} | {:error, any()}
   def consult_app_file(bin) do
     # The path could be located in an .ez archive, so we use the prim loader.
     with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)) do
@@ -272,6 +275,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  @spec application_ensure(atom()) :: :ok | error_return()
   def application_ensure(app_name) do
     with {:load, :ok} <- {:load, Application.load(app_name)},
          {:all, {:ok, _apps}} <- {:all, Application.ensure_all_started(app_name)} do
@@ -289,6 +293,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  @spec unload(atom()) :: :ok | error_return()
   def unload(app) do
     case Application.unload(app) do
       {:error, {:not_loaded, ^app}} ->
@@ -356,6 +361,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  @spec extensions_path() :: Path.t()
   def extensions_path() do
     info = MishkaInstaller.__information__()
     Path.join(info.path, ["deployment/", "#{info.env}/", "extensions"])
