@@ -34,7 +34,6 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     File.cd!(MishkaInstaller.__information__().path)
   end
 
-  # TODO: move builded files and compare all deps with exist
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################

@@ -52,6 +52,7 @@ defmodule MishkaInstaller.Installer.Installer do
     field(:dependency_type, dep_type(), default: :none, derive: "validate(#{@dep_type})")
     field(:compile_type, com_type(), default: :cmd, derive: "validate(#{@compile_type})")
     field(:depends, list(String.t()), default: [], derive: "validate(list)")
+    field(:prepend_paths, list(String.t()), default: [], derive: "validate(list)")
     # This type can be used when you want to introduce an event inserted_at unix time(timestamp).
     field(:inserted_at, DateTime.t(), auto: {Extra, :get_unix_time})
     # This type can be used when you want to introduce an event updated_at unix time(timestamp).
@@ -76,7 +77,6 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   # TODO: All runtime installed app should be Code.prepend_path and loaded
   # TODO: Create an item inside LibraryHandler queue
-  # |__ TODO: Store builded files for re-start project
   # |__ TODO: Update all stuff in mnesia db
   # TODO: Add some broadcasting to know what is the state of installing
   @spec install(t()) :: error_return() | okey_return()
@@ -86,8 +86,8 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- allowed_extract_path(data.path),
          ext_path <- LibraryHandler.extensions_path(),
          :ok <- rename_dir(data.path, "#{ext_path}/#{app.app}-#{app.version}"),
-         :ok <- install_and_compile_steps(data) do
-      {:ok, %{download: nil, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
+         {:ok, moved_files} <- install_and_compile_steps(data) do
+      {:ok, install_output(Map.merge(data, %{prepend_paths: moved_files}))}
     end
   after
     File.cd!(MishkaInstaller.__information__().path)
@@ -98,9 +98,8 @@ defmodule MishkaInstaller.Installer.Installer do
          {:ok, archived_file} <- Downloader.download(Map.get(data, :type), data),
          {:ok, path} <- LibraryHandler.move(app, archived_file),
          :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
-         ext_path <- LibraryHandler.extensions_path(),
-         :ok <- install_and_compile_steps(data) do
-      {:ok, %{download: path, extensions: data, dir: "#{ext_path}/#{app.app}-#{app.version}"}}
+         {:ok, moved_files} <- install_and_compile_steps(data) do
+      {:ok, install_output(Map.merge(data, %{prepend_paths: moved_files}), path)}
     end
   after
     File.cd!(MishkaInstaller.__information__().path)
@@ -303,7 +302,12 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- LibraryHandler.prepend_compiled_apps(moved_files),
          :ok <- LibraryHandler.unload(String.to_atom(data.app)),
          :ok <- LibraryHandler.application_ensure(String.to_atom(data.app)) do
-      :ok
+      {:ok, moved_files}
     end
+  end
+
+  defp install_output(data, download \\ nil) do
+    ext_path = LibraryHandler.extensions_path()
+    %{download: download, extensions: data, dir: "#{ext_path}/#{data.app}-#{data.version}"}
   end
 end
