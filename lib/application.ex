@@ -14,7 +14,7 @@ defmodule MishkaInstaller.Application do
     Supervisor.start_link(children, opts)
   end
 
-  if Mix.env() == :test do
+  if MishkaInstaller.__information__().env == :test do
     def supervised_children() do
       []
     end

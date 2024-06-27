@@ -64,7 +64,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ################################################################################
   @doc false
   @spec database_config() :: keyword()
-  if Mix.env() != :test do
+  if MishkaInstaller.__information__().env != :test do
     def database_config(),
       do: Keyword.merge(@mnesia_info, attributes: keys(), disc_copies: [node()])
   else

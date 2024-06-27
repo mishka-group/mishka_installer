@@ -6,7 +6,6 @@ defmodule MishkaInstaller.MnesiaRepo do
   alias MishkaInstaller.Installer.Installer
   alias MnesiaAssistant.Error, as: MError
 
-  @env_mod Mix.env()
   # I got the basic idea from https://github.com/processone/ejabberd
   @identifier :mishka_mnesia_repo
   ####################################################################################
@@ -44,7 +43,7 @@ defmodule MishkaInstaller.MnesiaRepo do
       "Identifier: #{inspect(@identifier)} ::: Placing Mnesia address of the generator in the mentioned system variable."
     )
 
-    mnesia_dir = ".mnesia" <> "/#{@env_mod}"
+    mnesia_dir = ".mnesia" <> "/#{MishkaInstaller.__information__().env}"
     config = Application.get_env(:mishka, Mishka.MnesiaRepo, mnesia_dir: mnesia_dir)
     File.mkdir_p(config[:mnesia_dir]) |> MError.error_description(@identifier)
     Application.put_env(:mnesia, :dir, config[:mnesia_dir] |> to_charlist)
@@ -114,7 +113,7 @@ defmodule MishkaInstaller.MnesiaRepo do
   end
 
   @impl true
-  if Mix.env() != :test do
+  if MishkaInstaller.__information__().env != :test do
     def handle_info(:health_check, state) do
       # TODO: this function can have some checker
       Process.send_after(__MODULE__, :health_check, 1000)
