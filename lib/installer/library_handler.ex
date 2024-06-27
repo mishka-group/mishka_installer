@@ -152,6 +152,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     path = extensions_path()
     info = MishkaInstaller.__information__()
     build_path = "#{path}/#{app.app}-#{app.version}/_build/#{info.env}/lib"
+    root_build = "#{info.path}/_build/#{info.env}/lib"
 
     moved_files =
       File.ls!(build_path)
@@ -161,12 +162,15 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
              :ok <- compare_version_with_installed_app(String.to_atom(sub_app), properties[:vsn]),
              sub_path <- "#{info.path}/_build/#{info.env}/lib/#{sub_app}",
              :ok <- Installer.uninstall(String.to_atom(sub_app), sub_path) do
-          File.cp_r("#{build_path}/#{sub_app}", "#{info.path}/_build/#{info.env}/lib")
-          acc ++ [{String.to_atom(sub_app), "#{build_path}/#{sub_app}"}]
+          destination_path = Path.join(root_build, Path.basename("#{build_path}/#{sub_app}"))
+          File.cp_r("#{build_path}/#{sub_app}", destination_path)
+          acc ++ [{String.to_atom(sub_app), destination_path <> "/ebin"}]
+        else
+          _ -> acc
         end
       end)
 
-    if moved_files != [] do
+    if moved_files != [] and !is_tuple(moved_files) do
       {:ok, moved_files}
     else
       message = "There is no app to be replicated in the requested path."

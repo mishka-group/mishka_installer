@@ -74,6 +74,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  # TODO: All runtime installed app should be Code.prepend_path and loaded
   # TODO: Create an item inside LibraryHandler queue
   # |__ TODO: Store builded files for re-start project
   # |__ TODO: Update all stuff in mnesia db
@@ -296,10 +297,7 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  defp install_and_compile_steps(struct_data) do
-    # Fix Dialyzer and LSP in editor
-    data = struct(__MODULE__, struct_data)
-
+  defp install_and_compile_steps(data) do
     with :ok <- LibraryHandler.do_compile(data),
          {:ok, moved_files} <- LibraryHandler.move_and_replace_build_files(data),
          :ok <- LibraryHandler.prepend_compiled_apps(moved_files),
