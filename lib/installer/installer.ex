@@ -77,7 +77,6 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   # TODO: All runtime installed app should be Code.prepend_path and loaded
   # TODO: Create an item inside LibraryHandler queue
-  # |__ TODO: Update all stuff in mnesia db
   # TODO: Add some broadcasting to know what is the state of installing
   @spec install(t()) :: error_return() | okey_return()
   def install(app) when app.type == :extracted do
@@ -86,8 +85,10 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- allowed_extract_path(data.path),
          ext_path <- LibraryHandler.extensions_path(),
          :ok <- rename_dir(data.path, "#{ext_path}/#{app.app}-#{app.version}"),
-         {:ok, moved_files} <- install_and_compile_steps(data) do
-      {:ok, install_output(Map.merge(data, %{prepend_paths: moved_files}))}
+         {:ok, moved_files} <- install_and_compile_steps(data),
+         merged_app <- Map.merge(data, %{prepend_paths: moved_files}),
+         {:ok, output} <- update_or_write(data, merged_app) do
+      {:ok, install_output(output)}
     end
   after
     File.cd!(MishkaInstaller.__information__().path)
@@ -98,8 +99,10 @@ defmodule MishkaInstaller.Installer.Installer do
          {:ok, archived_file} <- Downloader.download(Map.get(data, :type), data),
          {:ok, path} <- LibraryHandler.move(app, archived_file),
          :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
-         {:ok, moved_files} <- install_and_compile_steps(data) do
-      {:ok, install_output(Map.merge(data, %{prepend_paths: moved_files}), path)}
+         {:ok, moved_files} <- install_and_compile_steps(data),
+         merged_app <- Map.merge(data, %{prepend_paths: moved_files}),
+         {:ok, output} <- update_or_write(data, merged_app) do
+      {:ok, install_output(output, path)}
     end
   after
     File.cd!(MishkaInstaller.__information__().path)
@@ -201,7 +204,7 @@ defmodule MishkaInstaller.Installer.Installer do
 
       data ->
         map =
-          Map.merge(data, updated_to)
+          Map.merge(data, Map.drop(updated_to, [:id]))
           |> Map.merge(%{updated_at: Extra.get_unix_time()})
 
         write({:root, map, :edit})
@@ -304,6 +307,11 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- LibraryHandler.application_ensure(String.to_atom(data.app)) do
       {:ok, moved_files}
     end
+  end
+
+  defp update_or_write(data, merged_app) do
+    db_data = get(data.app)
+    if is_nil(db_data), do: write(merged_app), else: write(:id, db_data.id, merged_app)
   end
 
   defp install_output(data, download \\ nil) do
