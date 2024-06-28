@@ -102,10 +102,12 @@ defmodule MishkaInstaller.Installer.CompileHandler do
         output = Installer.install(List.first(running))
 
         case output do
-          {:ok, %{extension: extension}} ->
+          {:ok, %{extension: extension} = data} ->
             Logger.info(
               "Identifier: #{inspect(__MODULE__)} ::: The desired library(#{extension.app}) was successfully compiled and activated"
             )
+
+            MishkaInstaller.broadcast("installer", :install, data)
 
           {:error, error} ->
             Logger.error(

@@ -75,9 +75,6 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
-  # TODO: All runtime installed app should be Code.prepend_path and loaded
-  # TODO: Create an item inside LibraryHandler queue
-  # TODO: Add some broadcasting to know what is the state of installing
   @spec install(t()) :: error_return() | okey_return()
   def install(app) when app.type == :extracted do
     with {:ok, data} <- __MODULE__.builder(app),
@@ -88,6 +85,7 @@ defmodule MishkaInstaller.Installer.Installer do
          {:ok, moved_files} <- install_and_compile_steps(data),
          merged_app <- Map.merge(data, %{prepend_paths: moved_files}),
          {:ok, output} <- update_or_write(data, merged_app) do
+      MishkaInstaller.broadcast("installer", :install, install_output(output))
       {:ok, install_output(output)}
     end
   after
@@ -102,6 +100,7 @@ defmodule MishkaInstaller.Installer.Installer do
          {:ok, moved_files} <- install_and_compile_steps(data),
          merged_app <- Map.merge(data, %{prepend_paths: moved_files}),
          {:ok, output} <- update_or_write(data, merged_app) do
+      MishkaInstaller.broadcast("installer", :install, install_output(output))
       {:ok, install_output(output, path)}
     end
   after
@@ -114,6 +113,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Application.unload(app.app)
     info = MishkaInstaller.__information__()
     File.rm_rf!("#{info.path}/_build/#{info.env}/lib/#{app.app}")
+    MishkaInstaller.broadcast("installer", :uninstall, app)
     :ok
   end
 
@@ -122,6 +122,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Application.stop(app)
     Application.unload(app)
     File.rm_rf!(custom_path)
+    MishkaInstaller.broadcast("installer", :uninstall, app)
     :ok
   end
 

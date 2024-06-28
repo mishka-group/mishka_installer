@@ -189,7 +189,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
       System.cmd(operation, [command],
         into: %Collect{
           callback: fn line, _acc ->
-            MishkaInstaller.broadcast("library_handler", :cmd_messaging, %{
+            MishkaInstaller.broadcast("installer", :cmd_messaging, %{
               operation: command,
               message: "#{inspect(line)}",
               status: :looping
@@ -203,7 +203,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
       )
 
     return_exist = %{operation: command, output: stream, status: status}
-    MishkaInstaller.broadcast("library_handler", :cmd_stopped, return_exist)
+    MishkaInstaller.broadcast("installer", :cmd_stopped, return_exist)
 
     if status == 0 do
       :ok
@@ -386,7 +386,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
       {^port, {:data, {:eol, msg}}} when is_binary(msg) ->
         update_exec_satet([msg])
 
-        MishkaInstaller.broadcast("library_handler", :port_messaging, %{
+        MishkaInstaller.broadcast("installer", :port_messaging, %{
           operation: command,
           message: msg,
           status: :looping
@@ -398,7 +398,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
       {^port, {:data, data}} ->
         update_exec_satet([data])
 
-        MishkaInstaller.broadcast("library_handler", :port_messaging, %{
+        MishkaInstaller.broadcast("installer", :port_messaging, %{
           operation: command,
           message: data,
           status: :looping
@@ -411,7 +411,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
         output = get_exec_state()
         stop_exec_state()
         return_exist = %{operation: command, output: output, status: exit_status}
-        MishkaInstaller.broadcast("library_handler", :port_stopped, return_exist)
+        MishkaInstaller.broadcast("installer", :port_stopped, return_exist)
         return_exist
     end
   end
