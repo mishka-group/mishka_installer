@@ -265,7 +265,8 @@ defmodule MishkaInstaller.Event.Hook do
         MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
 
         new_state =
-          if :persistent_term.get(:event_status, nil) == "ready" do
+          if :persistent_term.get(:event_status, nil) == "ready" and
+               :persistent_term.get(:compile_status, nil) == "ready" do
             Hook.register_start_helper(__MODULE__, state)
           else
             Process.send_after(__MODULE__, :register_start_again, 1000)
@@ -310,9 +311,11 @@ defmodule MishkaInstaller.Event.Hook do
         # We need some state, it will be saved again or not, it should not be loaded if
         # |__ it is restored
         event_status = :persistent_term.get(:event_status, nil)
+        compile_status = :persistent_term.get(:compile_status, nil)
 
         new_state =
           with true <- event_status == "ready",
+               true <- compile_status == "ready",
                true <- event == Map.get(data, :event),
                true <- Map.get(data, :name) in depends,
                :ok <- Event.allowed_events?(depends),
@@ -343,6 +346,7 @@ defmodule MishkaInstaller.Event.Hook do
 
         new_state =
           with "ready" <- :persistent_term.get(:event_status, nil),
+               "ready" <- :persistent_term.get(:compile_status, nil),
                {:module, module} <- Code.ensure_loaded(MSE.module_event_name(@plugin_event)),
                data when not is_nil(data) <-
                  Enum.find(module.initialize().plugins, &(&1.name == @plugin_name)),

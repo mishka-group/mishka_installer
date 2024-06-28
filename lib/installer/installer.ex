@@ -316,6 +316,6 @@ defmodule MishkaInstaller.Installer.Installer do
 
   defp install_output(data, download \\ nil) do
     ext_path = LibraryHandler.extensions_path()
-    %{download: download, extensions: data, dir: "#{ext_path}/#{data.app}-#{data.version}"}
+    %{download: download, extension: data, dir: "#{ext_path}/#{data.app}-#{data.version}"}
   end
 end

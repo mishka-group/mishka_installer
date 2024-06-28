@@ -4,6 +4,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
   alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
 
   setup do
+    :persistent_term.put(:compile_status, "ready")
     # Got the idea from: https://github.com/Schultzer/ecto_qlc/blob/main/test/support/data_case.ex
     tmp_dir = System.tmp_dir!()
 

@@ -392,6 +392,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
           status: :looping
         })
 
+        IO.puts("[stdout] #{inspect(msg)}")
         loop(port, command)
 
       {^port, {:data, data}} ->
@@ -403,6 +404,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
           status: :looping
         })
 
+        IO.puts("[stdout] #{inspect(data)}")
         loop(port, command)
 
       {^port, {:exit_status, exit_status}} ->

@@ -1,10 +1,9 @@
-defmodule MishkaInstaller.Event.EventHandler do
+defmodule MishkaInstaller.Installer.CompileHandler do
   @moduledoc false
   use GenServer
   require Logger
-  alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
   require Logger
-
+  alias MishkaInstaller.Installer.{Installer, LibraryHandler}
   ################################################################################
   ######################## (▰˘◡˘▰) Init data (▰˘◡˘▰) #######################
   ################################################################################
@@ -100,13 +99,18 @@ defmodule MishkaInstaller.Event.EventHandler do
 
     new_state =
       if length(running) != 0 do
-        event = List.first(running)
-        output = perform(List.first(running))
+        output = Installer.install(List.first(running))
 
-        if !output do
-          Logger.error(
-            "Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{event}"
-          )
+        case output do
+          {:ok, %{extension: extension}} ->
+            Logger.info(
+              "Identifier: #{inspect(__MODULE__)} ::: The desired library(#{extension.app}) was successfully compiled and activated"
+            )
+
+          {:error, error} ->
+            Logger.error(
+              "Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{error}"
+            )
         end
 
         send(self(), :run_queues)
@@ -119,16 +123,29 @@ defmodule MishkaInstaller.Event.EventHandler do
   end
 
   def handle_info(%{status: :synchronized, channel: "mnesia"}, state) do
-    new_state =
-      if :persistent_term.get(:compile_status, nil) == "ready",
-        do: synchronized_start(state),
-        else: state
+    errors =
+      Installer.get()
+      |> Enum.reduce([], fn item, acc ->
+        with :ok <- LibraryHandler.prepend_compiled_apps(item.prepend_paths),
+             :ok <- LibraryHandler.unload(String.to_atom(item.app)),
+             :ok <- LibraryHandler.application_ensure(String.to_atom(item.app)) do
+          acc
+        else
+          error -> acc ++ [{item.app, error}]
+        end
+      end)
 
-    {:noreply, new_state}
-  end
+    if errors == [] do
+      :persistent_term.put(:compile_status, "ready")
+      MishkaInstaller.broadcast("mnesia", :compile_synchronized, %{identifier: :compile_handler})
+      Logger.debug("Identifier: #{inspect(__MODULE__)} ::: Run-time apps are Synchronized...")
+    else
+      Logger.error(
+        "Identifier: #{inspect(__MODULE__)} ::: Run-time apps Synchronizing have errors ::: Source: #{errors}"
+      )
+    end
 
-  def handle_info(%{status: :compile_synchronized, channel: "mnesia"}, state) do
-    {:noreply, synchronized_start(state)}
+    {:noreply, state}
   end
 
   @impl true
@@ -139,53 +156,4 @@ defmodule MishkaInstaller.Event.EventHandler do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
-  defp synchronized_start(state) do
-    case Event.start() do
-      {:ok, _sorted_events} ->
-        :persistent_term.put(:event_status, "ready")
-        Logger.debug("Identifier: #{inspect(__MODULE__)} ::: Plugins are Synchronized...")
-        MishkaInstaller.broadcast("mnesia", :event_status, "ready")
-        Keyword.merge(state, status: :synchronized)
-
-      _ ->
-        state
-    end
-  end
-
-  defp perform(event) do
-    plugins = Event.get(:event, event)
-
-    sorted_plugins =
-      Enum.reduce(plugins, [], fn pl_item, acc ->
-        with :ok <- Event.plugin_status(pl_item.status),
-             :ok <- Event.allowed_events?(pl_item.depends) do
-          acc ++ [pl_item]
-        else
-          _ -> acc
-        end
-      end)
-      |> Enum.sort_by(&{&1.priority, &1.name})
-
-    module = ModuleStateCompiler.module_event_name(event)
-
-    if Code.ensure_loaded?(module) and function_exported?(module, :is_changed?, 1) and
-         module.is_changed?(sorted_plugins) do
-      purge_create(sorted_plugins, event)
-    end
-
-    if !Code.ensure_loaded?(module) and !function_exported?(module, :is_changed?, 1) do
-      purge_create(sorted_plugins, event)
-    end
-
-    true
-  rescue
-    _ ->
-      # TODO: it should send the error
-      false
-  end
-
-  defp purge_create(sorted_plugins, event) do
-    :ok = ModuleStateCompiler.purge_create(sorted_plugins, event)
-    :ok = MishkaInstaller.broadcast("event", :purge_create, event)
-  end
 end
