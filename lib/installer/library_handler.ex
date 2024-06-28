@@ -1,6 +1,28 @@
 defmodule MishkaInstaller.Installer.LibraryHandler do
   @moduledoc """
+  This module provides programmers with a public APIs and helpers that allow them to
+  construct their own custom functions.
 
+  > It also includes aids and tools that allow them to work with the library while it is running.
+
+  `MishkaInstaller.Installer.Installer` is also referred to as action and aggregator functions,
+  which is something that should be taken into consideration.
+
+  If you are unsure about the responsibilities of each function,
+  it is recommended that you utilise the `MishkaInstaller.Installer.Installer` module and its functions,
+  which consist of a collection of predefined strategies.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  > #### Use cases information {: .tip}
+  >
+  > Especially when you want to work with a library that depends on a large number
+  > of other libraries or vice versa, each of the functions of this file has its own
+  > requirements that must be taken into consideration.
   """
   alias MishkaInstaller.Installer.{Installer, Collect}
 
@@ -21,6 +43,27 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   ####################################################################################
   ######################## (▰˘◡˘▰) Public API (▰˘◡˘▰) ##########################
   ####################################################################################
+  @doc """
+  This particular function executes the necessary instructions in order to download the
+  dependencies, compile the dependencies, and compile the project itself.
+
+  - In the present version, there are two options that are available, namely `Port` and `System`.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ```elixir
+  alias MishkaInstaller.Installer.{Installer, LibraryHandler}
+
+  do_compile(%Installer{app: "some_name", path: "some_name", type: :hex})
+  ```
+
+  **During the subsequent releases, we will make an effort to incorporate the `script` mode**.
+  - Based on: https://elixirforum.com/t/12114/14
+  """
   @spec do_compile(app) :: :ok | error_return()
   def do_compile(app) when app.compile_type in [:cmd, :port, :mix] do
     with ext_path <- extensions_path(),
@@ -37,6 +80,29 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
+  @doc """
+  By means of this helper function, identify the paths of dependencies to the Erlang VM.
+
+  For more information see `Code.prepend_path/1`.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  files_list = [
+    decimal: "/_build/dev/lib/decimal/ebin",
+    ecto: "/_build/dev/lib/ecto/ebin",
+    uniq: "/_build/dev/lib/uniq/ebin"
+  ]
+
+  prepend_compiled_apps(files_list)
+  ```
+  """
   @spec prepend_compiled_apps(list(tuple())) :: :ok | error_return()
   def prepend_compiled_apps(files_list) do
     prepend =
@@ -54,27 +120,21 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
-  def get_basic_information_from_mix_ast(ast, selection, extra \\ []) do
-    Enum.map(selection, fn item ->
-      {_ast, acc} =
-        Macro.postwalk(ast, %{"#{item}": nil, attributes: %{}}, fn
-          {:@, _, [{name, _, value}]} = ast, acc when is_atom(name) and not is_nil(value) ->
-            {ast, put_in(acc.attributes[name], value)}
+  @doc """
+  A helper function to extract downloaded libraries from `hex.pm`, `github` and custom `url`.
 
-          {^item, {:@, _, [{name, _, nil}]}} = ast, acc ->
-            {ast, Map.put(acc, item, {:attribute, name})}
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
 
-          {^item, value} = ast, acc ->
-            {ast, Map.put(acc, item, value)}
+  ## Example:
 
-          ast, acc ->
-            {ast, acc}
-        end)
-
-      convert_mix_ast_output(acc)
-    end) ++ extra
-  end
-
+  ```elixir
+  extract(:tar, a_path, "app_name-version")
+  ```
+  """
   @spec extract(:tar, binary(), String.t()) :: :ok | error_return()
   def extract(:tar, archived, name) do
     temp_path = ~c'#{extensions_path()}/temp-#{name}'
@@ -128,6 +188,21 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  @doc """
+  Helper function to transfer files to the deployment path.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  move(app, "archived_file_binary")
+  ```
+  """
   @spec move(Installer.t(), binary() | Path.t()) :: okey_return() | error_return()
   def move(app, archived_file) do
     with {:mkdir_p, :ok} <- {:mkdir_p, File.mkdir_p(extensions_path())},
@@ -143,9 +218,23 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
-  # 1. delete and unload old app
-  # 2. move new app
-  # 3. return list of moved apps
+  @doc """
+  Helper function to transfer and replace built libs to the project `_build` dir.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  alias MishkaInstaller.Installer.{Installer, LibraryHandler}
+
+  move_and_replace_build_files(%Installer{app: "some_name", path: "some_name", type: :hex})
+  ```
+  """
   @spec move_and_replace_build_files(Installer.t()) :: okey_return() | error_return()
   def move_and_replace_build_files(app) do
     path = extensions_path()
@@ -177,8 +266,29 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
-  # Ref: https://hexdocs.pm/elixir/Port.html#module-spawn_executable
-  # Ref: https://elixirforum.com/t/48336/
+  @doc """
+  Helper function that executes system and script commands.
+
+
+  #### Ref:
+
+  * https://hexdocs.pm/elixir/Port.html#module-spawn_executable
+  * https://elixirforum.com/t/48336/
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  command_execution(:cmd, "deps.get")
+
+  command_execution(:port, "deps.get")
+  ```
+  """
   @spec command_execution(:cmd | :port, String.t(), String.t()) :: :ok | error_return()
   def command_execution(type, command, operation \\ "mix")
 
@@ -239,6 +349,28 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  # Based on: https://elixirforum.com/t/12114/14
+  def command_execution(:mix, command, _operation) do
+    message = "We do not support it at the moment, it may be included in future versions."
+    source = %{command: command, output: nil}
+    {:error, [%{message: message, field: :port, action: :command_execution, source: source}]}
+  end
+
+  @doc """
+  Helper function to read Erlang `.app` file in Elixir.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  consult_app_file(bin_path)
+  ```
+  """
   @spec consult_app_file(Path.t()) :: {:ok, term()} | {:error, any()}
   def consult_app_file(bin) do
     # The path could be located in an .ez archive, so we use the prim loader.
@@ -248,10 +380,25 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   end
 
   @doc """
+  Helper function to read Erlang `.app` file in Elixir.
+
   Reads the given app from path in an optimized format and returns its contents.
 
   Based on:
   https://github.com/elixir-lang/elixir/blob/f0fcd64f937af8ccdd98e086c107c3902485d404/lib/mix/lib/mix/app_loader.ex#L59-L75
+
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  read_app(:mishka_developer_tools, app_bin_path)
+  ```
   """
   @spec read_app(atom(), Path.t()) :: {:ok, any()} | error_return()
   def read_app(app, app_path) do
@@ -278,6 +425,21 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  @doc """
+  Helper function to load an application and all its dependencies.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  application_ensure(:mishka_developer_tools)
+  ```
+  """
   @spec application_ensure(atom()) :: :ok | error_return()
   def application_ensure(app_name) do
     with {:load, :ok} <- {:load, Application.load(app_name)},
@@ -296,6 +458,21 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     end
   end
 
+  @doc """
+  Helper function to unload an application.
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
+
+  ```elixir
+  unload(:mishka_developer_tools)
+  ```
+  """
   @spec unload(atom()) :: :ok | error_return()
   def unload(app) do
     case Application.unload(app) do
@@ -309,6 +486,21 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
       _ ->
         :ok
     end
+  end
+
+  @doc """
+  Helper function to get download path and extract runtime libraries.
+
+  ## Example:
+
+  ```elixir
+  extensions_path()
+  ```
+  """
+  @spec extensions_path() :: Path.t()
+  def extensions_path() do
+    info = MishkaInstaller.__information__()
+    Path.join(info.path, ["deployment/", "#{info.env}/", "extensions"])
   end
 
   ####################################################################################
@@ -326,27 +518,6 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
-  # I duplicated the code to make this operation clear instead of getting dynamically and make it complicated.
-  defp convert_mix_ast_output(%{version: {:attribute, item}, attributes: attributes}),
-    do: {:version, List.first(Map.get(attributes, item))}
-
-  defp convert_mix_ast_output(%{version: ver, attributes: _attributes}) when is_binary(ver),
-    do: {:version, ver}
-
-  defp convert_mix_ast_output(%{app: {:attribute, item}, attributes: attributes}),
-    do: {:app, List.first(Map.get(attributes, item))}
-
-  defp convert_mix_ast_output(%{app: ver, attributes: _attributes}) when is_atom(ver),
-    do: {:app, ver}
-
-  defp convert_mix_ast_output(%{source_url: {:attribute, item}, attributes: attributes}),
-    do: {:source_url, List.first(Map.get(attributes, item))}
-
-  defp convert_mix_ast_output(%{source_url: ver, attributes: _attributes}) when is_binary(ver),
-    do: {:source_url, ver}
-
-  defp convert_mix_ast_output(_), do: {:error, :package, :convert_mix_ast_output}
-
   defp write_downloaded_lib(app, archived_file) do
     open_file =
       File.open("#{extensions_path()}/#{app.app}-#{app.version}.tar", [:read, :write], fn file ->
@@ -362,12 +533,6 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
         message = "An error occurred in downloading and transferring the library file you want."
         {:error, [%{message: message, field: :path, action: :move, source: error}]}
     end
-  end
-
-  @spec extensions_path() :: Path.t()
-  def extensions_path() do
-    info = MishkaInstaller.__information__()
-    Path.join(info.path, ["deployment/", "#{info.env}/", "extensions"])
   end
 
   defp change_dir(path) do

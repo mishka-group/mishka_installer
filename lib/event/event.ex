@@ -693,13 +693,15 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   To get all plugins ids from Mnesia database.
 
-  ## Example:
+
 
   > #### Security considerations {: .warning}
   >
   > It is important to remember that all of the functionalities contained within this
   > section must be implemented at the **high access level**, and they should not directly take
   > any input from the user. Ensure that you include the required safety measures.
+
+  ## Example:
 
   ```elixir
   ids()
@@ -830,7 +832,7 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
-  This function is exactly like `unique/2` function, except that its output is a Boolean
+  This function is exactly like `unique/2` function, except that its output is a Boolean.
 
   > #### Security considerations {: .warning}
   >

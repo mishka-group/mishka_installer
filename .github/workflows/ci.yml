@@ -18,15 +18,16 @@ jobs:
       matrix:
         include:
           - pair:
-              elixir: "1.17.0"
+              elixir: "1.17.1"
               otp: "27.0"
 
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
+        id: beam
         with:
           otp-version: ${{matrix.pair.otp}}
           elixir-version: ${{matrix.pair.elixir}}

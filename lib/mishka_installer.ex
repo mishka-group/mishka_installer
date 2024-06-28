@@ -29,6 +29,18 @@ defmodule MishkaInstaller do
     Phoenix.PubSub.unsubscribe(MishkaInstaller.PubSub, "mishka:plugin:#{channel}")
   end
 
+  @doc """
+  Helper function to specify project path and returns the current Mix environment.
+
+  ```elixir
+  MishkaInstaller.__information__()
+  ```
+
+  #### Please before using this library set these:
+
+  - Set `PROJECT_PATH` as the **System env** or `:mishka, :project_path` as the **Application env**
+  - Set `MIX_ENV` as the **System env** or `:mishka, :project_env` as the **Application env**
+  """
   def __information__() do
     %{
       path: System.get_env("PROJECT_PATH") || Application.get_env(:mishka, :project_path),
