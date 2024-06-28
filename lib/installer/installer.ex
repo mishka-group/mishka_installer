@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.Installer.Installer do
   use GuardedStruct
   alias MishkaDeveloperTools.Helper.{Extra, UUID}
-  alias MishkaInstaller.Installer.{Downloader, LibraryHandler}
+  alias MishkaInstaller.Installer.{Downloader, LibraryHandler, CompileHandler}
   alias MnesiaAssistant.{Transaction, Query, Table}
   alias MnesiaAssistant.Error, as: MError
 
@@ -123,6 +123,14 @@ defmodule MishkaInstaller.Installer.Installer do
     Application.unload(app)
     File.rm_rf!(custom_path)
     :ok
+  end
+
+  @spec async_install(t()) :: error_return() | :ok
+  def async_install(app) do
+    case __MODULE__.builder(app) do
+      {:ok, data} -> CompileHandler.do_compile(data, :start)
+      error -> error
+    end
   end
 
   ####################################################################################

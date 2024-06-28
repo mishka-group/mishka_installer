@@ -21,7 +21,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   ####################################################################################
   ######################## (▰˘◡˘▰) Public APIs (▰˘◡˘▰) #########################
   ####################################################################################
-  @spec do_compile(String.t(), atom()) :: :ok
+  @spec do_compile(Installer.t(), atom()) :: :ok
   def do_compile(event, status) do
     GenServer.cast(__MODULE__, {:do_compile, event, status})
   end
