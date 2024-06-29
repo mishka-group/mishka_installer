@@ -38,11 +38,17 @@ jobs:
           mix local.rebar --force
 
       - name: Source Compiling
-
         run: |
           mix deps.get
           mix deps.compile
 
+      - name: Set up environment
+        run: |
+          echo "PROJECT_PATH=$(pwd)" >> $GITHUB_ENV
+          mkdir -p $(pwd)/deployment/test/extensions
+
       - name: Run test with temporary information
         run: |
           mix test --trace
+        env:
+          PROJECT_PATH: ${{ env.PROJECT_PATH }}
