@@ -36,8 +36,8 @@ the Macro `behaviour` and `Hook` module will call you in its action module.
 This helps you have a regular and `error-free` system, and the library uses an almost
 integrated structure in all of its events.
 
-In **Mishka Installer** Library, a series of action or hook functions are
-given to the developer of the main plugin or software, which helps build plugins outside/inside
+> In **Mishka Installer** Library, a series of action or hook functions are
+given to the developer of the main plugin or software, which helps build plugins **outside**/**inside**
 the system and convert software sections into separate events.
 
 **Some of the functions of this module include the following:**
@@ -117,18 +117,21 @@ composed of two primary components, which are as follows:
 
 When a programmer uses this library for his own software development, we sought to
 ensure that in addition to the established capabilities, he also has access to a set of
-appropriate standards for software development that are based on preset behaviors that can be applied.
+appropriate standards for software development that are based on preset behaviors that can be applied;
+This was our goal.
 
-This was our goal. It streamlines and organizes the work of a group working on a project while
-also facilitating the creation of software.
-
+It streamlines and organizes the work of a group working on a project while also facilitating
+the creation of software.
 Error control and tree structure, which enable us to develop a system that is robust and trustworthy,
-are two of the guiding ideas behind the construction of this library, which has garnered attention
-from people all around the world.
+are two of the guiding ideas behind the construction of this library, which has garnered
+attention from people all around the world.
 
-The MishkaInstaller library can be created in various systems, and it provides fundamental
-capabilities such as the management of plugin states and the application of standard behaviors.
+The [MishkaInstaller](https://github.com/mishka-group/mishka_installer) library can be created in
+various systems, and it provides fundamental capabilities such as the management of plugin states
+and the application of standard behaviors.
 These features can all be accessed by specified hooks in the library.
+
+> **The installer part is in beta mode, use it carefully and some of its functionality may not work in the Elixir `release`.**
 
 ##### Example:
 
