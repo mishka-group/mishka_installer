@@ -14,8 +14,10 @@ defmodule MishkaInstaller do
   present your desired input/output absolutely plugin oriented to your users and makes it
   possible for the developers to write their required applications beyond the core source code.
 
-  **NOTICE: Do not use the master branch; this library is under heavy development. Expect version 0.1.0,
-  and for using the new features, please wait until a new release is out.**
+
+  > **NOTICE**: Do not use the master branch; this library is under heavy development.
+  > Expect version 0.1.0, and for using the new features, please wait until a new release is out.
+
 
   ##### This library is divided into the following main sections:
 
@@ -40,7 +42,7 @@ defmodule MishkaInstaller do
   given to the developer of the main plugin or software, which helps build plugins outside/inside
   the system and convert software sections into separate events.
 
-  Some of the functions of this module include the following:
+  **Some of the functions of this module include the following:**
 
   - Retrieves the merged configuration for the hook module.
   - Register a plugin for a specific event.
@@ -65,7 +67,7 @@ defmodule MishkaInstaller do
   end
   ```
 
-  If you want to change a series of default information, do this:
+  **If you want to change a series of default information, do this:**
 
   ```elixir
   use MishkaInstaller.Event.Hook,
@@ -73,7 +75,7 @@ defmodule MishkaInstaller do
     initial: %{depends: [SomeEvent], priority: 20}
   ```
 
-  #### You can call all plugins of an event:
+  **You can call all plugins of an event:**
 
   ```elixir
   alias MishkaInstaller.Event.Hook
@@ -108,6 +110,7 @@ defmodule MishkaInstaller do
 
   ### Plugin management system theory and installation of Elixir libraries at runtime
   ---
+
   The functionality of this library can be conceptualized as an architectural potential that is
   composed of two primary components, which are as follows:
 
@@ -149,7 +152,11 @@ defmodule MishkaInstaller do
 
   ## Installing the library:
   ---
-  It should be noted that this library must be installed in two parts of the plugin and the software that wants to display the plugins, and due to its small dependencies, it does not cause any problems. To install, just add this library to your "mix.exs" in the "deps" function as follows:
+
+  It should be noted that this library must be installed in two parts of the plugin and the
+  software that wants to display the plugins, and due to its small dependencies, it does
+  not cause any problems. To install, just add this library to your "mix.exs" in the "deps"
+  function as follows:
 
   ```elixir
   def deps do
