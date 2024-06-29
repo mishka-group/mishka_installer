@@ -31,10 +31,6 @@ defmodule MishkaInstaller.Event.EventHandler do
 
       case perform(event) do
         false ->
-          Logger.error(
-            "Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{event}"
-          )
-
           message = "An error occurred in the compile of an event."
           {:error, [%{message: message, field: :global, action: status}]}
 
@@ -197,7 +193,7 @@ defmodule MishkaInstaller.Event.EventHandler do
     true
   rescue
     _ ->
-      # TODO: it should send the error
+      Logger.error("Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{event}")
       false
   end
 

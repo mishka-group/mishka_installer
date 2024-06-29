@@ -138,7 +138,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert data.status == :held
     end
 
-    test "Start a plugin" do
+    test "Start a plugin - queue true" do
       %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
       |> Event.write()
 
@@ -154,7 +154,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
         assert Event.start(:name, RegisterEmailSender1, true)
     end
 
-    test "Start all plugins of an event" do
+    test "Start all plugins of an event - queue true" do
       create = fn name, status, deps, event, priority ->
         %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
         |> Map.put(:event, event)
@@ -196,7 +196,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       end
     end
 
-    test "Start all events" do
+    test "Start all events - queue true" do
       create = fn name, status, deps, event, priority ->
         %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
         |> Map.put(:event, event)
@@ -228,7 +228,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert module.initialize?()
     end
 
-    test "Restart a plugin" do
+    test "Restart a plugin - queue true" do
       %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
       |> Event.write()
 
@@ -246,7 +246,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:error, _error} = assert Event.restart(:name, RegisterEmailSender, true)
     end
 
-    test "Restart an event" do
+    test "Restart an event - queue true" do
       create = fn name, status, deps, event, priority ->
         %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
         |> Map.put(:event, event)
@@ -276,7 +276,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :restart, data: _data}
     end
 
-    test "Restart all events" do
+    test "Restart all events - queue true" do
       create = fn name, status, deps, event, priority ->
         %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
         |> Map.put(:event, event)
@@ -306,7 +306,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :restart, data: _data}
     end
 
-    test "Stop a plugin" do
+    test "Stop a plugin - queue true" do
       create = fn ->
         %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
         |> Event.write()
@@ -322,7 +322,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:error, _errors1} = assert Event.stop(:name, RegisterEmailSender, true)
     end
 
-    test "Stop an event" do
+    test "Stop an event - queue true" do
       create = fn name, status, deps, event, priority ->
         %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
         |> Map.put(:event, event)
@@ -374,7 +374,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       %{module: _, plugins: []} = assert module.initialize()
     end
 
-    test "Stop all events" do
+    test "Stop all events - queue true" do
       create = fn name, status, deps, event, priority ->
         %{name: name, extension: :mishka_installer, depends: deps, priority: priority}
         |> Map.put(:event, event)
@@ -428,7 +428,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       %{module: _, plugins: []} = assert module.initialize()
     end
 
-    test "Unregister a plugin" do
+    test "Unregister a plugin - queue true" do
       create = fn ->
         %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
         |> Event.write()
@@ -462,7 +462,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       %{module: _, plugins: []} = assert module.initialize()
     end
 
-    test "Unregister an events" do
+    test "Unregister an events - queue true" do
       create = fn ->
         %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
         |> Event.write()
@@ -491,7 +491,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert is_nil(Event.get(:name, struct1.name))
     end
 
-    test "Unregister all events" do
+    test "Unregister all events - queue true" do
       create = fn ->
         %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
         |> Event.write()
