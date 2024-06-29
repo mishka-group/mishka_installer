@@ -21,6 +21,18 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
                compile_type: :cmd
              })
 
+    # move_and_replace_build_files
+    {:ok, moved_files} =
+      assert LibraryHandler.move_and_replace_build_files(%{
+               app: "elixir-uuid",
+               version: "1.2.1"
+             })
+
+    # Prepend compiled apps of an Library
+    :ok = assert LibraryHandler.prepend_compiled_apps(moved_files)
+
+    File.rm_rf(File.cwd!() <> "/_build/test/lib/elixir_uuid")
+
     File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
   end
 
@@ -99,12 +111,7 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     "/deployment/test/extensions" =~ assert LibraryHandler.extensions_path()
   end
 
-  test "Prepend compiled apps of an Library" do
-    # true = Code.prepend_path(path)
-    # assert to_charlist(path) in :code.get_path()
-  end
-
-  test "Move and replace build files" do
-    # LibraryHandler.move_and_replace_build_files(app)
+  test "Mix command_execution error" do
+    {:error, _error} = assert LibraryHandler.command_execution(:mix, "", "")
   end
 end
