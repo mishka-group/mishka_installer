@@ -171,6 +171,8 @@ defmodule MishkaInstaller do
   end
   ```
 
+  The docs can be found at https://hexdocs.pm/mishka_installer.
+
   ---
 
   # Donate
