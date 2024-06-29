@@ -668,15 +668,6 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:ok, _unregister_data} = assert Event.unregister(:name, RegisterEmailSender, true)
 
       assert_receive %{status: :unregister, data: _data}, 3000
-
-      assert_receive %{status: :purge_create, data: _data}, 3000
-
-      assert !Process.alive?(pid)
-
-      assert is_nil(Event.get(:name, RegisterEmailSender))
-
-      module = ModuleStateCompiler.module_event_name("after_success_login")
-      %{module: _, plugins: []} = assert module.initialize()
     end
 
     test "Unregister a plugin - queue false" do

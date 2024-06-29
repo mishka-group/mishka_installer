@@ -295,7 +295,7 @@ defmodule MishkaInstaller.Event.Event do
          deps_list <- allowed_events(data.depends),
          {:ok, db_plg} <- write(:id, data.id, depends_status(deps_list, :restarted)),
          :ok <- plugin_status(db_plg.status),
-         _ok <- EventHandler.do_compile(db_plg.event, :restart, queue) do
+         :ok <- EventHandler.do_compile(db_plg.event, :restart, queue) do
       {:ok, db_plg}
     end
   end
@@ -395,7 +395,7 @@ defmodule MishkaInstaller.Event.Event do
     with {:ok, data} <- exist_record?(get(:name, name)),
          :ok <- plugin_status(data.status),
          {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}),
-         _ok <- EventHandler.do_compile(db_plg.event, :stop, queue) do
+         :ok <- EventHandler.do_compile(db_plg.event, :stop, queue) do
       {:ok, db_plg}
     end
   end
@@ -486,7 +486,7 @@ defmodule MishkaInstaller.Event.Event do
   def unregister(:name, name, queue) do
     with {:ok, db_plg} <- delete(:name, name),
          :ok <- GenServer.stop(name, :normal),
-         _ok <- EventHandler.do_compile(db_plg.event, :unregister, queue) do
+         :ok <- EventHandler.do_compile(db_plg.event, :unregister, queue) do
       {:ok, db_plg}
     end
   end
