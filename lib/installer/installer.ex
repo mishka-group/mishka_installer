@@ -29,6 +29,10 @@ defmodule MishkaInstaller.Installer.Installer do
   > Especially when you want to work with a library that depends on a large number
   > of other libraries or vice versa, each of the functions of this file has its own
   > requirements that must be taken into consideration.
+
+  #### Note:
+  > If you are using Phoenix as developer mode, please disable `live_reload` in `dev.exs`.
+  > Please add `reloadable_apps: [:mishka_installer]` to your endpoint config in `config.exs` file.
   """
   use GuardedStruct
   alias MishkaDeveloperTools.Helper.{Extra, UUID}
