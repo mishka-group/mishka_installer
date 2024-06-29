@@ -28,6 +28,9 @@ defmodule MishkaInstaller.MixProject do
           MishkaInstaller.MnesiaRepo.State,
           MishkaInstaller.Installer.PortHandler,
           MishkaInstaller.MnesiaRepo,
+          MishkaInstaller.Installer.CompileHandler,
+          MishkaInstaller.Installer.Collect,
+          Collectable.MishkaInstaller.Installer.Collect,
           ~r/\.Support.MishkaPlugin\./
         ]
       ]
@@ -48,7 +51,7 @@ defmodule MishkaInstaller.MixProject do
       {:plug, "~> 1.16"},
 
       # Extra tools
-      {:mishka_developer_tools, github: "mishka-group/mishka_developer_tools"},
+      {:mishka_developer_tools, "~> 0.1.6"},
       {:telemetry, "~> 1.2.1"},
 
       # Dev and Test dependencies
