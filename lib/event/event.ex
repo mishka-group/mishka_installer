@@ -424,7 +424,7 @@ defmodule MishkaInstaller.Event.Event do
         if queue do
           EventHandler.do_compile(event, :stop)
         else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
+          MishkaInstaller.Event.ModuleStateCompiler.purge_create([], event)
         end
 
         {:ok, sorted_plugins}
@@ -514,7 +514,7 @@ defmodule MishkaInstaller.Event.Event do
         if queue do
           EventHandler.do_compile(event, :unregister)
         else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
+          MishkaInstaller.Event.ModuleStateCompiler.purge_create([], event)
         end
 
         {:ok, sorted_plugins}
