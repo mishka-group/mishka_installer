@@ -1,6 +1,6 @@
 defmodule MishkaInstaller do
   @moduledoc """
-  # Mishka Installer is a system plugin(event) manager and run time installer for elixir.
+  # Mishka Installer is a system plugin(event) manager and run time installer for Elixir.
 
   [![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.0-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
 
@@ -16,6 +16,12 @@ defmodule MishkaInstaller do
 
   **NOTICE: Do not use the master branch; this library is under heavy development. Expect version 0.1.0,
   and for using the new features, please wait until a new release is out.**
+
+  ##### This library is divided into the following main sections:
+
+  - [Events and Hook](#events-and-hook)
+  - [Plugin management system theory and installation of Elixir libraries at runtime](#plugin-management-system-theory-and-installation-of-elixir-libraries-at-runtime)
+
 
   ### Events and Hook
   ---
@@ -47,7 +53,7 @@ defmodule MishkaInstaller do
 
   > For more information please see the `MishkaInstaller.Event.Hook` module.
 
-  ### Example:
+  ##### Example:
 
   ```elixir
   defmodule RegisterEmailSender do
@@ -97,7 +103,10 @@ defmodule MishkaInstaller do
   Supervisor.start_link(children, opts)
   ```
 
-  ### Plugin management system theory and installation of Elixir libraries at `runtime`
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+
+  ### Plugin management system theory and installation of Elixir libraries at runtime
   ---
   The functionality of this library can be conceptualized as an architectural potential that is
   composed of two primary components, which are as follows:
@@ -120,8 +129,22 @@ defmodule MishkaInstaller do
   capabilities such as the management of plugin states and the application of standard behaviors.
   These features can all be accessed by specified hooks in the library.
 
-  > This module is a read-only in-memory storage optimized for the fastest possible read times
-  > not for write strategies.
+  ##### Example:
+
+  ```elixir
+  alias MishkaInstaller.Installer.Installer
+
+  # Normal calling
+  Installer.install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+
+  # Normal calling
+  Installer.uninstall(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+
+  # Normal calling
+  Installer.async_install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+  ```
+
+  > For more information please see the `MishkaInstaller.Installer.Installer` module.
 
 
   ## Installing the library:
