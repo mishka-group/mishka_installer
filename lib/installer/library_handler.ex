@@ -180,11 +180,11 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
           end
         end
 
-      {:error, term} ->
+      error ->
         message =
           "There is a problem in extracting the compressed file of the ready-made library."
 
-        {:error, [%{message: message, field: :path, action: :move, source: term}]}
+        {:error, [%{message: message, field: :path, action: :move, source: error}]}
     end
   end
 
@@ -354,29 +354,6 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     message = "We do not support it at the moment, it may be included in future versions."
     source = %{command: command, output: nil}
     {:error, [%{message: message, field: :port, action: :command_execution, source: source}]}
-  end
-
-  @doc """
-  Helper function to read Erlang `.app` file in Elixir.
-
-  > #### Security considerations {: .warning}
-  >
-  > It is important to remember that all of the functionalities contained within this
-  > section must be implemented at the **high access level**, and they should not directly take
-  > any input from the user. Ensure that you include the required safety measures.
-
-  ## Example:
-
-  ```elixir
-  consult_app_file(bin_path)
-  ```
-  """
-  @spec consult_app_file(Path.t()) :: {:ok, term()} | {:error, any()}
-  def consult_app_file(bin) do
-    # The path could be located in an .ez archive, so we use the prim loader.
-    with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)) do
-      :erl_parse.parse_term(tokens)
-    end
   end
 
   @doc """

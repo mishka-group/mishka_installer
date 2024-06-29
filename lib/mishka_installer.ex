@@ -255,9 +255,11 @@ defmodule MishkaInstaller do
   - Set `MIX_ENV` as the **System env** or `:mishka, :project_env` as the **Application env**
   """
   def __information__() do
+    env = System.get_env("MIX_ENV") || Application.get_env(:mishka, :project_env) || @project_env
+
     %{
       path: System.get_env("PROJECT_PATH") || Application.get_env(:mishka, :project_path),
-      env: System.get_env("MIX_ENV") || Application.get_env(:mishka, :project_env) || @project_env
+      env: if(is_atom(env), do: env, else: String.to_atom(env))
     }
   end
 end

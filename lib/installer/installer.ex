@@ -630,6 +630,7 @@ defmodule MishkaInstaller.Installer.Installer do
     with :ok <- LibraryHandler.do_compile(data),
          {:ok, moved_files} <- LibraryHandler.move_and_replace_build_files(data),
          :ok <- LibraryHandler.prepend_compiled_apps(moved_files),
+         _ <- Application.stop(String.to_atom(data.app)),
          :ok <- LibraryHandler.unload(String.to_atom(data.app)),
          :ok <- LibraryHandler.application_ensure(String.to_atom(data.app)) do
       {:ok, moved_files}
