@@ -22,9 +22,26 @@ defmodule MishkaInstaller.Event.EventHandler do
   ####################################################################################
   ######################## (▰˘◡˘▰) Public APIs (▰˘◡˘▰) #########################
   ####################################################################################
-  @spec do_compile(String.t(), atom()) :: :ok
-  def do_compile(event, status) do
-    GenServer.cast(__MODULE__, {:do_compile, event, status})
+  @spec do_compile(String.t(), atom(), boolean()) :: :ok
+  def do_compile(event, status, queue \\ true) do
+    if queue do
+      GenServer.cast(__MODULE__, {:do_compile, event, status})
+    else
+      MishkaInstaller.broadcast("event", status, %{})
+
+      case perform(event) do
+        false ->
+          Logger.error(
+            "Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{event}"
+          )
+
+          message = "An error occurred in the compile of an event."
+          {:error, [%{message: message, field: :global, action: status}]}
+
+        true ->
+          :ok
+      end
+    end
   end
 
   @spec get() :: keyword()

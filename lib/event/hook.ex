@@ -190,6 +190,7 @@ defmodule MishkaInstaller.Event.Hook do
       @wait_for_tables 6000
       @after_compile __MODULE__
       @checking Keyword.get(opts, :checking, 1000)
+      @queue Keyword.get(opts, :queue, true)
 
       @spec config() :: keyword()
       def config(),
@@ -205,22 +206,22 @@ defmodule MishkaInstaller.Event.Hook do
 
       @spec start() :: okey_return | error_return
       def start() do
-        Event.start(:name, config(:__plugin__))
+        Event.start(:name, config(:__plugin__), @queue)
       end
 
       @spec restart() :: okey_return | error_return
       def restart() do
-        Event.restart(:name, config(:__plugin__))
+        Event.restart(:name, config(:__plugin__), @queue)
       end
 
       @spec stop() :: okey_return | error_return
       def stop() do
-        Event.stop(:name, config(:__plugin__))
+        Event.stop(:name, config(:__plugin__), @queue)
       end
 
       @spec unregister() :: okey_return | error_return
       def unregister() do
-        Event.unregister(:name, config(:__plugin__))
+        Event.unregister(:name, config(:__plugin__), @queue)
       end
 
       @spec get() :: keyword()

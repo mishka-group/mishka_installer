@@ -184,18 +184,18 @@ defmodule MishkaInstaller.Event.Event do
   start(:event, "after_login")
   ```
   """
-  @spec start(:name | :event, module() | String.t()) :: error_return | okey_return
-  def start(:name, name) do
+  @spec start(:name | :event, module() | String.t(), boolean()) :: error_return | okey_return
+  def start(:name, name, queue) do
     with {:ok, data} <- exist_record?(get(:name, name)),
          :ok <- plugin_status(data.status),
          :ok <- allowed_events?(data.depends),
          {:ok, db_plg} <- write(:id, data.id, %{status: :started}),
-         _ok <- EventHandler.do_compile(db_plg.event, :start) do
+         :ok <- EventHandler.do_compile(db_plg.event, :start, queue) do
       {:ok, db_plg}
     end
   end
 
-  def start(:event, event) do
+  def start(:event, event, queue) do
     case get(:event, event) do
       [] ->
         message =
@@ -216,7 +216,12 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        EventHandler.do_compile(event, :start)
+        if queue do
+          EventHandler.do_compile(event, :start)
+        else
+          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
+        end
+
         {:ok, sorted_plugins}
     end
   end
@@ -224,12 +229,12 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   This function starts all events, For more information please see `start/2`.
   """
-  @spec start() :: okey_return() | error_return()
-  def start() do
+  @spec start(boolean()) :: okey_return() | error_return()
+  def start(queue \\ true) do
     case group_events() do
       {:ok, events} ->
         sorted_events =
-          Enum.map(events, &start(:event, &1))
+          Enum.map(events, &start(:event, &1, queue))
           |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
 
         {:ok, sorted_events}
@@ -284,18 +289,18 @@ defmodule MishkaInstaller.Event.Event do
   restart(:event, "after_login")
   ```
   """
-  @spec restart(:name | :event, module() | String.t()) :: error_return | okey_return
-  def restart(:name, name) do
+  @spec restart(:name | :event, module() | String.t(), boolean()) :: error_return | okey_return
+  def restart(:name, name, queue) do
     with {:ok, data} <- exist_record?(get(:name, name)),
          deps_list <- allowed_events(data.depends),
          {:ok, db_plg} <- write(:id, data.id, depends_status(deps_list, :restarted)),
          :ok <- plugin_status(db_plg.status),
-         _ok <- EventHandler.do_compile(db_plg.event, :restart) do
+         _ok <- EventHandler.do_compile(db_plg.event, :restart, queue) do
       {:ok, db_plg}
     end
   end
 
-  def restart(:event, event) do
+  def restart(:event, event, queue) do
     case get(:event, event) do
       [] ->
         message =
@@ -317,7 +322,12 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        EventHandler.do_compile(event, :restart)
+        if queue do
+          EventHandler.do_compile(event, :restart)
+        else
+          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
+        end
+
         {:ok, sorted_plugins}
     end
   end
@@ -325,12 +335,12 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   This function restarts all events, For more information please see `restart/2`.
   """
-  @spec restart() :: okey_return() | error_return()
-  def restart() do
+  @spec restart(boolean()) :: okey_return() | error_return()
+  def restart(queue \\ true) do
     case group_events() do
       {:ok, events} ->
         sorted_events =
-          Enum.map(events, &restart(:event, &1))
+          Enum.map(events, &restart(:event, &1, queue))
           |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
 
         {:ok, sorted_events}
@@ -380,17 +390,17 @@ defmodule MishkaInstaller.Event.Event do
   stop(:event, "after_login")
   ```
   """
-  @spec stop(:name | :event, module() | String.t()) :: okey_return() | error_return()
-  def stop(:name, name) do
+  @spec stop(:name | :event, module() | String.t(), boolean()) :: okey_return() | error_return()
+  def stop(:name, name, queue) do
     with {:ok, data} <- exist_record?(get(:name, name)),
          :ok <- plugin_status(data.status),
          {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}),
-         _ok <- EventHandler.do_compile(db_plg.event, :stop) do
+         _ok <- EventHandler.do_compile(db_plg.event, :stop, queue) do
       {:ok, db_plg}
     end
   end
 
-  def stop(:event, event) do
+  def stop(:event, event, queue) do
     case get(:event, event) do
       [] ->
         message =
@@ -411,7 +421,12 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        EventHandler.do_compile(event, :stop)
+        if queue do
+          EventHandler.do_compile(event, :stop)
+        else
+          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
+        end
+
         {:ok, sorted_plugins}
     end
   end
@@ -419,12 +434,12 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   This function stops all events, For more information please see `stop/2`.
   """
-  @spec stop() :: okey_return() | error_return()
-  def stop() do
+  @spec stop(boolean()) :: okey_return() | error_return()
+  def stop(queue \\ true) do
     case group_events() do
       {:ok, events} ->
         sorted_events =
-          Enum.map(events, &stop(:event, &1))
+          Enum.map(events, &stop(:event, &1, queue))
           |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
 
         {:ok, sorted_events}
@@ -466,16 +481,17 @@ defmodule MishkaInstaller.Event.Event do
   unregister(:event, "after_login")
   ```
   """
-  @spec unregister(:name | :event, module() | String.t()) :: okey_return() | error_return()
-  def unregister(:name, name) do
+  @spec unregister(:name | :event, module() | String.t(), boolean()) ::
+          okey_return() | error_return()
+  def unregister(:name, name, queue) do
     with {:ok, db_plg} <- delete(:name, name),
          :ok <- GenServer.stop(name, :normal),
-         _ok <- EventHandler.do_compile(db_plg.event, :unregister) do
+         _ok <- EventHandler.do_compile(db_plg.event, :unregister, queue) do
       {:ok, db_plg}
     end
   end
 
-  def unregister(:event, event) do
+  def unregister(:event, event, queue) do
     case get(:event, event) do
       [] ->
         message =
@@ -495,7 +511,12 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        EventHandler.do_compile(event, :unregister)
+        if queue do
+          EventHandler.do_compile(event, :unregister)
+        else
+          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
+        end
+
         {:ok, sorted_plugins}
     end
   end
@@ -503,12 +524,12 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   This function stops all unregisters, For more information please see `unregister/2`.
   """
-  @spec unregister() :: okey_return() | error_return()
-  def unregister() do
+  @spec unregister(boolean()) :: okey_return() | error_return()
+  def unregister(queue \\ true) do
     case group_events() do
       {:ok, events} ->
         sorted_events =
-          Enum.map(events, &unregister(:event, &1))
+          Enum.map(events, &unregister(:event, &1, queue))
           |> Enum.reject(&(is_tuple(&1) and elem(&1, 0) == :error))
 
         {:ok, sorted_events}

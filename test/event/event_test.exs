@@ -146,12 +146,12 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:ok, struct1} = assert Event.write(:name, RegisterEmailSender, %{status: :registered})
 
       {:ok, %Event{extension: :mishka_installer, status: :started, name: RegisterEmailSender}} =
-        assert Event.start(:name, struct1.name)
+        assert Event.start(:name, struct1.name, true)
 
       assert_receive %{status: :start, data: _data}
 
       {:error, [%{message: _msg, field: :global, action: :exist_record?}]} =
-        assert Event.start(:name, RegisterEmailSender1)
+        assert Event.start(:name, RegisterEmailSender1, true)
     end
 
     test "Start all plugins of an event" do
@@ -169,7 +169,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       create.(MishkaPluginTest.Email2, :started, [], "after_login_test", 50)
       create.(MishkaPluginTest.Email3, :started, [], "before_login_test", 10)
 
-      Event.start(:event, "after_login_test")
+      Event.start(:event, "after_login_test", true)
 
       assert_receive %{status: :start, data: _data}
 
@@ -180,7 +180,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert length(module.initialize().plugins) == 3
 
-      Event.start(:event, "before_login_test")
+      Event.start(:event, "before_login_test", true)
 
       assert_receive %{status: :start, data: _data}
 
@@ -232,7 +232,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       %{name: RegisterEmailSender, event: "after_success_login", extension: :mishka_installer}
       |> Event.write()
 
-      {:ok, _data} = Event.restart(:name, RegisterEmailSender)
+      {:ok, _data} = Event.restart(:name, RegisterEmailSender, true)
 
       assert_receive %{status: :restart, data: _data}
 
@@ -241,9 +241,9 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:ok, _struct} =
         assert Event.write(:name, RegisterEmailSender, %{depends: [RegisterEmailSender1]})
 
-      {:error, _error1} = assert Event.restart(:name, RegisterEmailSender1)
+      {:error, _error1} = assert Event.restart(:name, RegisterEmailSender1, true)
 
-      {:error, _error} = assert Event.restart(:name, RegisterEmailSender)
+      {:error, _error} = assert Event.restart(:name, RegisterEmailSender, true)
     end
 
     test "Restart an event" do
@@ -267,11 +267,11 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert_receive %{status: :start, data: _data}
 
-      {:ok, _data} = Event.restart(:event, "after_login_test")
+      {:ok, _data} = Event.restart(:event, "after_login_test", true)
 
       assert_receive %{status: :restart, data: _data}
 
-      {:ok, _data} = Event.restart(:event, "before_login_test")
+      {:ok, _data} = Event.restart(:event, "before_login_test", true)
 
       assert_receive %{status: :restart, data: _data}
     end
@@ -315,11 +315,11 @@ defmodule MishkaInstallerTest.Event.EventTest do
       {:ok, data} = assert create.()
 
       {:ok, %Event{extension: :mishka_installer, status: :stopped}} =
-        assert Event.stop(:name, data.name)
+        assert Event.stop(:name, data.name, true)
 
-      {:error, _errors} = assert Event.stop(:name, RegisterEmailSender1)
+      {:error, _errors} = assert Event.stop(:name, RegisterEmailSender1, true)
 
-      {:error, _errors1} = assert Event.stop(:name, RegisterEmailSender)
+      {:error, _errors1} = assert Event.stop(:name, RegisterEmailSender, true)
     end
 
     test "Stop an event" do
@@ -353,7 +353,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       module = ModuleStateCompiler.module_event_name("before_login_test")
       assert module.initialize?()
 
-      {:ok, _data} = assert Event.stop(:event, "after_login_test")
+      {:ok, _data} = assert Event.stop(:event, "after_login_test", true)
 
       assert_receive %{status: :stop, data: _data}
 
@@ -363,7 +363,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       %{module: _, plugins: []} = assert module.initialize()
 
-      {:ok, _data} = assert Event.stop(:event, "before_login_test")
+      {:ok, _data} = assert Event.stop(:event, "before_login_test", true)
 
       assert_receive %{status: :stop, data: _data}
 
@@ -448,7 +448,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert Process.alive?(pid)
 
-      {:ok, _unregister_data} = assert Event.unregister(:name, RegisterEmailSender)
+      {:ok, _unregister_data} = assert Event.unregister(:name, RegisterEmailSender, true)
 
       assert_receive %{status: :unregister, data: _data}, 3000
 
@@ -482,7 +482,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert Process.alive?(pid)
 
-      {:ok, _data} = assert Event.unregister(:event, struct1.event)
+      {:ok, _data} = assert Event.unregister(:event, struct1.event, true)
 
       assert_receive %{status: :unregister, data: _data}
 
