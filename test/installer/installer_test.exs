@@ -18,7 +18,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     Process.register(self(), :__mishka_installer_test__)
 
-    Application.put_env(:mishka, Mishka.MnesiaRepo,
+    Application.put_env(:mishka_installer, Mishka.MnesiaRepo,
       mnesia_dir: mnesia_dir,
       essential: [Installer]
     )

@@ -44,7 +44,7 @@ defmodule MishkaInstaller.MnesiaRepo do
     )
 
     mnesia_dir = ".mnesia" <> "/#{MishkaInstaller.__information__().env}"
-    config = Application.get_env(:mishka, Mishka.MnesiaRepo, mnesia_dir: mnesia_dir)
+    config = Application.get_env(:mishka_installer, Mishka.MnesiaRepo, mnesia_dir: mnesia_dir)
     File.mkdir_p(config[:mnesia_dir]) |> MError.error_description(@identifier)
     Application.put_env(:mnesia, :dir, config[:mnesia_dir] |> to_charlist)
 

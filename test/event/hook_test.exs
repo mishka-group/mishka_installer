@@ -26,7 +26,11 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
     Process.register(self(), :__mishka_installer_event_test__)
 
-    Application.put_env(:mishka, Mishka.MnesiaRepo, mnesia_dir: mnesia_dir, essential: [Event])
+    Application.put_env(:mishka_installer, Mishka.MnesiaRepo,
+      mnesia_dir: mnesia_dir,
+      essential: [Event]
+    )
+
     MishkaInstaller.subscribe("mnesia")
     MishkaInstaller.subscribe("event")
     start_supervised!(MishkaInstaller.Event.EventHandler)
