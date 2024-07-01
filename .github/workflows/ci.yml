@@ -3,10 +3,10 @@ name: MishkaInstaller CI
 on:
   push:
     branches:
-      - refactor-dependencies
+      - master
   pull_request:
     branches:
-      - refactor-dependencies
+      - master
 
 jobs:
   ci:
