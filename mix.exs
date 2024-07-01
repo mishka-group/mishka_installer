@@ -1,26 +1,38 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
-  @version "0.0.4"
+
+  @version "0.1.0"
+  @source_url "https://github.com/mishka-group/mishka_installer"
 
   def project do
     [
       app: :mishka_installer,
       version: @version,
-      elixir: "~> 1.13",
+      elixir: "~> 1.16",
+      name: "Mishka installer",
+      elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      name: "Mishka Installer",
-      elixirc_paths: elixirc_paths(Mix.env()),
       description: description(),
       package: package(),
       homepage_url: "https://github.com/mishka-group",
-      source_url: "https://github.com/mishka-group/mishka_installer",
-      xref: [exclude: [EctoEnum.Use]],
+      source_url: @source_url,
       docs: [
         main: "MishkaInstaller",
         source_ref: "master",
         extras: ["README.md"],
-        source_url: "https://github.com/mishka-group/mishka_installer"
+        source_url: @source_url
+      ],
+      test_coverage: [
+        ignore_modules: [
+          MishkaInstaller.MnesiaRepo.State,
+          MishkaInstaller.Installer.PortHandler,
+          MishkaInstaller.MnesiaRepo,
+          MishkaInstaller.Installer.CompileHandler,
+          MishkaInstaller.Installer.Collect,
+          Collectable.MishkaInstaller.Installer.Collect,
+          ~r/\.Support.MishkaPlugin\./
+        ]
       ]
     ]
   end
@@ -34,17 +46,17 @@ defmodule MishkaInstaller.MixProject do
 
   defp deps do
     [
-      {:phoenix_pubsub, "~> 2.1"},
-      {:mishka_developer_tools, "~> 0.0.7"},
-      {:jason, "~> 1.4"},
-      {:finch, "~> 0.13.0"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:phoenix_live_view, "~> 0.17.9"},
-      {:sourceror, "~> 0.11.2"},
-      {:ets, "~> 0.9.0"},
-      {:oban, "~> 2.13"},
-      {:gettext, "~> 0.20.0"},
-      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
+      {:phoenix_pubsub, "~> 2.1.3"},
+      {:req, "~> 0.5.1"},
+      {:plug, "~> 1.16"},
+
+      # Extra tools
+      {:mishka_developer_tools, "~> 0.1.6"},
+      {:telemetry, "~> 1.2.1"},
+
+      # Dev and Test dependencies
+      {:ex_doc, "~> 0.34.0", only: :dev, runtime: false},
+      {:hex_core, "~> 0.10.2", only: :test}
     ]
   end
 
@@ -60,7 +72,7 @@ defmodule MishkaInstaller.MixProject do
       files: ~w(lib priv .formatter.exs mix.exs LICENSE README*),
       licenses: ["Apache-2.0"],
       maintainers: ["Shahryar Tavakkoli"],
-      links: %{"GitHub" => "https://github.com/mishka-group/mishka_installer"}
+      links: %{"GitHub" => @source_url}
     ]
   end
 end

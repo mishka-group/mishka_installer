@@ -18,49 +18,37 @@ jobs:
       matrix:
         include:
           - pair:
-              elixir: '1.14.0'
-              otp: '25.0.4'
-              postgres: '14.5-alpine'
+              elixir: "1.17.1"
+              otp: "27.0"
 
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:${{matrix.pair.postgres}}
-        env:
-          POSTGRES_DB: mishka_test
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_USER: postgres
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432/tcp
-
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
 
       - uses: erlef/setup-beam@v1
+        id: beam
         with:
           otp-version: ${{matrix.pair.otp}}
           elixir-version: ${{matrix.pair.elixir}}
 
       - name: Elixir and Erlang Dependencies
-        run: | 
+        run: |
           mix local.hex --force
           mix local.rebar --force
 
       - name: Source Compiling
-        env:
-          DATABASE_DEVELOPERT_URL: postgresql://postgres:postgres@localhost:${{job.services.postgres.ports[5432]}}/mishka_installer_test
-        run: | 
+        run: |
           mix deps.get
           mix deps.compile
 
+      - name: Set up environment
+        run: |
+          echo "PROJECT_PATH=$(pwd)" >> $GITHUB_ENV
+          mkdir -p $(pwd)/deployment/test/extensions
+
       - name: Run test with temporary information
-        env:
-          DATABASE_DEVELOPERT_URL: postgresql://postgres:postgres@localhost:${{job.services.postgres.ports[5432]}}/mishka_installer_test
         run: |
           mix test --trace
+        env:
+          PROJECT_PATH: ${{ env.PROJECT_PATH }}

@@ -1,189 +1,209 @@
-# Elixir programming language plugin management system
-[![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.0.4-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
+# Mishka Installer is a system plugin(event) manager and run time installer for Elixir.
 
+[![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.0-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
 
 ## Build purpose
 ---
 
-Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and `SMS`; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code. 
-> We have used this library in the [Mishka content management system](https://github.com/mishka-group/mishka-cms).
-
-**NOTICE: Do not use the master branch; this library is under heavy development.** Expect version 0.0.4, and for using the new features, please wait until a new release is out.
-
-### Plugin management system theory and installation of Elixir libraries at `runtime`
----
-The functionality of this library can be conceptualized as an architectural potential that is composed of two primary components, which are as follows:
-1. Event management
-2. Managing removal and installation of Elixir plugins without `downtime`.
-
-When a programmer uses this library for his own software development, we sought to ensure that in addition to the established capabilities, he also has access to a set of appropriate standards for software development that are based on preset behaviors that can be applied. This was our goal. It streamlines and organizes the work of a group working on a project while also facilitating the creation of software.
-
-Error control and tree structure, which enable us to develop a system that is robust and trustworthy, are two of the guiding ideas behind the construction of this library, which has garnered attention from people all around the world.
-The MishkaInstaller library can be created in various systems, and it provides fundamental capabilities such as the management of plugin states and the application of standard behaviors. These features can all be accessed by specified hooks in the library.
+Imagine you are going to make an application that will have many plugins built for it in the future.
+But the fact that many manipulations will be made on your source code makes it difficult to
+maintain the application. For example, you present a content management system for your users,
+and now they need to activate a section for registration and `SMS`; the system allows you to
+present your desired input/output absolutely plugin oriented to your users and makes it
+possible for the developers to write their required applications beyond the core source code.
 
 
-## Behaviors and events
----
-In this section, you can define a series of events for each `event`, for example: after `successful registration` or `unsuccessful purchase` from “the store”, and for each `event`, put a set of `callbacks` in one module. After completing this step, when the user wants to create his own plugin, the `@behaviour` module will call you in its action module.
-This helps you have a regular and error-free system, and the library uses an almost integrated structure in all of its events.
+> **NOTICE**: Do not use the master branch; this library is under heavy development.
+> Expect version 0.1.0, and for using the new features, please wait until a new release is out.
 
-## `Hook` with priority
----
-In Mishka Elixir Plugin Management Library, a series of action or `hook` functions are given to the developer of the main plugin or software, which helps build plugins outside the system and convert software sections into separate `events`. Some of the functions of this module include the following:
 
-1. Registering a plugin outside of the system in database and ram `state`
-3. Removing plugin from database and `state`
-4. Restoring plugin
-5. Successful pause of plugin
-6. `Hook` plugin
-7. Search among the `events`
+##### This library is divided into the following main sections:
 
-And other functions that help both the mother software become an event-driven system and the developer can build the desired plugin or extension for different parts of the software and install it on the system as a separate package. This package can also be published in `hex`.
+- [Events and Hook](#events-and-hook)
+- [Plugin management system theory and installation of Elixir libraries at runtime](#plugin-management-system-theory-and-installation-of-elixir-libraries-at-runtime)
 
-## State management and links to the database supporting `PostgreSQL`
+
+### Events and Hook
 ---
 
-The `Hook` module manages a large part of this part, and the developer of the external plugin usually does not need it much. Still, this part creates a `state` on RAM for each plugin that is activated in a specific event and a dynamic supervisor for it. This allows us in case of an error in each plugin; the other plugins in the different events face no errors, and the system will try to restart with various strategies. 
-It should be noted for more stability and data storage after registering a plugin in the system; This section also maintains a backup copy of the database and strategies for recall in the event in case of an error. But to speed up the calling of each plugin, the website always uses `state`.
+In this section, you can define a series of events for each event,
+for example: after **successful registration** or **unsuccessful purchase** from “the store”,
+and for each event, put a set of callbacks in one module.
 
+After completing this step, when the user wants to create his own plugin,
+the Macro `behaviour` and `Hook` module will call you in its action module.
+
+This helps you have a regular and `error-free` system, and the library uses an almost
+integrated structure in all of its events.
+
+> In **Mishka Installer** Library, a series of action or hook functions are
+given to the developer of the main plugin or software, which helps build plugins **outside**/**inside**
+the system and convert software sections into separate events.
+
+**Some of the functions of this module include the following:**
+
+- Retrieves the merged configuration for the hook module.
+- Register a plugin for a specific event.
+- Start a plugin of a specific event.
+- Restart a plugin of a specific event.
+- Stop a plugin of a specific event.
+- Unregister a plugin of a specific event.
+- Retrieves a Plugin `GenServer` state.
+- Each plugin has A `GenServer` to do some auto jobs.
+
+> For more information please see the `MishkaInstaller.Event.Hook` module.
+
+##### Example:
+
+```elixir
+defmodule RegisterEmailSender do
+  use MishkaInstaller.Event.Hook, event: "after_success_login"
+
+  def call(entries) do
+    {:reply, entries}
+  end
+end
+```
+
+**If you want to change a series of default information, do this:**
+
+```elixir
+use MishkaInstaller.Event.Hook,
+  event: "after_success_login",
+  initial: %{depends: [SomeEvent], priority: 20}
+```
+
+**You can call all plugins of an event:**
+
+```elixir
+alias MishkaInstaller.Event.Hook
+
+# Normal call an event plugins
+Hook.call("after_success_login", params)
+
+# If you want certain entries not to change
+Hook.call("after_success_login", params, [private: something_based_on_your_data])
+
+# If you want the initial entry to be displayed at the end
+Hook.call("after_success_login", params, [return: true])
+```
+
+**Note: If you want your plugin to execute automatically,
+all you need to do is send the name of the module in which you utilized
+the `MishkaInstaller.Event.Hook` to the Application module.***
+
+```elixir
+children = [
+  ...
+  RegisterEmailSender
+]
+
+...
+opts = [strategy: :one_for_one, name: SomeModule.Supervisor]
+Supervisor.start_link(children, opts)
+```
+
+> This module is a read-only in-memory storage optimized for the fastest possible read times
+> not for write strategies.
+
+### Plugin management system theory and installation of Elixir libraries at runtime
 ---
 
-## Managing removal and installation of Elixir plugins without `downtime`
+The functionality of this library can be conceptualized as an architectural potential that is
+composed of two primary components, which are as follows:
 
-Through the use of event management, you are able to convert any portion of your program into a standalone event based on the specific requirements of the strategy, and you are also able to activate an endless number of modules or plugins for each event. However, if you do not perform installation at runtime, you will need to ensure that you call all of the necessary plugins in addition to the primary source when you start the software. One example of this would be installing an Elixir library in the `mix.exs` file.
+1. Event management (Plugin Hook powered by **Elixir Macro**)
+2. Managing removal and installation of Elixir libraries at `runtime`.
 
-By utilizing this capability, you will be able to add your program to the system and manage it after adding it, even if your software is already operating. The following are examples of management facilities that may be included:
+When a programmer uses this library for his own software development, we sought to
+ensure that in addition to the established capabilities, he also has access to a set of
+appropriate standards for software development that are based on preset behaviors that can be applied;
+This was our goal.
 
-1. Register a plugin for a specified event
-2. Activate the plugin for the installation
-3. Put an end to the installation of plugins
-4. Resetting the configuration plugin used during installation
-5. Uninstall the currently active plugin.
-6. Manage the plugin's requirements after they have been installed.
-7. Keeping an eye on the graphic panel and demonstrating it to the site managers
+It streamlines and organizes the work of a group working on a project while also facilitating
+the creation of software.
+Error control and tree structure, which enable us to develop a system that is robust and trustworthy,
+are two of the guiding ideas behind the construction of this library, which has garnered
+attention from people all around the world.
 
-And there are other scenarios that are known as APIs or Hooks to the software developer and management, and making use of them is a pretty straightforward process.
-It is important to note that this capability does not involve Erlang's hot coding and that it can only be used to install an Elixir library. Additionally, it is still in the process of being developed and is now in an experimental stage. If you use the software, you need to make sure you have a backup of it. At the moment, it is merely in the testing phase of its development, which consists of trial and error.
+The [MishkaInstaller](https://github.com/mishka-group/mishka_installer) library can be created in
+various systems, and it provides fundamental capabilities such as the management of plugin states
+and the application of standard behaviors.
+These features can all be accessed by specified hooks in the library.
 
-> **To use this section, please read the documentation of this library**
+> **The installer part is in beta mode, use it carefully and some of its functionality may not work in the Elixir `release`.**
 
----
+##### Example:
+
+```elixir
+alias MishkaInstaller.Installer.Installer
+
+# Normal calling
+Installer.install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+
+# Normal calling
+Installer.uninstall(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+
+# Normal calling
+Installer.async_install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+```
+
+> For more information please see the `MishkaInstaller.Installer.Installer` module.
+
 
 ## Installing the library:
 ---
-It should be noted that this library must be installed in two parts of the plugin and the software that wants to display the plugins, and due to its small dependencies, it does not cause any problems. To install, just add this library to your "mix.exs" in the "deps" function as follows:
+
+It should be noted that this library must be installed in two parts of the plugin and the
+software that wants to display the plugins, and due to its small dependencies, it does
+not cause any problems. To install, just add this library to your "mix.exs" in the "deps"
+function as follows:
 
 ```elixir
 def deps do
   [
-    {:mishka_installer, "~> 0.0.4"}
+    {:mishka_installer, "~> 0.1.0"}
   ]
 end
 ```
 
-## Using the library for extension creation and event activation:
----
-
-After installing this library, you must first install the required database of this package on your website, for which a `mix task` has been created, which is enough to load it once in your terminal, in the project path before the start.
-
-```elixir
-mix mishka_installer.db.gen.migration
-```
-
-After implementing the above sections, you must first implement events in your main software and place the `call` function from the `Hook` module there to call all the plugins activated in the event you want based on priority. And give the `state` you want, to these plugins in order, and the output you expect will eventually be generated.
-
-For example, you can see the mentioned description in a function controller in phoenix after a successful registration as the following:
-
-```elixir
-def login(conn, %{"user" => %{"email" => email, "password" => password}} = _params) do
-    # If your conditions are passed we call an event and pass it a struct of entries
-    # which our developers need to create plugin with this information
-    state = %MishkaInstaller.Reference.OnUserAfterLogin{
-        conn: conn, 
-        endpoint: :html, 
-        ip: user_ip, type: :email, 
-        user_info: user_info
-     }
-
-    hook = MishkaInstaller.Hook.call(event: "on_user_after_login", state: state)
-
-    hook.conn
-    |> renew_session()
-    |> put_session(:user_id, user_info.id)
-    |> put_flash(:info, "You entered to our world, well played.")
-    |> redirect(to: "/home")
-end
-```
-
-Now the event is ready in the part where you need to allow the developer to make his own plugins for it. And it's time to write a plugin for this section. This is very simple. Consider the following example:
-
-```elixir
-defmodule MishkaUser.SuccessLogin do
-   alias MishkaInstaller.Reference.OnUserAfterLogin
-   use MishkaInstaller.Hook,
-      module: __MODULE__,
-      behaviour: OnUserAfterLogin,
-      event: :on_user_after_login,
-      initial: []
-
-   @spec initial(list()) :: {:ok, OnUserAfterLogin.ref(), list()}
-   def initial(args) do
-      event = %PluginState{name: "MishkaUser.SuccessLogin", event: Atom.to_string(@ref), priority: 1}
-      Hook.register(event: event)
-      {:ok, @ref, args}
-   end
-
-   @spec call(OnUserAfterLogin.t()) :: {:reply, OnUserAfterLogin.t()}
-   def call(%OnUserAfterLogin{} = state) do
-      new_state = Your_Code_Or_Function
-      {:reply, new_state}
-   end
-end
-```
-
-> As you can see in the above, we used `MishkaInstaller.Reference.OnUserAfterLogin` in order to activate `behavior` which has a few `callback` in it, and you can see [here](https://github.com/mishka-group/mishka_installer/blob/master/lib/plugin_manager/event/reference/on_user_after_login.ex). 
+The docs can be found at https://hexdocs.pm/mishka_installer.
 
 ---
 
-> There should be two main functions in each plugin, namely `initial` and also `call`. In the first function, we introduce our plugin, and in the second function, whenever the action function calls this special event for which the plugin is written, based on priority. This plugin is also called. But what is important is the final output of the `call` function. This output may be the input of other plugins with higher priorities. The order of the plugins is from small to large, and if several plugins are registered for a number, it is sorted by name in the second parameter. And it should be noted that in any case, if you did not want this `state` to go to other plugins and the last output is returned in the same plugin, and you can replace `{:reply, :halt, new_state}` with `{:reply, new_state}`.
+# Donate
 
-Subsequent plugins with higher priorities are not counted, and the loop ends here.
-Notice that a `Genserver` will be made based on each plugin name without a supervisor, which can be used for temporary memory in the case when the ` __using__` function is used as above, which results in the following option:
+If the project was useful for you, the only way you can donate to me is the following ways
 
-```elixir
-use MishkaInstaller.Hook,
-    module: __MODULE__,
-    behaviour: OnUserAfterLogin,
-    event: :on_user_after_login,
-    initial: []
+| **BTC**                                                                                                                            | **ETH**                                                                                                                            | **DOGE**                                                                                                                           | **TRX**                                                                                                                            |
+| ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/230ea4bf-7e8f-4f18-99c9-0f940dd3c6eb" width="200"> | <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/0c8e677b-7240-4b0d-8b9e-bd1efca970fb" width="200"> | <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/3de9183e-c4c0-40fe-b2a1-2b9bb4268e3a" width="200"> | <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/aaa1f103-a7c7-43ed-8f39-20e4c8b9975e" width="200"> |
+
+<details>
+  <summary>Donate addresses</summary>
+
+**BTC**:‌
+
+```
+bc1q24pmrpn8v9dddgpg3vw9nld6hl9n5dkw5zkf2c
 ```
 
-The last two step to use the plugin you have to put it in your `Application` module so that whenever the server is turned off and on, the plugin is run again and if it is not registered, a copy of its support will be provided once in the database.
+**ETH**:
 
-```elixir
-children = [
-  %{id: YOUR_PLUGIN_MODULE, start: {YOUR_PLUGIN_MODULE, :start_link, [[]]}}
-]
+```
+0xD99feB9db83245dE8B9D23052aa8e62feedE764D
 ```
 
-And add these config in your project like `/config/config.exs`
+**DOGE**:
 
-```elixir
-config :mishka_installer, :basic,
-  repo: YOUR_Repo,
-  pubsub: YOUR_PUBSUB or nil,
-  html_router: YOUR_WEBSITE_ROUTER_MODULE,
-  project_path: YOUR_PROJECT_PATH,
-  mix: YOUR_MIX_MODULE,
-  mix_path: YOUR_MIX_EXS_PATH,
-  gettext: YOUR_GETTEXT
+```
+DGGT5PfoQsbz3H77sdJ1msfqzfV63Q3nyH
 ```
 
-> If you are using Phoenix as developer mode, please disable `live_reload` in `dev.exs`.
-> Please add `reloadable_apps: [:mishka_installer]` to your endpoint config in `config.exs` file.
+**TRX**:
 
-> **Because there are a lot of moving elements in this plugin, you need to read the documentation before using it.**
+```
+TBamHas3wAxSEvtBcWKuT3zphckZo88puz
+```
 
-You can see our recommendations and other colleagues in the [Proposal](https://github.com/mishka-group/Proposals) repository, and if you have a request or idea, send us the full description.
-
-> **Please help us by submitting suggestions and reviewing the project so that [Mishka Group](https://github.com/mishka-group) can produce more products and provide them to programmers and webmasters, and online software.**
+</details>
