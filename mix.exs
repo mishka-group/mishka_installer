@@ -51,7 +51,7 @@ defmodule MishkaInstaller.MixProject do
       {:plug, "~> 1.16"},
 
       # Extra tools
-      {:mishka_developer_tools, "~> 0.1.6"},
+      {:mishka_developer_tools, "~> 0.1.7"},
       {:telemetry, "~> 1.2.1"},
 
       # Dev and Test dependencies
