@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
 
-  @version "0.1.0-alpha.2"
+  @version "0.1.0"
   @source_url "https://github.com/mishka-group/mishka_installer"
 
   def project do
@@ -17,12 +17,7 @@ defmodule MishkaInstaller.MixProject do
       package: package(),
       homepage_url: "https://github.com/mishka-group",
       source_url: @source_url,
-      docs: [
-        main: "MishkaInstaller",
-        source_ref: "master",
-        extras: ["README.md"],
-        source_url: @source_url
-      ],
+      docs: docs(),
       test_coverage: [
         ignore_modules: [
           MishkaInstaller.MnesiaRepo.State,
@@ -52,6 +47,7 @@ defmodule MishkaInstaller.MixProject do
 
       # Extra tools
       {:mishka_developer_tools, "~> 0.1.7"},
+      # We will cover telemetry in whole project
       {:telemetry, "~> 1.2.1"},
 
       # Dev and Test dependencies
@@ -69,10 +65,25 @@ defmodule MishkaInstaller.MixProject do
 
   defp package() do
     [
-      files: ~w(lib .formatter.exs mix.exs LICENSE README*),
+      files: ~w(lib .formatter.exs mix.exs LICENSE README* Changelog.md),
       licenses: ["Apache-2.0"],
       maintainers: ["Shahryar Tavakkoli"],
-      links: %{"GitHub" => @source_url}
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "https://hexdocs.pm/mishka_installer/changelog.html"
+      }
+    ]
+  end
+
+  defp docs() do
+    [
+      main: "readme",
+      source_ref: "v#{@version}",
+      extras: [
+        "README.md",
+        "CHANGELOG.md"
+      ],
+      source_url: @source_url
     ]
   end
 end

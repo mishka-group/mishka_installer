@@ -21,8 +21,8 @@ defmodule MishkaInstaller do
 
   ##### This library is divided into the following main sections:
 
-  - [Events and Hook](#events-and-hook)
-  - [Plugin management system theory and installation of Elixir libraries at runtime](#plugin-management-system-theory-and-installation-of-elixir-libraries-at-runtime)
+  - [Events and Hook](#module-events-and-hook)
+  - [Plugin management system theory and installation of Elixir libraries at runtime](#module-plugin-management-system-theory-and-installation-of-elixir-libraries-at-runtime)
 
 
   ### Events and Hook
