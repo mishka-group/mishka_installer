@@ -270,7 +270,7 @@ defmodule MishkaInstaller.Event.Hook do
                :persistent_term.get(:compile_status, nil) == "ready" do
             Hook.register_start_helper(__MODULE__, state)
           else
-            Process.send_after(__MODULE__, :register_start_again, 1000)
+            Process.send_after(__MODULE__, :start_again, 1000)
             state
           end
 
@@ -298,7 +298,11 @@ defmodule MishkaInstaller.Event.Hook do
           if MSE.safe_initialize?(event) and module.is_initialized?(db_plg) do
             Keyword.merge(state, status: db_plg.status, depends: db_plg.depends)
           else
-            Hook.start_helper(__MODULE__, state, db_plg)
+            if is_nil(db_plg) do
+              Hook.register_start_helper(__MODULE__, state)
+            else
+              Hook.start_helper(__MODULE__, state, db_plg)
+            end
           end
 
         {:noreply, new_state}
