@@ -71,30 +71,37 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
               unquote(Macro.escape(plugins))
               |> MishkaInstaller.Event.ModuleStateCompiler.perform({:reply, state})
 
-            if !is_nil(return_status) do
-              state
-            else
-              case performed do
-                {:ok, data} when is_list(data) ->
-                  if Keyword.keyword?(data) and !is_nil(private),
-                    do: {:ok, Keyword.merge(data, private)},
-                    else: {:ok, data}
+            new_state =
+              if !is_nil(return_status) do
+                state
+              else
+                case performed do
+                  {:ok, data} when is_list(data) ->
+                    if Keyword.keyword?(data) and !is_nil(private),
+                      do: {:ok, Keyword.merge(data, private)},
+                      else: {:ok, data}
 
-                {:ok, data} when is_map(data) ->
-                  {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
+                  {:ok, data} when is_map(data) ->
+                    {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
 
-                {:error, _errors} = errors ->
-                  errors
+                  # If you have :private, we do not recommend to use this pattern
+                  {:ok, data} ->
+                    {:ok, data}
 
-                data when is_list(data) ->
-                  if Keyword.keyword?(data) and !is_nil(private),
-                    do: Keyword.merge(data, private),
-                    else: data
+                  {:error, _errors} = errors ->
+                    errors
 
-                data when is_map(data) ->
-                  if !is_nil(private), do: Map.merge(data, private), else: data
+                  data when is_list(data) ->
+                    if Keyword.keyword?(data) and !is_nil(private),
+                      do: Keyword.merge(data, private),
+                      else: data
+
+                  data when is_map(data) ->
+                    if !is_nil(private), do: Map.merge(data, private), else: data
+                end
               end
-            end
+
+            new_state
           rescue
             _e -> state
           end

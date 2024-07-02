@@ -170,6 +170,62 @@ defmodule MishkaInstaller.Event.Hook do
   >
   > You can override these functions:
   > `register: 0`, `start: 0`, `restart: 0`, `stop: 0`, `unregister: 0`, `get: 0`
+
+  ### Consideration:
+
+  It should be brought to your attention that the output of the `call` function has a few trade-offs.
+  These trade-offs do not restrict your ability to customize the outcome of the `call` function;
+  nevertheless, they do cause you to move away from the foreseen and planned structure that is the
+  approach that this library takes.
+
+  In situations when you have access to a `:private` key, it is preferable for your data to be in the
+  form of a `Map` or a `Keyword`. This allows you to perform an accurate match prior to the
+  output of the data.
+  With the exception of these two circumstances, we do not collect any other data.
+
+  ---
+
+  The list below is all the outputs that are checked in the form of different wrist patterns:
+
+  ```elixir
+  {:ok, data} when is_list(data) # It can be merged with the `:private` key
+  {:ok, data} when is_map(data) # It can be merged with the `:private` key
+  # If you have :private, we do not recommend to use this pattern
+  {:ok, data} # It can not be merged with the `:private` key
+  {:error, _errors} # It does not need to be merged
+  data when is_list(data) # It can be merged with the `:private` key
+  data when is_map(data) # It can be merged with the `:private` key
+  ```
+
+  ### For example:
+
+  We do not recommend these the data or error data; they should have `Map` or `Keyword` format.
+
+  ```elixir
+  def call(entries) do
+    {:reply, :halt, {:ok, "Message is sent!"}}
+  end
+
+  def call(entries) do
+    {:reply, entries}
+  end
+  ```
+
+  But it is recommended to use these.
+
+  ```elixir
+  def call(entries) do
+    {:reply, :halt, {:ok, %{name: "mishka"}}
+  end
+
+  def call(entries) do
+    {:reply, {:ok, [name: "mishka"]}
+  end
+
+  def call(entries) do
+    {:reply, {:error, any_data}
+  end
+  ```
   """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 
