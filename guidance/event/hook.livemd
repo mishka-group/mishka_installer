@@ -6,6 +6,10 @@ Mix.install([
 ])
 ```
 
+## Solve a possible problem in the execution of sample codes
+
+> **Should you come into an error such as "you are on another node," it is imperative that you terminate the livebook session associated with this repository and then reopen it.**
+
 ## Build purpose
 
 Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and SMS; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code.
@@ -68,13 +72,6 @@ System.get_env("PROJECT_PATH") OR Application.get_env(:mishka_installer, :projec
 <!-- livebook:{"break_markdown":true} -->
 
 Should you choose to leave this area unchecked, it is possible that it will evaluate a set of default data for you. While this will not be a problem in the developer environment, it is highly likely that you will see an error when you release the code.
-
-## This part is just for LiveBook not your project
-
-```elixir
-Application.load(:mishka_installer)
-{:ok, _} = Application.ensure_all_started(:mishka_installer)
-```
 
 ## Step 1: Create main functions
 
@@ -212,6 +209,9 @@ You are no longer required to interact with the parent methods in order to add a
 ```elixir
 UserManagement.register(%{mobile: "123456789"})
 # {:ok, "Message is sent!"}
+```
+
+```elixir
 UserManagement.register(%{mobile: "00000000"})
 # {:ok, {:ok, %{mobile: "00000000"}}}
 ```

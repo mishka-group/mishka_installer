@@ -243,6 +243,8 @@ defmodule MishkaInstaller.Event.Hook do
   ```elixir
   use MishkaInstaller.Event.Hook, event: "after_success_login", queue: false
   ```
+
+  [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fmishka-group%2Fmishka_installer%2Fblob%2Fmaster%2Fguidance%2Fevent%2Fhook.livemd)
   """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 

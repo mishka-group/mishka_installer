@@ -108,6 +108,8 @@ defmodule MishkaInstaller do
   > This module is a read-only in-memory storage optimized for the fastest possible read times
   > not for write strategies.
 
+  [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fmishka-group%2Fmishka_installer%2Fblob%2Fmaster%2Fguidance%2Fevent%2Fhook.livemd)
+
   ### Plugin management system theory and installation of Elixir libraries at runtime
   ---
 
