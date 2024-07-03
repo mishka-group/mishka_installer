@@ -1,0 +1,217 @@
+# Mishka Installer Event Hook
+
+```elixir
+Mix.install([
+  {:mishka_installer, github: "mishka-group/mishka_installer", branch: "master"}
+])
+```
+
+## Build purpose
+
+Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and SMS; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code.
+
+> **NOTICE**: Do not use the master branch; this library is under heavy development. Expect version 0.1.0, and for using the new features, please wait until a new release is out.
+
+<!-- livebook:{"break_markdown":true} -->
+
+##### This library is divided into the following main sections:
+
+* [Events and Hook](#events-and-hook)
+* [Plugin management system theory and installation of Elixir libraries at runtime](#plugin-management-system-theory-and-installation-of-elixir-libraries-at-runtime)
+
+## Events and Hook
+
+In this section, you can define a series of plugins for each event,
+for example: after **successful registration** or **unsuccessful purchase** from “the store”,
+and for each event, put a set of callbacks in one module.
+
+<!-- livebook:{"break_markdown":true} -->
+
+After completing this step, when the user wants to create his own plugin,
+the Macro `behaviour` and `Hook` module will call you in its action module.
+
+This helps you have a regular and `error-free` system, and the library uses an almost
+integrated structure in all of its events.
+
+> In **[Mishka Installer](https://github.com/mishka-group/mishka_installer)** Library, a series of action or hook functions are
+> given to the developer of the main plugin or software, which helps build plugins **outside**/**inside**
+> the system and convert software sections into separate events.
+
+<!-- livebook:{"break_markdown":true} -->
+
+**Some of the functions of this module include the following:**
+
+* Retrieves the merged configuration for the hook module.
+* Register a plugin for a specific event.
+* Start a plugin of a specific event.
+* Restart a plugin of a specific event.
+* Stop a plugin of a specific event.
+* Unregister a plugin of a specific event.
+* Retrieves a Plugin `GenServer` state.
+* Each plugin has A `GenServer` to do some auto jobs.
+
+> For more information please see the `MishkaInstaller.Event.Hook` module.
+
+<!-- livebook:{"break_markdown":true} -->
+
+At the outset, it is necessary for you to establish the project route and project Evn, from which you can select one of the following modes of operation. It must to be done in **Main project** not inside plugins.
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+System.get_env("MIX_ENV") OR Application.get_env(:mishka_installer, :project_env)
+System.get_env("PROJECT_PATH") OR Application.get_env(:mishka_installer, :project_path)
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+Should you choose to leave this area unchecked, it is possible that it will evaluate a set of default data for you. While this will not be a problem in the developer environment, it is highly likely that you will see an error when you release the code.
+
+## This part is just for LiveBook not your project
+
+```elixir
+Application.load(:mishka_installer)
+{:ok, _} = Application.ensure_all_started(:mishka_installer)
+```
+
+## Step 1: Create main functions
+
+**Consider the following scenario**:
+
+we have a `user management system`, and after 
+`registering` and `logging` into the system, we are going to carry out a number of actions. 
+On the other hand, we do not intend to alter the primary functions contained within 
+the source code except for the initial instance, and we will add our preferred 
+plugins outside of the source code.
+
+```elixir
+defmodule UserManagement do
+  alias MishkaInstaller.Event.Hook
+
+  def register(params) do
+    Hook.call!("after_register", params)
+  end
+
+  def login(params) do
+    Hook.call!("after_login", params)
+  end
+end
+
+```
+
+You can see that we make use of the `call!` function by looking at the code that is located above. When we are absolutely certain that the state module exists for the event that we want, we should use this function. If we are not certain, we should use the `call` method instead.
+
+> **For more information please read the document. [click](https://hexdocs.pm/mishka_installer/)**.
+
+## Step 2: Create a custom plugin
+
+> It's important to note that the manner in which the plugins are called is prioritized, and each plugin has the ability to either display the output at the same time or transmit its processed information to another plugin that has a higher priority. Other plugins do not take into consideration this possibility.
+
+**For more information and options please read the document. [click](https://hexdocs.pm/mishka_installer/)**.
+
+<!-- livebook:{"break_markdown":true} -->
+
+By default, all plugins are considered as 100 if they are not prioritized. The smaller this number is, the more plugins will be prioritized in that particular event
+
+Due to the fact that there is a complete document for these parts in the system ([Hook document](https://hexdocs.pm/mishka_installer/MishkaInstaller.Event.Hook.html)), we did not make the examples completely in order to make it easier to understand.
+
+> As a result of this, this area has a good number of additional options that give you the ability to personalize each plugin. I ask that you read the document.
+
+<!-- livebook:{"break_markdown":true} -->
+
+### Plugin 1 with `priority: 20` (In the same event)
+
+<!-- livebook:{"break_markdown":true} -->
+
+In this example, it is very simple to act in such a way that if there is a certain number in the system, the OTP code will be sent and other plugins will not be executed in this special event, i.e. `after_register`.
+
+```elixir
+defmodule UserManagement.Plugins.SendOTPPlugin do
+  use MishkaInstaller.Event.Hook,
+    event: "after_register",
+    queue: false,
+    initial: %{priority: 20}
+
+  def call(entries) do
+    if is_map(entries) and Map.get(entries, :mobile) == "123456789" do
+      {:reply, :halt, {:ok, "Message is sent!"}}
+    else
+      {:reply, {:ok, entries}}
+    end
+  end
+end
+
+```
+
+### Plugin 2 with `priority: 100` (In the same event)
+
+```elixir
+defmodule UserManagement.Plugins.SendEmailPlugin do
+  use MishkaInstaller.Event.Hook, event: "after_register", queue: false
+
+  def call(entries) do
+    {:reply, {:ok, entries}}
+  end
+end
+```
+
+### Plugin 3 with `priority: 100` (In another event)
+
+```elixir
+defmodule UserManagement.Plugins.SendSmsPlugin do
+  use MishkaInstaller.Event.Hook, event: "after_login", queue: false
+
+  def call(entries) do
+    {:reply, {:error, entries}}
+  end
+end
+
+```
+
+## Step 2: Manual start or activation in the Application module of your project
+
+**Note: If you want your plugin to execute automatically,
+all you need to do is send the name of the module in which you utilized
+the `MishkaInstaller.Event.Hook` to the Application module.**
+
+<!-- livebook:{"break_markdown":true} -->
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+children = [
+  ...
+  UserManagement.Plugins.SendSmsPlugin,
+  UserManagement.Plugins.SendEmailPlugin,
+  UserManagement.Plugins.SendOTPPlugin
+]
+
+...
+opts = [strategy: :one_for_one, name: SomeModule.Supervisor]
+Supervisor.start_link(children, opts)
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+Since we did not add the `Application` module in `LiveBook`, we have to start it manually, but the above method is recommended for the actual project.
+
+```elixir
+UserManagement.Plugins.SendSmsPlugin.start_link()
+UserManagement.Plugins.SendEmailPlugin.start_link()
+UserManagement.Plugins.SendOTPPlugin.start_link()
+```
+
+The remaining elements that you require will be automatically fixed by the system, and once the system is restarted, if these plugins are running automatically, they will be automatically accessible again.
+
+## Step 3: Using parent functions
+
+You are no longer required to interact with the parent methods in order to add a plugin. In addition, you can even install a plugin in `mix.exs` within a library. Furthermore, if the library itself has a `Application` module and you call the plugin in itself, you do not even require it in the parent project. Also, make adjustments.
+
+```elixir
+UserManagement.register(%{mobile: "123456789"})
+# {:ok, "Message is sent!"}
+UserManagement.register(%{mobile: "00000000"})
+# {:ok, {:ok, %{mobile: "00000000"}}}
+```

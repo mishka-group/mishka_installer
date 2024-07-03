@@ -28,7 +28,7 @@ defmodule MishkaInstaller do
   ### Events and Hook
   ---
 
-  In this section, you can define a series of events for each event,
+  In this section, you can define a series of plugins for each event,
   for example: after **successful registration** or **unsuccessful purchase** from “the store”,
   and for each event, put a set of callbacks in one module.
 
@@ -92,7 +92,7 @@ defmodule MishkaInstaller do
 
   **Note: If you want your plugin to execute automatically,
   all you need to do is send the name of the module in which you utilized
-  the `MishkaInstaller.Event.Hook` to the Application module.***
+  the `MishkaInstaller.Event.Hook` to the Application module.**
 
   ```elixir
   children = [

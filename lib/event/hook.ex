@@ -226,6 +226,23 @@ defmodule MishkaInstaller.Event.Hook do
     {:reply, {:error, any_data}
   end
   ```
+
+  > #### Use cases information {: .tip}
+  >
+  > Take note that you have the ability to set the `queue` of a plugin to `false` while
+  > you are defining it. This will ensure that the implementation and build of
+  > the event state module are not **queued**.
+  >
+  > For projects that require a significant amount of time to compile their events module,
+  > this possibility has been implemented. Additionally, these projects may have created a
+  > series of conditions in order to avoid race conditions from occurring within their system.
+  >
+  > It is `true` by default and recommend to set `false` till you get some problem.
+
+  ##### Example:
+  ```elixir
+  use MishkaInstaller.Event.Hook, event: "after_success_login", queue: false
+  ```
   """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 

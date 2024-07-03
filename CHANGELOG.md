@@ -5,3 +5,5 @@
 You will see that this version of the project has undergone a total overhaul, and the strategy that was taken to it has been radically altered.
 
 Because of this, it is not possible to write down the details, and each area has its own document that you are able to study thoroughly.
+
+- Based on: https://github.com/mishka-group/mishka_installer/pull/99
