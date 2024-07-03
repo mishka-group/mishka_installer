@@ -83,7 +83,7 @@ defmodule MishkaInstaller.MnesiaRepo do
       {:ok, %State{tables: :mnesia.system_info(:local_tables), schemas: schemas()}}
     else
       Logger.critical(
-        "Identifier: #{inspect(@identifier)} ::: Node name mismatch: I'm #{inspect(my_node)}, the database is owned by #{db_nodes}"
+        "Identifier: #{inspect(@identifier)} ::: Node name mismatch: I'm #{inspect(my_node)}, the database is owned by #{inspect(db_nodes)}"
       )
 
       {:stop, :node_name_mismatch}
