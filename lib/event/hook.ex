@@ -248,10 +248,23 @@ defmodule MishkaInstaller.Event.Hook do
   """
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
 
+  @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
+  @type okey_return :: {:ok, struct() | map() | module() | list(any())}
+
+  @callback call(any()) :: any()
+  @callback register() :: okey_return | error_return
+  @callback start() :: okey_return | error_return
+  @callback restart() :: okey_return | error_return
+  @callback stop() :: okey_return | error_return
+  @callback unregister() :: okey_return | error_return
+  @callback get() :: keyword()
+  @optional_callbacks register: 0, start: 0, restart: 0, stop: 0, unregister: 0, get: 0
+
   @spec __using__(keyword()) :: Macro.t()
   defmacro __using__(opts \\ []) do
     quote bind_quoted: [opts: opts] do
       use GenServer, restart: :transient
+      @behaviour MishkaInstaller.Event.Hook
       alias MishkaInstaller.Event.{Event, Hook, EventHandler}
       alias MishkaInstaller.Event.ModuleStateCompiler, as: MSE
 

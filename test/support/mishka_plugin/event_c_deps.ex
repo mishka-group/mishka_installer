@@ -5,6 +5,7 @@ defmodule MishkaInstallerTest.Support.MishkaPlugin.EventCDeps do
     event: "event_c_extra",
     initial: %{depends: [EventCDepsOne], priority: 20}
 
+  @impl true
   def call(entries) do
     {:reply, entries}
   end
