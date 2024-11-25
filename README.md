@@ -164,7 +164,7 @@ function as follows:
 ```elixir
 def deps do
   [
-    {:mishka_installer, "~> 0.1.0"}
+    {:mishka_installer, "~> 0.1.1"}
   ]
 end
 ```

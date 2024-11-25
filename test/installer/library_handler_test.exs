@@ -84,7 +84,7 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
                System.get_env("PROJECT_PATH") <> "/_build/test/lib/req/ebin/req.app"
              )
 
-    assert Keyword.get(data, :vsn) == ~c"0.5.1"
+    assert Keyword.get(data, :vsn) == ~c"0.5.7"
     {:error, _error} = assert LibraryHandler.read_app(:req, "_build/test/lib/req/ebin/req1.app")
     {:error, _error} = assert LibraryHandler.read_app(:req1, "_build/test/lib/req/ebin/req.app")
   end
