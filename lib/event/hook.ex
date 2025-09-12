@@ -271,7 +271,22 @@ defmodule MishkaInstaller.Event.Hook do
       @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
       @type okey_return :: {:ok, struct() | map() | module() | list(any())}
       # Based on https://elixirforum.com/t/59168/5
+      # Only keep basic config values that can be serialized at compile time
       @app_config Mix.Project.config()
+                  |> Keyword.take([
+                    :app,
+                    :version,
+                    :elixir,
+                    :deps,
+                    :name,
+                    :source_url,
+                    :homepage_url,
+                    :description
+                  ])
+                  |> Keyword.filter(fn {_k, v} ->
+                    is_atom(v) or is_binary(v) or is_list(v) or is_map(v) or is_number(v) or
+                      is_nil(v)
+                  end)
       @plugin_event Keyword.get(opts, :event)
       @initial Keyword.get(opts, :initial, %{})
       @plugin_name __MODULE__

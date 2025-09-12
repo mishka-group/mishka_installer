@@ -9,9 +9,12 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
   test "Compile an Elixir Library with cmd - command_execution" do
     System.put_env("PROJECT_PATH", File.cwd!())
     temp_name = "elixir-uuid-1.2.1"
+    # Clean up both test and dev directories
     File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/temp-#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/temp-#{temp_name}")
     path = "test/support/elixir-uuid-1.2.1.tar.gz"
-    File.mkdir!(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
     :ok = LibraryHandler.extract(:tar, path, temp_name)
 
     :ok =
@@ -39,10 +42,13 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
   test "Compile an Elixir Library with port - command_execution" do
     System.put_env("PROJECT_PATH", File.cwd!())
     temp_name = "uuid-1.2.2"
+    # Clean up both test and dev directories
     File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/test/extensions/#{temp_name}")
+    File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/test/extensions/temp-#{temp_name}")
+    File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/dev/extensions/#{temp_name}")
+    File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/dev/extensions/temp-#{temp_name}")
     path = "test/support/elixir-uuid-1.2.1.tar.gz"
-    File.mkdir!(System.get_env("PROJECT_PATH") <> "/deployment/test/extensions/#{temp_name}")
-    LibraryHandler.extract(:tar, path, temp_name)
+    :ok = LibraryHandler.extract(:tar, path, temp_name)
 
     :ok =
       assert LibraryHandler.do_compile(%{
@@ -51,7 +57,9 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
                compile_type: :port
              })
 
+    # Clean up both test and dev directories at the end
     File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
   end
 
   test "Compile an Elixir Library with mix - command_execution" do
@@ -66,13 +74,19 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
   test "Extract and move tar file" do
     System.put_env("PROJECT_PATH", File.cwd!())
     temp_name = "test1"
+    # Clean up both test and dev directories
     File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/temp-#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/temp-#{temp_name}")
     path = "test/support/elixir-uuid-1.2.1.tar.gz"
     :ok = LibraryHandler.extract(:tar, path, temp_name)
 
     path1 = "test/support/mishka_developer_tools-0.1.8.tar.gz"
     {:error, _error} = assert LibraryHandler.extract(:tar, path1, temp_name)
+    # Clean up both test and dev directories at the end
     File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
+    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
   end
 
   test "Read app file" do
@@ -84,7 +98,7 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
                System.get_env("PROJECT_PATH") <> "/_build/test/lib/req/ebin/req.app"
              )
 
-    assert Keyword.get(data, :vsn) == ~c"0.5.7"
+    assert Keyword.get(data, :vsn) == ~c"0.5.15"
     {:error, _error} = assert LibraryHandler.read_app(:req, "_build/test/lib/req/ebin/req1.app")
     {:error, _error} = assert LibraryHandler.read_app(:req1, "_build/test/lib/req/ebin/req.app")
   end

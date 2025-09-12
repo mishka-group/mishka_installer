@@ -1,14 +1,14 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
 
-  @version "0.1.1"
+  @version "0.1.2"
   @source_url "https://github.com/mishka-group/mishka_installer"
 
   def project do
     [
       app: :mishka_installer,
       version: @version,
-      elixir: "~> 1.16",
+      elixir: "~> 1.17",
       name: "Mishka installer",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -42,18 +42,18 @@ defmodule MishkaInstaller.MixProject do
   defp deps do
     [
       {:phoenix_pubsub, "~> 2.1.3"},
-      {:req, "~> 0.5.7"},
-      {:plug, "~> 1.16"},
+      {:req, "~> 0.5.15"},
+      {:plug, "~> 1.18.1"},
 
       # Extra tools
       {:mishka_developer_tools, "~> 0.1.8"},
-      {:guarded_struct, "~> 0.0.2"},
+      {:guarded_struct, "~> 0.0.4"},
       # We will cover telemetry in whole project
       {:telemetry, "~> 1.3"},
 
       # Dev and Test dependencies
-      {:ex_doc, "~> 0.35.1", only: :dev, runtime: false},
-      {:hex_core, "~> 0.10.3", only: :test}
+      {:ex_doc, "~> 0.38.4", only: :dev, runtime: false},
+      {:hex_core, "~> 0.11.0", only: :test}
     ]
   end
 
