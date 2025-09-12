@@ -46,7 +46,7 @@ defmodule MishkaInstaller.MixProject do
       {:plug, "~> 1.18.1"},
 
       # Extra tools
-      {:mishka_developer_tools, "~> 0.1.8"},
+      {:mishka_developer_tools, "~> 0.1.9"},
       {:guarded_struct, "~> 0.0.4"},
       # We will cover telemetry in whole project
       {:telemetry, "~> 1.3"},
