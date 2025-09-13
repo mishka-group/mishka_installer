@@ -2,11 +2,21 @@
 
 [![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.0-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
 
-<a href="https://www.buymeacoffee.com/mishkagroup" target="_blank">
-  <img src="https://img.buymeacoffee.com/button-api/?text=Buy us coffee&emoji=☕&slug=mishkagroup&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" alt="Buy Me A Coffee" height="50" width="210">
-</a>
+<div align="center">
+  <pre style="display: inline-block; text-align: left;">
+    💖 Hey there! If you like my work, please <b><a href="https://github.com/sponsors/mishka-group">support me financially!</a></b> 💖
+  </pre>
+</div>
 
-## Low Maintenance Warning: 
+<br />
+
+<p align="center">
+  <a href="https://www.buymeacoffee.com/mishkagroup">
+    <img src="https://github.com/user-attachments/assets/f4d4df7e-dcc4-4d1a-80e1-59c4d99725ab" alt="Support Mishka by Buy Me a Coffee" />
+  </a>
+</p>
+
+## Low Maintenance Warning:
 
 > **This library is in low maintenance mode, which means the author is currently only responding to pull requests.**
 
@@ -173,7 +183,7 @@ function as follows:
 ```elixir
 def deps do
   [
-    {:mishka_installer, "~> 0.1.1"}
+    {:mishka_installer, "~> 0.1.3"}
   ]
 end
 ```
@@ -184,37 +194,4 @@ The docs can be found at https://hexdocs.pm/mishka_installer.
 
 # Donate
 
-You can support this project through the "[Sponsor](https://github.com/sponsors/mishka-group)" button on GitHub or via cryptocurrency donations. All our projects are **open-source** and **free**, and we rely on community contributions to enhance and improve them further.
-
-| **BTC**                                                                                                                            | **ETH**                                                                                                                            | **DOGE**                                                                                                                           | **TRX**                                                                                                                            |
-| ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/230ea4bf-7e8f-4f18-99c9-0f940dd3c6eb" width="200"> | <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/0c8e677b-7240-4b0d-8b9e-bd1efca970fb" width="200"> | <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/3de9183e-c4c0-40fe-b2a1-2b9bb4268e3a" width="200"> | <img src="https://github.com/mishka-group/mishka_developer_tools/assets/8413604/aaa1f103-a7c7-43ed-8f39-20e4c8b9975e" width="200"> |
-
-<details>
-  <summary>Donate addresses</summary>
-
-**BTC**:‌
-
-```
-bc1q24pmrpn8v9dddgpg3vw9nld6hl9n5dkw5zkf2c
-```
-
-**ETH**:
-
-```
-0xD99feB9db83245dE8B9D23052aa8e62feedE764D
-```
-
-**DOGE**:
-
-```
-DGGT5PfoQsbz3H77sdJ1msfqzfV63Q3nyH
-```
-
-**TRX**:
-
-```
-TBamHas3wAxSEvtBcWKuT3zphckZo88puz
-```
-
-</details>
+You can support this project through the "[Sponsor](https://github.com/sponsors/mishka-group)" button on GitHub donations. All our projects are **open-source** and **free**, and we rely on community contributions to enhance and improve them further.
