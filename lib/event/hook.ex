@@ -496,12 +496,7 @@ defmodule MishkaInstaller.Event.Hook do
   @spec call(String.t(), any(), keyword()) :: any()
   def call(event, data, args \\ []) do
     module = ModuleStateCompiler.module_event_name(event)
-
-    if function_exported?(module, :call, 2) do
-      module.call(data, args)
-    else
-      {:error, :undefined_function_error}
-    end
+    if function_exported?(module, :call, 2), do: module.call(data, args), else: data
   end
 
   @doc """
