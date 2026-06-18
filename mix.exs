@@ -42,18 +42,18 @@ defmodule MishkaInstaller.MixProject do
   defp deps do
     [
       {:phoenix_pubsub, "~> 2.2"},
-      {:req, "~> 0.5.17"},
+      {:req, "~> 0.6.1"},
       {:plug, "~> 1.19"},
 
       # Extra tools
       {:mishka_developer_tools, "~> 0.1.10"},
-      {:guarded_struct, "~> 0.0.5"},
+      {:guarded_struct, "~> 0.1.0-beta.8"},
       # We will cover telemetry in whole project
       {:telemetry, "~> 1.4"},
 
       # Dev and Test dependencies
-      {:ex_doc, "~> 0.40.1", only: :dev, runtime: false},
-      {:hex_core, "~> 0.15.0", only: :test}
+      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
+      {:hex_core, "~> 0.18.0", only: :test}
     ]
   end
 

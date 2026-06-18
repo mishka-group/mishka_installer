@@ -59,26 +59,26 @@ defmodule MishkaInstaller.Event.Event do
 
   guardedstruct do
     # This type can be used when you want to introduce an plugin id.
-    field(:id, UUID.t(), auto: {UUID, :generate}, derive: "validate(uuid)")
+    field(:id, UUID.t(), auto: {UUID, :generate}, derives: "validate(uuid)")
     # This type can be used when you want to introduce an plugin name.
-    field(:name, module(), enforce: true, derive: "validate(atom)")
+    field(:name, module(), enforce: true, derives: "validate(atom)")
     # This type can be used when you want to introduce an event name.
-    field(:event, String.t(), enforce: true, derive: "validate(not_empty_string)")
+    field(:event, String.t(), enforce: true, derives: "validate(not_empty_string)")
     # This type can be used when you want to introduce a priority of calling an event.
-    field(:priority, integer(), default: 100, derive: "validate(integer, min_len=0, max_len=100)")
+    field(:priority, integer(), default: 100, derives: "validate(integer, min_len=0, max_len=100)")
     # This type can be used when you want to introduce a status for an event.
     field(:status, status(),
-      derive: "validate(enum=Atom[registered::started::stopped::restarted::held])",
+      derives: "validate(enum=Atom[registered::started::stopped::restarted::held])",
       default: :registered
     )
 
     # This type can be used when you want to introduce an event owner extension.
-    field(:extension, atom(), enforce: true, derive: "validate(atom)")
+    field(:extension, atom(), enforce: true, derives: "validate(atom)")
 
     # This type can be used when you want to introduce a list of modules that an event depend on them.
-    field(:depends, list(String.t()), default: [], derive: "validate(list)")
+    field(:depends, list(String.t()), default: [], derives: "validate(list)")
     # This type can be used when you want to introduce an extra data for an event.
-    field(:extra, list(map()), default: [], derive: "validate(list)")
+    field(:extra, list(map()), default: [], derives: "validate(list)")
     # This type can be used when you want to introduce an event inserted_at unix time(timestamp).
     field(:inserted_at, DateTime.t(), auto: {Extra, :get_unix_time})
     # This type can be used when you want to introduce an event updated_at unix time(timestamp).

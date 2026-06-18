@@ -75,19 +75,19 @@ defmodule MishkaInstaller.Installer.Installer do
     @dep_type "enum=Atom[none::force_update]"
     @compile_type "enum=Atom[cmd::port::mix]"
 
-    field(:id, UUID.t(), auto: {UUID, :generate}, derive: "validate(uuid)")
-    field(:app, String.t(), enforce: true, derive: "validate(not_empty_string)")
-    field(:version, String.t(), enforce: true, derive: "validate(not_empty_string)")
-    field(:type, download_type(), enforce: true, derive: "validate(enum=Atom[#{@ext_type}])")
-    field(:path, String.t(), enforce: true, derive: "validate(either=[not_empty_string, url])")
-    field(:tag, String.t(), derive: "validate(not_empty_string)")
-    field(:release, String.t(), derive: "validate(not_empty_string)")
-    field(:branch, branch(), derive: "validate(either=[tuple, not_empty_string])")
-    field(:custom_command, String.t(), derive: "validate(not_empty_string)")
-    field(:dependency_type, dep_type(), default: :none, derive: "validate(#{@dep_type})")
-    field(:compile_type, com_type(), default: :cmd, derive: "validate(#{@compile_type})")
-    field(:depends, list(String.t()), default: [], derive: "validate(list)")
-    field(:prepend_paths, list(String.t()), default: [], derive: "validate(list)")
+    field(:id, UUID.t(), auto: {UUID, :generate}, derives: "validate(uuid)")
+    field(:app, String.t(), enforce: true, derives: "validate(not_empty_string)")
+    field(:version, String.t(), enforce: true, derives: "validate(not_empty_string)")
+    field(:type, download_type(), enforce: true, derives: "validate(enum=Atom[#{@ext_type}])")
+    field(:path, String.t(), enforce: true, derives: "validate(either=[not_empty_string, url])")
+    field(:tag, String.t(), derives: "validate(not_empty_string)")
+    field(:release, String.t(), derives: "validate(not_empty_string)")
+    field(:branch, branch(), derives: "validate(either=[tuple, not_empty_string])")
+    field(:custom_command, String.t(), derives: "validate(not_empty_string)")
+    field(:dependency_type, dep_type(), default: :none, derives: "validate(#{@dep_type})")
+    field(:compile_type, com_type(), default: :cmd, derives: "validate(#{@compile_type})")
+    field(:depends, list(String.t()), default: [], derives: "validate(list)")
+    field(:prepend_paths, list(String.t()), default: [], derives: "validate(list)")
     # This type can be used when you want to introduce an event inserted_at unix time(timestamp).
     field(:inserted_at, DateTime.t(), auto: {Extra, :get_unix_time})
     # This type can be used when you want to introduce an event updated_at unix time(timestamp).
