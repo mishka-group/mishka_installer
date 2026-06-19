@@ -15,7 +15,7 @@ defmodule MishkaInstaller.MnesiaRepo do
   config :mishka_installer, MishkaInstaller.MnesiaRepo,
     mnesia_dir: "/var/lib/my_app/mnesia",
     essential: [MishkaInstaller.Event.Event, MishkaInstaller.Installer.Installer],
-    cluster_nodes: [:"app@10.0.0.2", :"app@10.0.0.3"],
+    cluster_nodes: :auto,
     wait_timeout: 60_000,
     wait_retries: 5
   ```
@@ -23,9 +23,12 @@ defmodule MishkaInstaller.MnesiaRepo do
   - `:mnesia_dir` — where Mnesia stores its files. Defaults to `".mnesia/<env>"` under the project.
   - `:essential` — modules whose `database_config/0` defines a table to create on boot. Defaults to
     `[MishkaInstaller.Installer.Installer, MishkaInstaller.Event.Event]`.
-  - `:cluster_nodes` — other (already distribution-connected) nodes to join. `[]` (default) =
-    standalone single node. When set, this node connects, makes its schema `disc_copies`, and keeps
-    a local `disc_copies` copy of each essential table.
+  - `:cluster_nodes` — peers to join the Mnesia cluster. `:auto` (default) uses the already
+    distribution-connected nodes (`Node.list/0`), so a cluster formed by `libcluster`/`Node.connect`
+    is joined automatically — no static list needed. Pass an explicit list to override, or `[]` to
+    stay standalone. On join, this node connects, makes its schema `disc_copies` and keeps a local
+    `disc_copies` copy of each essential table. Nodes that connect **after** boot are handled in the
+    cluster phase (monitoring `:nodeup`), not at boot.
   - `:wait_timeout` / `:wait_retries` — one wait "slice" (ms) and how many slices to wait while
     `disc_copies` tables load from disk into RAM before giving up. Raise these for large datasets.
 
@@ -193,7 +196,7 @@ defmodule MishkaInstaller.MnesiaRepo do
   defp full_boot(config) do
     configure_dir(config[:mnesia_dir])
     essential = config[:essential]
-    cluster = config[:cluster_nodes]
+    cluster = cluster_nodes(config)
 
     with :ok <- start_or_join(cluster),
          :ok <- wait_for(local_tables(), config),
@@ -308,9 +311,16 @@ defmodule MishkaInstaller.MnesiaRepo do
     Application.get_env(:mishka_installer, __MODULE__, [])
     |> Keyword.put_new(:mnesia_dir, ".mnesia/#{MishkaInstaller.__information__().env}")
     |> Keyword.put_new(:essential, [Installer, Event])
-    |> Keyword.put_new(:cluster_nodes, [])
+    |> Keyword.put_new(:cluster_nodes, :auto)
     |> Keyword.put_new(:wait_timeout, @wait_timeout)
     |> Keyword.put_new(:wait_retries, @wait_retries)
+  end
+
+  defp cluster_nodes(config) do
+    case config[:cluster_nodes] do
+      :auto -> Node.list()
+      nodes when is_list(nodes) -> nodes
+    end
   end
 
   defp configure_dir(dir) do
