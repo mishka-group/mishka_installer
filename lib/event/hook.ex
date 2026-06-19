@@ -366,7 +366,7 @@ defmodule MishkaInstaller.Event.Hook do
 
       @impl true
       def handle_continue(:start_plugin, state) do
-        MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
+        MishkaInstaller.MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
 
         new_state =
           if :persistent_term.get(:event_status, nil) == "ready" and

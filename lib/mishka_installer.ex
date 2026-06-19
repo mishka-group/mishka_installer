@@ -259,12 +259,12 @@ defmodule MishkaInstaller do
   def __information__() do
     env =
       System.get_env("MIX_ENV") || Application.get_env(:mishka_installer, :project_env) ||
-        @project_env
+        @project_env || :prod
 
     %{
       path:
         System.get_env("PROJECT_PATH") || Application.get_env(:mishka_installer, :project_path),
-      env: if(is_atom(env), do: env, else: String.to_atom(env))
+      env: if(is_binary(env), do: String.to_atom(env), else: env)
     }
   end
 end

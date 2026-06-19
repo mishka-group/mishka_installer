@@ -1,9 +1,25 @@
 defmodule MishkaInstaller.Installer.CompileHandler do
-  @moduledoc false
+  @moduledoc """
+  Serialises runtime library installs and replays previously installed libraries on boot.
+
+  Installs are queued and run one at a time (installing mutates global VM state — the code path,
+  loaded modules and started apps — so it must not run concurrently). When the Mnesia store is
+  synchronized, every persisted `MishkaInstaller.Installer.Installer` record is re-activated
+  (re-added to the code path and started), fault-isolated per app.
+
+  ## Telemetry
+
+  - `[:mishka_installer, :installer, :install]` — emitted after an install. Metadata: `:app`,
+    `:result` (`:ok` | `:error`).
+  - `[:mishka_installer, :installer, :replay]` — emitted per app re-activated on boot. Metadata:
+    `:app`, `:result` (`:ok` | `:error`).
+  """
   use GenServer
   require Logger
-  require Logger
   alias MishkaInstaller.Installer.{Installer, LibraryHandler}
+
+  @telemetry [:mishka_installer, :installer]
+
   ################################################################################
   ######################## (▰˘◡˘▰) Init data (▰˘◡˘▰) #######################
   ################################################################################
@@ -15,7 +31,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   @spec init(keyword()) :: {:ok, keyword()}
   def init(state \\ []) do
     MishkaInstaller.subscribe("mnesia")
-    {:ok, Keyword.merge(state, running: [], queues: QueueAssistant.new())}
+    {:ok, Keyword.merge(state, running: [], queues: MishkaInstaller.QueueAssistant.new())}
   end
 
   ####################################################################################
@@ -42,8 +58,8 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   @impl true
   def handle_cast({:do_compile, event, status}, state) do
     MishkaInstaller.broadcast("event", status, %{})
-    queues = Keyword.get(state, :queues, QueueAssistant.new())
-    new_state = Keyword.merge(state, queues: QueueAssistant.insert(queues, event))
+    queues = Keyword.get(state, :queues, MishkaInstaller.QueueAssistant.new())
+    new_state = Keyword.merge(state, queues: MishkaInstaller.QueueAssistant.insert(queues, event))
 
     send(self(), :run_queues)
 
@@ -52,7 +68,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
 
   @impl true
   def handle_cast(:do_clean, state) do
-    new_state = Keyword.merge(state, running: [], queues: QueueAssistant.new())
+    new_state = Keyword.merge(state, running: [], queues: MishkaInstaller.QueueAssistant.new())
     {:noreply, new_state}
   end
 
@@ -74,11 +90,11 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   @impl true
   def handle_info(:run_queues, state) do
     running = Keyword.get(state, :running, [])
-    queues = Keyword.get(state, :queues, QueueAssistant.new())
+    queues = Keyword.get(state, :queues, MishkaInstaller.QueueAssistant.new())
 
     new_state =
-      if length(running) == 0 and !QueueAssistant.empty?(queues) do
-        case QueueAssistant.out(queues) do
+      if length(running) == 0 and !MishkaInstaller.QueueAssistant.empty?(queues) do
+        case MishkaInstaller.QueueAssistant.out(queues) do
           {:empty, _} ->
             state
 
@@ -99,20 +115,15 @@ defmodule MishkaInstaller.Installer.CompileHandler do
 
     new_state =
       if length(running) != 0 do
-        output = Installer.install(List.first(running))
-
-        case output do
+        case Installer.install(List.first(running)) do
           {:ok, %{extension: extension} = data} ->
-            Logger.info(
-              "Identifier: #{inspect(__MODULE__)} ::: The desired library(#{extension.app}) was successfully compiled and activated"
-            )
-
+            Logger.info("[installer] #{extension.app} installed and activated")
             MishkaInstaller.broadcast("installer", :install, data)
+            telemetry(:install, %{app: extension.app, result: :ok})
 
           {:error, error} ->
-            Logger.error(
-              "Identifier: #{inspect(__MODULE__)} ::: Installing error! ::: Source: #{inspect(error)}"
-            )
+            Logger.error("[installer] install error: #{inspect(error)}")
+            telemetry(:install, %{app: nil, result: :error})
         end
 
         send(self(), :run_queues)
@@ -130,25 +141,11 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   # extension is logged and skipped so it cannot freeze the whole system, and `:compile_status` is
   # still set to "ready" for the apps that did re-load.
   def handle_info(%{status: :synchronized, channel: "mnesia"}, state) do
-    Installer.get()
-    |> Enum.each(fn item ->
-      with :ok <- LibraryHandler.prepend_compiled_apps(item.prepend_paths),
-           :ok <- LibraryHandler.unload(String.to_atom(item.app)),
-           :ok <- LibraryHandler.application_ensure(String.to_atom(item.app)) do
-        Logger.debug(
-          "Identifier: #{inspect(__MODULE__)} ::: Re-loaded installed app ::: #{item.app}"
-        )
-      else
-        error ->
-          Logger.error(
-            "Identifier: #{inspect(__MODULE__)} ::: Skipped re-loading #{item.app} on boot ::: Source: #{inspect(error)}"
-          )
-      end
-    end)
+    Enum.each(Installer.get(), &replay/1)
 
     :persistent_term.put(:compile_status, "ready")
     MishkaInstaller.broadcast("mnesia", :compile_synchronized, %{identifier: :compile_handler})
-    Logger.debug("Identifier: #{inspect(__MODULE__)} ::: Run-time apps are Synchronized...")
+    Logger.debug("[installer] run-time apps synchronized")
 
     {:noreply, state}
   end
@@ -156,5 +153,25 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   @impl true
   def handle_info(_action, state) do
     {:noreply, state}
+  end
+
+  ####################################################################################
+  ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
+  ####################################################################################
+  defp replay(item) do
+    with :ok <- LibraryHandler.prepend_compiled_apps(item.prepend_paths),
+         :ok <- LibraryHandler.unload(String.to_atom(item.app)),
+         :ok <- LibraryHandler.application_ensure(String.to_atom(item.app)) do
+      Logger.debug("[installer] re-loaded installed app: #{item.app}")
+      telemetry(:replay, %{app: item.app, result: :ok})
+    else
+      error ->
+        Logger.error("[installer] skipped re-loading #{item.app} on boot: #{inspect(error)}")
+        telemetry(:replay, %{app: item.app, result: :error})
+    end
+  end
+
+  defp telemetry(name, metadata) do
+    :telemetry.execute(@telemetry ++ [name], %{system_time: System.system_time()}, metadata)
   end
 end

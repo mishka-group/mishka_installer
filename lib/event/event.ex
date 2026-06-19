@@ -40,10 +40,10 @@ defmodule MishkaInstaller.Event.Event do
   module is being created and destroyed during the compilation process.
   """
   use GuardedStruct
-  alias MishkaDeveloperTools.Helper.{Extra, UUID}
-  import MnesiaAssistant, only: [er: 1, erl_fields: 4]
-  alias MnesiaAssistant.{Transaction, Query, Table}
-  alias MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Helper.{Extra, UUID}
+  import MishkaInstaller.MnesiaAssistant, only: [er: 1, erl_fields: 4]
+  alias MishkaInstaller.MnesiaAssistant.{Transaction, Query, Table}
+  alias MishkaInstaller.MnesiaAssistant.Error, as: MError
   alias MishkaInstaller.Event.EventHandler
 
   @mnesia_info [
@@ -65,7 +65,11 @@ defmodule MishkaInstaller.Event.Event do
     # This type can be used when you want to introduce an event name.
     field(:event, String.t(), enforce: true, derives: "validate(not_empty_string)")
     # This type can be used when you want to introduce a priority of calling an event.
-    field(:priority, integer(), default: 100, derives: "validate(integer, min_len=0, max_len=100)")
+    field(:priority, integer(),
+      default: 100,
+      derives: "validate(integer, min_len=0, max_len=100)"
+    )
+
     # This type can be used when you want to introduce a status for an event.
     field(:status, status(),
       derives: "validate(enum=Atom[registered::started::stopped::restarted::held])",
@@ -564,7 +568,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.match_object(pattern) end)
     |> case do
       {:atomic, res} ->
-        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -601,7 +605,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        data = MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        data = MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         if field in [:event, :extension], do: data, else: List.first(data)
 
       {:aborted, reason} ->
@@ -630,7 +634,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
     |> case do
       {:atomic, res} ->
-        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
+        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)

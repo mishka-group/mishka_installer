@@ -1,9 +1,23 @@
 defmodule MishkaInstaller.Event.EventHandler do
-  @moduledoc false
+  @moduledoc """
+  Serialises (re)compilation of the per-event plugin modules.
+
+  Compile requests are queued and run one at a time so the dynamically generated event modules are
+  never created and destroyed concurrently.
+
+  ## Telemetry
+
+  - `[:mishka_installer, :event, :compile]` — emitted after an event module is (re)built.
+    Metadata: `:event`, `:result` (`:ok` | `:error`).
+  - `[:mishka_installer, :event, :synchronized]` — emitted once all events have started after the
+    Mnesia store is ready. Metadata: `:node`.
+  """
   use GenServer
   require Logger
   alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
-  require Logger
+  alias MishkaInstaller.QueueAssistant
+
+  @telemetry [:mishka_installer, :event]
 
   ################################################################################
   ######################## (▰˘◡˘▰) Init data (▰˘◡˘▰) #######################
@@ -114,12 +128,9 @@ defmodule MishkaInstaller.Event.EventHandler do
     new_state =
       if length(running) != 0 do
         event = List.first(running)
-        output = perform(List.first(running))
 
-        if !output do
-          Logger.error(
-            "Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{event}"
-          )
+        unless perform(event) do
+          Logger.error("[event] compile error for event #{inspect(event)}")
         end
 
         send(self(), :run_queues)
@@ -156,8 +167,9 @@ defmodule MishkaInstaller.Event.EventHandler do
     case Event.start() do
       {:ok, _sorted_events} ->
         :persistent_term.put(:event_status, "ready")
-        Logger.debug("Identifier: #{inspect(__MODULE__)} ::: Plugins are Synchronized...")
+        Logger.info("[event] plugins synchronized")
         MishkaInstaller.broadcast("mnesia", :event_status, "ready")
+        telemetry(:synchronized, %{node: node()})
         Keyword.merge(state, status: :synchronized)
 
       _ ->
@@ -190,15 +202,21 @@ defmodule MishkaInstaller.Event.EventHandler do
       purge_create(sorted_plugins, event)
     end
 
+    telemetry(:compile, %{event: event, result: :ok})
     true
   rescue
-    _ ->
-      Logger.error("Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{event}")
+    error ->
+      Logger.error("[event] compile failed for event #{inspect(event)}: #{inspect(error)}")
+      telemetry(:compile, %{event: event, result: :error})
       false
   end
 
   defp purge_create(sorted_plugins, event) do
     :ok = ModuleStateCompiler.purge_create(sorted_plugins, event)
     :ok = MishkaInstaller.broadcast("event", :purge_create, event)
+  end
+
+  defp telemetry(name, metadata) do
+    :telemetry.execute(@telemetry ++ [name], %{system_time: System.system_time()}, metadata)
   end
 end

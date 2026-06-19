@@ -31,7 +31,7 @@ defmodule MishkaInstaller.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :mnesia],
       mod: {MishkaInstaller.Application, []}
     ]
   end
@@ -42,15 +42,13 @@ defmodule MishkaInstaller.MixProject do
       {:req, "~> 0.6.1"},
       {:plug, "~> 1.19"},
 
-      # Extra tools
-      {:mishka_developer_tools, "~> 0.1.10"},
+      # Schema validation + sanitizing
       {:guarded_struct, "~> 0.1.0-beta.8"},
-      # We will cover telemetry in whole project
+      # Telemetry instrumentation
       {:telemetry, "~> 1.4"},
 
       # Dev and Test dependencies
-      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
-      {:hex_core, "~> 0.18.0", only: :test}
+      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false}
     ]
   end
 

@@ -28,7 +28,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   When it comes to reading and running all plugins, this problem only occurs when a
   module is being created and destroyed during the compilation process.
   """
-  alias MishkaDeveloperTools.Helper.Extra
+  alias MishkaInstaller.Helper.Extra
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}

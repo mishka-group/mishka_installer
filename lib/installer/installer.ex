@@ -43,10 +43,11 @@ defmodule MishkaInstaller.Installer.Installer do
   > Please add `reloadable_apps: [:mishka_installer]` to your endpoint config in `config.exs` file.
   """
   use GuardedStruct
-  alias MishkaDeveloperTools.Helper.{Extra, UUID}
+  require Logger
+  alias MishkaInstaller.Helper.{Extra, UUID}
   alias MishkaInstaller.Installer.{Downloader, LibraryHandler, CompileHandler}
-  alias MnesiaAssistant.{Transaction, Query, Table}
-  alias MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.MnesiaAssistant.{Transaction, Query, Table}
+  alias MishkaInstaller.MnesiaAssistant.Error, as: MError
 
   @type download_type :: :path | :url | :github_tag | :github_latest_release
 
@@ -89,6 +90,8 @@ defmodule MishkaInstaller.Installer.Installer do
 
     # The optional release asset name to pick for `:github_*` downloads (defaults to the first asset).
     field(:asset, String.t(), derives: "validate(not_empty_string)")
+    # Optional sha256 (hex) of the downloaded artifact; verified before extraction when present.
+    field(:checksum, String.t(), derives: "validate(not_empty_string)")
 
     # This type can be used when you want to introduce a list of apps that a library depend on them.
     field(:depends, list(String.t()), default: [], derives: "validate(list)")
@@ -169,6 +172,7 @@ defmodule MishkaInstaller.Installer.Installer do
          :ok <- valid_name(data.app),
          {:ok, dest} <- fetch_package(data),
          :ok <- ebin_exist(dest),
+         _ <- warn_on_native(dest, data.app),
          {:ok, _props} <-
            LibraryHandler.read_app(safe_atom(data.app), app_resource(dest, data.app)),
          :ok <-
@@ -278,7 +282,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.match_object(pattern) end)
     |> case do
       {:atomic, res} ->
-        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -306,7 +310,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
     |> case do
       {:atomic, res} ->
-        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
+        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -334,7 +338,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         |> List.first()
 
       {:aborted, reason} ->
@@ -567,6 +571,7 @@ defmodule MishkaInstaller.Installer.Installer do
     name = "#{data.app}-#{data.version}"
 
     with {:ok, body} <- Downloader.download(data.type, download_pkg(data)),
+         :ok <- verify_checksum(body, Map.get(data, :checksum)),
          :ok <- LibraryHandler.extract(:tar, body, name) do
       {:ok, "#{LibraryHandler.extensions_path()}/#{name}"}
     end
@@ -580,6 +585,34 @@ defmodule MishkaInstaller.Installer.Installer do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # When a checksum is supplied, the downloaded artifact must match it before we extract or load it.
+  defp verify_checksum(_body, nil), do: :ok
+
+  defp verify_checksum(body, expected) do
+    actual = :crypto.hash(:sha256, body) |> Base.encode16(case: :lower)
+
+    if actual == String.downcase(expected) do
+      :ok
+    else
+      message = "The downloaded artifact does not match the expected sha256 checksum."
+      {:error, [%{message: message, field: :checksum, action: :verify_checksum}]}
+    end
+  end
+
+  # Native code (NIF / port driver) is OS/arch/ERTS specific and is not portable across machines.
+  # We surface it loudly rather than fail, since a same-target artifact is legitimate.
+  defp warn_on_native(dest, app) do
+    natives = Path.wildcard("#{dest}/priv/**/*.{so,dll,dylib}")
+
+    if natives != [] do
+      Logger.warning(
+        "[installer] #{app} ships native artifacts (#{inspect(natives)}); they must match this host's OS/arch/ERTS."
+      )
+    end
+
+    :ok
+  end
 
   # Only lowercase letters, digits and underscores are allowed in an app name. This is checked
   # **before** any `String.to_atom/1` so an attacker-influenced name cannot exhaust the global

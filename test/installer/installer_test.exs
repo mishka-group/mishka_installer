@@ -8,7 +8,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaDeveloperTools.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
 
     on_exit(fn ->
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
@@ -20,7 +20,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     Process.register(self(), :__mishka_installer_test__)
 
-    Application.put_env(:mishka_installer, Mishka.MnesiaRepo,
+    Application.put_env(:mishka_installer, MishkaInstaller.MnesiaRepo,
       mnesia_dir: mnesia_dir,
       essential: [Installer]
     )
@@ -179,10 +179,26 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       refute app_atom in Enum.map(Application.loaded_applications(), &elem(&1, 0))
 
       # Boot replay: CompileHandler re-activates every installed app once Mnesia is synchronized.
+      test_pid = self()
+      handler = {__MODULE__, make_ref()}
+
+      :telemetry.attach(
+        handler,
+        [:mishka_installer, :installer, :replay],
+        fn event, _meas, meta, _ -> send(test_pid, {:telemetry, event, meta}) end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
       pid = start_supervised!(MishkaInstaller.Installer.CompileHandler)
       send(pid, %{status: :synchronized, channel: "mnesia"})
 
       assert_receive %{status: :compile_synchronized, channel: "mnesia"}, 2000
+
+      assert_receive {:telemetry, [:mishka_installer, :installer, :replay],
+                      %{app: ^app, result: :ok}},
+                     2000
 
       # The app is back purely from the persisted record + the on-disk ebin (no reinstall, no mix).
       assert app_atom in started_apps()
@@ -227,6 +243,60 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert is_nil(Installer.get(:app, app))
       refute String.to_atom(app) in Enum.map(Application.loaded_applications(), &elem(&1, 0))
     end
+
+    test "verifies a matching checksum on a downloaded artifact" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      app = uniq_app("sum_ok")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      checksum = :crypto.hash(:sha256, tarball) |> Base.encode16(case: :lower)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      {:ok, _} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz",
+                 checksum: checksum
+               })
+
+      assert module.hello() == :world
+    end
+
+    test "rejects a mismatched checksum and installs nothing" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      app = uniq_app("sum_bad")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, _module} = EbinFixture.tar_fake_app(app_atom, version)
+      stub_download(tarball)
+
+      on_exit(fn ->
+        cleanup(app_atom, "#{LibraryHandler.extensions_path()}/#{app}-#{version}")
+      end)
+
+      {:error, [%{action: :verify_checksum}]} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz",
+                 checksum: "deadbeef"
+               })
+
+      assert is_nil(Installer.get(:app, app))
+      refute app_atom in started_apps()
+    end
   end
 
   ###################################################################################
@@ -245,6 +315,14 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   end
 
   defp started_apps, do: Enum.map(Application.started_applications(), &elem(&1, 0))
+
+  defp stub_download(tarball) do
+    Req.Test.stub(Downloader, fn conn ->
+      conn
+      |> Plug.Conn.put_resp_content_type("application/gzip", nil)
+      |> Plug.Conn.send_resp(200, tarball)
+    end)
+  end
 
   defp cleanup(app_atom, dir) do
     Application.stop(app_atom)
