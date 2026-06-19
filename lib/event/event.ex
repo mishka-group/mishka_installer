@@ -689,7 +689,8 @@ defmodule MishkaInstaller.Event.Event do
           :mnesia.abort(:record_not_found)
 
         data ->
-          merged = data |> Map.merge(updated_to) |> Map.merge(%{updated_at: Extra.get_unix_time()})
+          merged =
+            data |> Map.merge(updated_to) |> Map.merge(%{updated_at: Extra.get_unix_time()})
 
           case builder({:root, merged, :edit}) do
             {:ok, struct} ->

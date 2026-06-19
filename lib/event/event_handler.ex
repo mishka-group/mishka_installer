@@ -102,7 +102,14 @@ defmodule MishkaInstaller.Event.EventHandler do
         broadcast_recompile(event)
         :ok
       else
-        {:error, [%{message: "An error occurred in the compile of an event.", field: :global, action: status}]}
+        {:error,
+         [
+           %{
+             message: "An error occurred in the compile of an event.",
+             field: :global,
+             action: status
+           }
+         ]}
       end
 
     {:reply, result, state}
