@@ -1,8 +1,10 @@
 defmodule MishkaInstallerTest.Installer.InstallerTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Installer.Installer
+  alias MishkaInstaller.Installer.{Installer, LibraryHandler, Downloader}
+  alias MishkaInstallerTest.Support.EbinFixture
 
   setup do
+    System.put_env("PROJECT_PATH", File.cwd!())
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
@@ -43,8 +45,6 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         assert Installer.write(%{
                  app: "mishka_developer_tools",
                  version: "0.1.5",
-                 tag: "0.1.5",
-                 type: :hex,
                  path: "mishka_developer_tools"
                })
     end
@@ -53,28 +53,15 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert Installer.get() == []
 
       {:ok, _data} =
-        assert Installer.write(%{
-                 app: "mishka_developer_tools",
-                 version: "0.1.5",
-                 tag: "0.1.5",
-                 type: :hex,
-                 path: "mishka_developer_tools"
-               })
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
 
       assert Installer.get() != []
-
       assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
     end
 
     test "Update a Library record" do
       {:ok, _data} =
-        assert Installer.write(%{
-                 app: "mishka_developer_tools",
-                 version: "0.1.5",
-                 tag: "0.1.5",
-                 type: :hex,
-                 path: "mishka_developer_tools"
-               })
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
 
       get_data = Installer.get() |> List.first()
 
@@ -84,32 +71,20 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert struct.version == "0.1.6"
       get_data1 = Installer.get() |> List.first()
       assert get_data1.id == get_data.id
-      {:ok, struct} = assert Installer.write(:id, get_data.id, %{type: :github})
-      assert Installer.get(struct.id).type == :github
+      {:ok, struct} = assert Installer.write(:id, get_data.id, %{tag: "1.0.0"})
+      assert Installer.get(struct.id).tag == "1.0.0"
     end
 
     test "All keys of Libraries Record" do
       {:ok, _data} =
-        assert Installer.write(%{
-                 app: "mishka_developer_tools",
-                 version: "0.1.5",
-                 tag: "0.1.5",
-                 type: :hex,
-                 path: "mishka_developer_tools"
-               })
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
 
       assert length(Installer.ids()) == 1
     end
 
     test "Unique? Library Record by app" do
       {:ok, _data} =
-        assert Installer.write(%{
-                 app: "mishka_developer_tools",
-                 version: "0.1.5",
-                 tag: "0.1.5",
-                 type: :hex,
-                 path: "mishka_developer_tools"
-               })
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
 
       assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
       assert is_nil(Installer.get(:app, "mishka_developer_tools1"))
@@ -117,13 +92,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     test "Delete Library Record" do
       {:ok, _data} =
-        assert Installer.write(%{
-                 app: "mishka_developer_tools",
-                 version: "0.1.5",
-                 tag: "0.1.5",
-                 type: :hex,
-                 path: "mishka_developer_tools"
-               })
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
 
       assert Installer.get() != []
       {:ok, _data} = Installer.delete(:app, "mishka_developer_tools")
@@ -132,13 +101,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     test "Drop all Library records" do
       {:ok, _data} =
-        assert Installer.write(%{
-                 app: "mishka_developer_tools",
-                 version: "0.1.5",
-                 tag: "0.1.5",
-                 type: :hex,
-                 path: "mishka_developer_tools"
-               })
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
 
       assert Installer.get() != []
       {:ok, :atomic} = assert Installer.drop()
@@ -150,5 +113,142 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   ######################## (▰˘◡˘▰) FunctionsTest (▰˘◡˘▰) ######################
   ###################################################################################
   describe "Installer Module FunctionsTest ===>" do
+    test "install a local pre-built ebin (:path) loads the app and persists the record" do
+      {app, app_atom, version, pkg, module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, output} = assert Installer.install(%{app: app, version: version, path: pkg})
+
+      assert output.extension.app == app
+      assert output.extension.prepend_paths == [{app_atom, "#{pkg}/ebin"}]
+      assert Installer.get(:app, app).version == version
+      assert app_atom in started_apps()
+      assert module.hello() == :world
+    end
+
+    test "install a downloaded pre-built ebin (:url) via Req.Test" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      app = uniq_app("url_demo")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+
+      Req.Test.stub(Downloader, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type("application/gzip", nil)
+        |> Plug.Conn.send_resp(200, tarball)
+      end)
+
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      {:ok, _output} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz"
+               })
+
+      assert app_atom in started_apps()
+      assert module.hello() == :world
+      assert File.dir?("#{dest}/ebin")
+    end
+
+    test "restart persistence: the installed app is re-loaded from the record + on-disk ebin" do
+      {app, app_atom, version, pkg, module} = fake_local_app()
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        :code.purge(module)
+        :code.delete(module)
+      end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+      assert app_atom in started_apps()
+
+      # Simulate a server restart: code path + loaded/started state are in-memory only and gone.
+      :ok = Application.stop(app_atom)
+      :ok = Application.unload(app_atom)
+      Code.delete_path("#{pkg}/ebin")
+      :code.delete(module)
+      :code.purge(module)
+      refute app_atom in Enum.map(Application.loaded_applications(), &elem(&1, 0))
+
+      # Boot replay: CompileHandler re-activates every installed app once Mnesia is synchronized.
+      pid = start_supervised!(MishkaInstaller.Installer.CompileHandler)
+      send(pid, %{status: :synchronized, channel: "mnesia"})
+
+      assert_receive %{status: :compile_synchronized, channel: "mnesia"}, 2000
+
+      # The app is back purely from the persisted record + the on-disk ebin (no reinstall, no mix).
+      assert app_atom in started_apps()
+      assert String.to_charlist("#{pkg}/ebin") in :code.get_path()
+      assert module.hello() == :world
+      assert :persistent_term.get(:compile_status) == "ready"
+    end
+
+    test "rejects a path outside the extensions directory (path traversal)" do
+      {:error, [%{action: :allowed_extract_path}]} =
+        assert Installer.install(%{
+                 app: "evil_app",
+                 version: "1.0.0",
+                 type: :path,
+                 path: "/tmp/evil-#{System.unique_integer([:positive])}"
+               })
+    end
+
+    test "rejects an invalid app name (atom-table safety)" do
+      {:error, [%{action: :valid_name}]} =
+        assert Installer.install(%{app: "../../etc", version: "1.0.0", path: "whatever"})
+    end
+
+    test "rejects re-installing the same version of an already running app" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+
+      {:error, [%{action: :compare_version_with_installed_app}]} =
+        assert Installer.install(%{app: app, version: version, path: pkg})
+    end
+
+    test "a corrupt .app aborts install with no record and no loaded app" do
+      app = uniq_app("bad_demo")
+      pkg = "#{LibraryHandler.extensions_path()}/#{app}-0.1.0"
+      File.mkdir_p!("#{pkg}/ebin")
+      File.write!("#{pkg}/ebin/#{app}.app", "this is not a valid erlang term")
+      on_exit(fn -> File.rm_rf!(pkg) end)
+
+      {:error, _error} = assert Installer.install(%{app: app, version: "0.1.0", path: pkg})
+      assert is_nil(Installer.get(:app, app))
+      refute String.to_atom(app) in Enum.map(Application.loaded_applications(), &elem(&1, 0))
+    end
+  end
+
+  ###################################################################################
+  ########################## (▰˘◡˘▰) Helpers (▰˘◡˘▰) ##########################
+  ###################################################################################
+  defp uniq_app(prefix), do: "mishka_#{prefix}_#{System.unique_integer([:positive])}"
+
+  defp fake_local_app do
+    app = uniq_app("ebin_demo")
+    app_atom = String.to_atom(app)
+    version = "0.1.0"
+    pkg = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+    File.rm_rf!(pkg)
+    {^app_atom, module, _ebin} = EbinFixture.build_fake_app(pkg, app_atom, version)
+    {app, app_atom, version, pkg, module}
+  end
+
+  defp started_apps, do: Enum.map(Application.started_applications(), &elem(&1, 0))
+
+  defp cleanup(app_atom, dir) do
+    Application.stop(app_atom)
+    Application.unload(app_atom)
+    File.rm_rf!(dir)
   end
 end

@@ -12,11 +12,19 @@ defmodule MishkaInstaller.Installer.Installer do
   this module in order to make it possible for this task to be completed for you in
   accordance with some **established strategies**.
 
-  Among these tactics is the utilisation of the `Mix` tool, which is located within
-  the `System` and `Port` module.
+  ## Pre-built `ebin` only (works in a release)
 
-  **During the subsequent releases, we will make an effort to incorporate the `script` mode**.
-  - Based on: https://elixirforum.com/t/12114/14
+  This module installs a **pre-built** library, i.e. its already compiled `ebin` (the
+  `ebin/*.beam` files and the `ebin/<app>.app` resource). It does **not** compile at runtime.
+
+  Runtime compilation (`mix deps.get`/`deps.compile`/`compile`) is intentionally **not** supported,
+  because a production `release` ships no `Mix`, no `Hex`, no project source and no `_build` tree, so
+  there is nothing to compile with. Instead the artifacts are placed in a writable extensions
+  directory, added to the code path and loaded:
+
+  - `Code.prepend_path/1` then `Application.load/1` + `Application.ensure_all_started/1`.
+
+  Build the artifacts on a machine that uses the **same** Erlang/OTP and Elixir as the host.
 
   > #### Security considerations {: .warning}
   >
@@ -40,20 +48,7 @@ defmodule MishkaInstaller.Installer.Installer do
   alias MnesiaAssistant.{Transaction, Query, Table}
   alias MnesiaAssistant.Error, as: MError
 
-  @type download_type ::
-          :hex
-          | :github
-          | :github_latest_release
-          | :github_latest_tag
-          | :github_release
-          | :github_tag
-          | :url
-
-  @type dep_type :: :none | :force_update
-
-  @type com_type :: :none | :cmd | :port | :mix
-
-  @type branch :: String.t() | {String.t(), [git: boolean()]}
+  @type download_type :: :path | :url | :github_tag | :github_latest_release
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
 
@@ -61,9 +56,11 @@ defmodule MishkaInstaller.Installer.Installer do
 
   @type builder_entry :: {:root, struct() | map(), :edit} | struct() | map()
 
+  @name_pattern ~r/^[a-z][a-z0-9_]*$/
+
   @mnesia_info [
     type: :set,
-    index: [:app, :type, :dependency_type],
+    index: [:app],
     record_name: __MODULE__,
     storage_properties: [ets: [{:read_concurrency, true}, {:write_concurrency, true}]]
   ]
@@ -71,22 +68,31 @@ defmodule MishkaInstaller.Installer.Installer do
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
   ####################################################################################
   guardedstruct do
-    @ext_type "hex::github::github_latest_release::github_latest_tag::url::extracted"
-    @dep_type "enum=Atom[none::force_update]"
-    @compile_type "enum=Atom[cmd::port::mix]"
-
+    # This type can be used when you want to introduce a runtime library id.
     field(:id, UUID.t(), auto: {UUID, :generate}, derives: "validate(uuid)")
+    # This type can be used when you want to introduce a runtime library (OTP app) name.
     field(:app, String.t(), enforce: true, derives: "validate(not_empty_string)")
+    # This type can be used when you want to introduce a runtime library version.
     field(:version, String.t(), enforce: true, derives: "validate(not_empty_string)")
-    field(:type, download_type(), enforce: true, derives: "validate(enum=Atom[#{@ext_type}])")
-    field(:path, String.t(), enforce: true, derives: "validate(either=[not_empty_string, url])")
+    # Where the pre-built package comes from. `:path` is a local directory (already inside the
+    # extensions dir); the rest download a `tar.gz` artifact. See `MishkaInstaller.Installer.Downloader`.
+    field(:type, download_type(),
+      default: :path,
+      derives: "validate(enum=Atom[path::url::github_tag::github_latest_release])"
+    )
+
+    # For `:path` it is the local package directory; for `:url` the artifact URL; for `:github_*`
+    # the `"owner/repo"`.
+    field(:path, String.t(), enforce: true, derives: "validate(not_empty_string)")
+    # The release tag for `:github_tag` downloads.
     field(:tag, String.t(), derives: "validate(not_empty_string)")
-    field(:release, String.t(), derives: "validate(not_empty_string)")
-    field(:branch, branch(), derives: "validate(either=[tuple, not_empty_string])")
-    field(:custom_command, String.t(), derives: "validate(not_empty_string)")
-    field(:dependency_type, dep_type(), default: :none, derives: "validate(#{@dep_type})")
-    field(:compile_type, com_type(), default: :cmd, derives: "validate(#{@compile_type})")
+
+    # The optional release asset name to pick for `:github_*` downloads (defaults to the first asset).
+    field(:asset, String.t(), derives: "validate(not_empty_string)")
+
+    # This type can be used when you want to introduce a list of apps that a library depend on them.
     field(:depends, list(String.t()), default: [], derives: "validate(list)")
+    # The `{app, ebin_path}` list added to the code path; replayed on every boot to re-activate.
     field(:prepend_paths, list(String.t()), default: [], derives: "validate(list)")
     # This type can be used when you want to introduce an event inserted_at unix time(timestamp).
     field(:inserted_at, DateTime.t(), auto: {Extra, :get_unix_time})
@@ -111,35 +117,34 @@ defmodule MishkaInstaller.Installer.Installer do
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
   @doc """
-  This function, in point of fact, combines a number of different methods for downloading,
-  compiling, and activating a library within the system. It is possible that this library
-  is already present on the system, or it may serve as an update to the version that was
-  previously available.
+  This function activates a **pre-built** library (its compiled `ebin`) within the running system.
+  It is possible that this library is already present on the system, or it may serve as an update
+  to the version that was previously available.
 
-  It ought to be underlined. Adding or updating a library in the system
-  is supported by three different techniques in this version of the software.
+  The package is a `ebin` directory plus a `ebin/<app>.app` resource. The `type` decides how it is
+  obtained: `:path` uses a local package already inside the extensions directory (see
+  `MishkaInstaller.Installer.LibraryHandler.extensions_path/0`); `:url`/`:github_tag`/
+  `:github_latest_release` **download** a pre-built `tar.gz` artifact and extract it there. Nothing
+  is ever compiled here (see `MishkaInstaller.Installer.Downloader`).
 
-  1. Obtain the file from `hex.pm` and install it.
-  2. Obtain the version from `GitHub` and install it.
-  3. Install by utilising the `folder` itself direct.
-
-  > Naturally, it is important to point out that there are also features that can
-  > be used to enhance the system's customised functions. In order to accomplish this,
-  > the programmer needs to incorporate additional functions into his/her programme,
-  > such as downloading from a predetermined URL.
+  The steps are: validate the app name, resolve the package (local move or download + extract),
+  confirm the `ebin`/`.app` exist, reject a same/older version that is already running, add the
+  `ebin` to the code path (`Code.prepend_path/1`), then `Application.load/1` +
+  `Application.ensure_all_started/1`. On any failure **after** the code path is touched, the partial
+  install is rolled back so the node is left clean.
 
   > #### Security considerations {: .warning}
   >
   > It is important to remember that all of the functionalities contained within this
   > section must be implemented at the **high access level**, and they should not directly take
   > any input from the user. Ensure that you include the required safety measures.
+  >
+  > Loading a `.beam` is **running arbitrary code with full node privileges**; the BEAM has no
+  > sandbox. Only install artifacts from a trusted source, built for the **same** Erlang/OTP and
+  > Elixir as the host.
 
   In reality, the structure of this module `__MODULE__.builder/1`, which likewise possesses
   a high access level validation, is what this function takes as its input.
-
-  It is important to note that this validation and sanitizer is not intended for the user and
-  is only necessary for the administrative level of data cleaning. **Pay particular attention
-  to the cautions regarding security**.
 
   **For read more please see this type `MishkaInstaller.Installer.Installer.t()`**.
 
@@ -148,36 +153,28 @@ defmodule MishkaInstaller.Installer.Installer do
   ```elixir
   alias MishkaInstaller.Installer.Installer
 
-  # Normal calling
-  Installer.install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
-
-  # Use builder
-  {:ok, hex_tag} = Installer.builder(%{
+  # `path` points to the pre-built package placed inside the extensions directory.
+  {:ok, lib} = Installer.builder(%{
     app: "mishka_developer_tools",
     version: "0.1.5",
-    tag: "0.1.5",
-    type: :hex,
-    path: "mishka_developer_tools"
+    path: "<extensions_path>/mishka_developer_tools-0.1.5"
   })
 
-  Installer.install(hex_tag)
+  Installer.install(lib)
   ```
-
-  #### More info:
-
-  - `type` --> hex - github - github_latest_release - github_latest_tag - url - extracted
-  - `compile_type` --> cmd - port - mix
-  - Download methods see `MishkaInstaller.Installer.Downloader`
   """
   @spec install(t()) :: error_return() | okey_return()
-  def install(app) when app.type == :extracted do
+  def install(app) do
     with {:ok, data} <- __MODULE__.builder(app),
-         :ok <- mix_exist(data.path),
-         :ok <- allowed_extract_path(data.path),
-         ext_path <- LibraryHandler.extensions_path(),
-         :ok <- rename_dir(data.path, "#{ext_path}/#{app.app}-#{app.version}"),
-         {:ok, moved_files} <- install_and_compile_steps(data),
-         merged_app <- Map.merge(data, %{prepend_paths: moved_files}),
+         :ok <- valid_name(data.app),
+         {:ok, dest} <- fetch_package(data),
+         :ok <- ebin_exist(dest),
+         {:ok, _props} <-
+           LibraryHandler.read_app(safe_atom(data.app), app_resource(dest, data.app)),
+         :ok <-
+           LibraryHandler.compare_version_with_installed_app(safe_atom(data.app), data.version),
+         {:ok, prepend_paths} <- install_steps(data, dest),
+         merged_app <- Map.merge(data, %{prepend_paths: prepend_paths}),
          {:ok, output} <- update_or_write(data, merged_app) do
       MishkaInstaller.broadcast("installer", :install, install_output(output))
       {:ok, install_output(output)}
@@ -186,30 +183,17 @@ defmodule MishkaInstaller.Installer.Installer do
     File.cd!(MishkaInstaller.__information__().path)
   end
 
-  def install(app) do
-    with {:ok, data} <- __MODULE__.builder(app),
-         {:ok, archived_file} <- Downloader.download(Map.get(data, :type), data),
-         {:ok, path} <- LibraryHandler.move(app, archived_file),
-         :ok <- LibraryHandler.extract(:tar, path, "#{app.app}-#{app.version}"),
-         {:ok, moved_files} <- install_and_compile_steps(data),
-         merged_app <- Map.merge(data, %{prepend_paths: moved_files}),
-         {:ok, output} <- update_or_write(data, merged_app) do
-      MishkaInstaller.broadcast("installer", :install, install_output(output))
-      {:ok, install_output(output, path)}
-    end
-  after
-    File.cd!(MishkaInstaller.__information__().path)
-  end
-
   @doc """
-  This function allows you to remove a library's directory from the build folder
-  and deactivate the library from runtime.
+  This function deactivates a library from runtime and removes its pre-built package from the
+  extensions directory.
+
+  It stops and unloads the application, drops its `ebin` from the code path, deletes the
+  `"<app>-<version>"` directory and removes the record from the database.
 
   > Note that the sub-set libraries are not removed by this function.
   >
   > In later versions, a checker to delete **sub-ap**p libraries might be included.
   > You can add it as a custom for now.
-
 
   > #### Security considerations {: .warning}
   >
@@ -221,41 +205,25 @@ defmodule MishkaInstaller.Installer.Installer do
   alias MishkaInstaller.Installer.Installer
 
   # Normal calling
-  Installer.uninstall(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+  Installer.uninstall(%__MODULE__{app: "some_name", version: "0.1.0", path: "some_path"})
   ```
   """
-  @spec uninstall(atom()) :: :ok
+  @spec uninstall(t() | map()) :: :ok
   def uninstall(app) do
-    Application.stop(app.app)
-    Application.unload(app.app)
-    info = MishkaInstaller.__information__()
-    File.rm_rf!("#{info.path}/_build/#{info.env}/lib/#{app.app}")
-    MishkaInstaller.broadcast("installer", :uninstall, app)
-    :ok
-  end
-
-  @doc """
-  The only difference of this function is in the custom path of deleting the build directory.
-  See `uninstall/1`.
-
-  > #### Security considerations {: .warning}
-  >
-  > It is important to remember that all of the functionalities contained within this
-  > section must be implemented at the **high access level**, and they should not directly take
-  > any input from the user. Ensure that you include the required safety measures.
-  """
-  @spec uninstall(atom(), Path.t()) :: :ok
-  def uninstall(app, custom_path) do
-    Application.stop(app)
-    Application.unload(app)
-    File.rm_rf!(custom_path)
+    app_atom = safe_atom(app.app)
+    ext_path = LibraryHandler.extensions_path()
+    Application.stop(app_atom)
+    Application.unload(app_atom)
+    Code.delete_path("#{ext_path}/#{app.app}-#{app.version}/ebin")
+    File.rm_rf!("#{ext_path}/#{app.app}-#{app.version}")
+    delete(:app, app.app)
     MishkaInstaller.broadcast("installer", :uninstall, app)
     :ok
   end
 
   @doc """
   This function is the same as the `install/1` function, with the difference that it executes
-  one by one in a simple queue
+  one by one in a simple queue (`MishkaInstaller.Installer.CompileHandler`).
 
   > #### Security considerations {: .warning}
   >
@@ -268,19 +236,13 @@ defmodule MishkaInstaller.Installer.Installer do
   ```elixir
   alias MishkaInstaller.Installer.Installer
 
-  # Normal calling
-  Installer.async_install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
-
-  # Use builder
-  {:ok, hex_tag} = Installer.builder(%{
+  {:ok, lib} = Installer.builder(%{
     app: "mishka_developer_tools",
     version: "0.1.5",
-    tag: "0.1.5",
-    type: :hex,
-    path: "mishka_developer_tools"
+    path: "<extensions_path>/mishka_developer_tools-0.1.5"
   })
 
-  Installer.async_install(hex_tag)
+  Installer.async_install(lib)
   ```
   """
   @spec async_install(t()) :: error_return() | :ok
@@ -589,51 +551,119 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
-  defp mix_exist(path) do
-    with true <- File.dir?(path),
-         files_list <- File.ls!(path),
-         true <- "mix.exs" in files_list do
+  # Resolve the pre-built package on disk and return its canonical directory (`<app>-<version>`)
+  # inside the extensions dir. `:path` uses a local package; the rest download + extract an
+  # artifact. Nothing is ever compiled here.
+  defp fetch_package(%{type: :path} = data) do
+    dest = "#{LibraryHandler.extensions_path()}/#{data.app}-#{data.version}"
+
+    with :ok <- allowed_extract_path(data.path),
+         :ok <- place_package(data.path, dest) do
+      {:ok, dest}
+    end
+  end
+
+  defp fetch_package(data) do
+    name = "#{data.app}-#{data.version}"
+
+    with {:ok, body} <- Downloader.download(data.type, download_pkg(data)),
+         :ok <- LibraryHandler.extract(:tar, body, name) do
+      {:ok, "#{LibraryHandler.extensions_path()}/#{name}"}
+    end
+  end
+
+  defp download_pkg(data) do
+    %{path: data.path}
+    |> maybe_put(:tag, Map.get(data, :tag))
+    |> maybe_put(:asset, Map.get(data, :asset))
+  end
+
+  defp maybe_put(map, _key, nil), do: map
+  defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # Only lowercase letters, digits and underscores are allowed in an app name. This is checked
+  # **before** any `String.to_atom/1` so an attacker-influenced name cannot exhaust the global
+  # atom table.
+  defp valid_name(app) do
+    if Regex.match?(@name_pattern, "#{app}") and String.length("#{app}") <= 255 do
+      :ok
+    else
+      message =
+        "The application name is invalid. Use only lowercase letters, digits and underscores."
+
+      {:error, [%{message: message, field: :app, action: :valid_name}]}
+    end
+  end
+
+  # The atom is created exactly once, at controlled install time, after `valid_name/1`.
+  defp safe_atom(app), do: String.to_atom(app)
+
+  defp app_resource(path, app), do: "#{path}/ebin/#{app}.app"
+
+  defp ebin_exist(path) do
+    with true <- File.dir?("#{path}/ebin"),
+         files_list <- File.ls!("#{path}/ebin"),
+         true <- Enum.any?(files_list, &String.ends_with?(&1, ".app")) do
       :ok
     else
       _ ->
         message =
-          "There is no mix.exs file in the specified path (directory). Please use Elixir standard library."
+          "There is no compiled `ebin` directory (with a `.app` file) in the specified path. " <>
+            "Please provide the pre-built artifacts of the library."
 
-        {:error, [%{message: message, field: :global, action: :mix_exist}]}
+        {:error, [%{message: message, field: :path, action: :ebin_exist}]}
     end
   end
 
+  # Path-traversal guard: the package must live inside the extensions directory.
+  defp allowed_extract_path(extract_path) do
+    allowed = LibraryHandler.extensions_path()
+
+    if String.starts_with?(Path.expand(extract_path), Path.expand(allowed)) do
+      :ok
+    else
+      message = "Your library path is not allowed. It must be inside the extensions directory."
+
+      {:error,
+       [%{message: message, field: :path, action: :allowed_extract_path, allowed: allowed}]}
+    end
+  end
+
+  defp place_package(source, dest) do
+    if Path.expand(source) == Path.expand(dest), do: :ok, else: rename_dir(source, dest)
+  end
+
   defp rename_dir(path, name_path) do
+    File.rm_rf!(name_path)
+
     case File.rename(path, name_path) do
       :ok ->
-        File.rm_rf!(path)
         :ok
 
       {:error, source} ->
-        File.rm_rf!(path)
         message = "There was a problem moving the file."
         {:error, [%{message: message, field: :path, action: :rename_dir, source: source}]}
     end
   end
 
-  defp allowed_extract_path(extract_path) do
-    if String.starts_with?(extract_path, LibraryHandler.extensions_path()) do
-      :ok
-    else
-      message = "Your library extraction path is not correct."
-      allowed = LibraryHandler.extensions_path()
-      {:error, [%{message: message, field: :path, action: :rename_dir, allowed: allowed}]}
-    end
-  end
+  # Add the `ebin` to the code path, then (re)load and start the app. On any failure after the
+  # code path is touched, roll back so the node is left clean (no half-installed state).
+  defp install_steps(data, dest) do
+    app = safe_atom(data.app)
+    ebin = "#{dest}/ebin"
+    prepend_paths = [{app, ebin}]
 
-  defp install_and_compile_steps(data) do
-    with :ok <- LibraryHandler.do_compile(data),
-         {:ok, moved_files} <- LibraryHandler.move_and_replace_build_files(data),
-         :ok <- LibraryHandler.prepend_compiled_apps(moved_files),
-         _ <- Application.stop(String.to_atom(data.app)),
-         :ok <- LibraryHandler.unload(String.to_atom(data.app)),
-         :ok <- LibraryHandler.application_ensure(String.to_atom(data.app)) do
-      {:ok, moved_files}
+    with :ok <- LibraryHandler.prepend_compiled_apps(prepend_paths),
+         _ <- Application.stop(app),
+         :ok <- LibraryHandler.unload(app),
+         :ok <- LibraryHandler.application_ensure(app) do
+      {:ok, prepend_paths}
+    else
+      error ->
+        Application.stop(app)
+        Application.unload(app)
+        Code.delete_path(ebin)
+        error
     end
   end
 
@@ -642,8 +672,8 @@ defmodule MishkaInstaller.Installer.Installer do
     if is_nil(db_data), do: write(merged_app), else: write(:id, db_data.id, merged_app)
   end
 
-  defp install_output(data, download \\ nil) do
+  defp install_output(data) do
     ext_path = LibraryHandler.extensions_path()
-    %{download: download, extension: data, dir: "#{ext_path}/#{data.app}-#{data.version}"}
+    %{extension: data, dir: "#{ext_path}/#{data.app}-#{data.version}"}
   end
 end

@@ -111,7 +111,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
 
           {:error, error} ->
             Logger.error(
-              "Identifier: #{inspect(__MODULE__)} ::: Compiling error! ::: Source: #{error}"
+              "Identifier: #{inspect(__MODULE__)} ::: Installing error! ::: Source: #{inspect(error)}"
             )
         end
 
@@ -124,28 +124,31 @@ defmodule MishkaInstaller.Installer.CompileHandler do
     {:noreply, new_state}
   end
 
+  # Boot replay: code paths and loaded/started apps do NOT survive a restart, so every previously
+  # installed library (persisted in the `Installer` table) must be re-added to the code path and
+  # re-loaded here once Mnesia is synchronized. Each app is fault-isolated: a missing/corrupt
+  # extension is logged and skipped so it cannot freeze the whole system, and `:compile_status` is
+  # still set to "ready" for the apps that did re-load.
   def handle_info(%{status: :synchronized, channel: "mnesia"}, state) do
-    errors =
-      Installer.get()
-      |> Enum.reduce([], fn item, acc ->
-        with :ok <- LibraryHandler.prepend_compiled_apps(item.prepend_paths),
-             :ok <- LibraryHandler.unload(String.to_atom(item.app)),
-             :ok <- LibraryHandler.application_ensure(String.to_atom(item.app)) do
-          acc
-        else
-          error -> acc ++ [{item.app, error}]
-        end
-      end)
+    Installer.get()
+    |> Enum.each(fn item ->
+      with :ok <- LibraryHandler.prepend_compiled_apps(item.prepend_paths),
+           :ok <- LibraryHandler.unload(String.to_atom(item.app)),
+           :ok <- LibraryHandler.application_ensure(String.to_atom(item.app)) do
+        Logger.debug(
+          "Identifier: #{inspect(__MODULE__)} ::: Re-loaded installed app ::: #{item.app}"
+        )
+      else
+        error ->
+          Logger.error(
+            "Identifier: #{inspect(__MODULE__)} ::: Skipped re-loading #{item.app} on boot ::: Source: #{inspect(error)}"
+          )
+      end
+    end)
 
-    if errors == [] do
-      :persistent_term.put(:compile_status, "ready")
-      MishkaInstaller.broadcast("mnesia", :compile_synchronized, %{identifier: :compile_handler})
-      Logger.debug("Identifier: #{inspect(__MODULE__)} ::: Run-time apps are Synchronized...")
-    else
-      Logger.error(
-        "Identifier: #{inspect(__MODULE__)} ::: Run-time apps Synchronizing have errors ::: Source: #{errors}"
-      )
-    end
+    :persistent_term.put(:compile_status, "ready")
+    MishkaInstaller.broadcast("mnesia", :compile_synchronized, %{identifier: :compile_handler})
+    Logger.debug("Identifier: #{inspect(__MODULE__)} ::: Run-time apps are Synchronized...")
 
     {:noreply, state}
   end

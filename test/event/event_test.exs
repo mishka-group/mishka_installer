@@ -48,7 +48,8 @@ defmodule MishkaInstallerTest.Event.EventTest do
   ###################################################################################
   describe "Event Table CRUD QueryTest ===>" do
     test "Create a Plugin record" do
-      {:error, %{message: _msg, fields: [:extension, :event, :name]}} = assert Event.write(%{})
+      {:error, errors} = assert Event.write(%{})
+      assert Enum.sort(Enum.map(errors, & &1.field)) == [:event, :extension, :name]
 
       create = fn ->
         %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}

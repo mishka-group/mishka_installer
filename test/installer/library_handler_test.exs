@@ -1,97 +1,14 @@
 defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Installer.LibraryHandler
+  alias MishkaInstallerTest.Support.EbinFixture
 
   setup do
     System.put_env("PROJECT_PATH", File.cwd!())
-  end
-
-  test "Compile an Elixir Library with cmd - command_execution" do
-    System.put_env("PROJECT_PATH", File.cwd!())
-    temp_name = "elixir-uuid-1.2.1"
-    # Clean up both test and dev directories
-    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/temp-#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/temp-#{temp_name}")
-    path = "test/support/elixir-uuid-1.2.1.tar.gz"
-    :ok = LibraryHandler.extract(:tar, path, temp_name)
-
-    :ok =
-      assert LibraryHandler.do_compile(%{
-               app: "elixir-uuid",
-               version: "1.2.1",
-               compile_type: :cmd
-             })
-
-    # move_and_replace_build_files
-    {:ok, moved_files} =
-      assert LibraryHandler.move_and_replace_build_files(%{
-               app: "elixir-uuid",
-               version: "1.2.1"
-             })
-
-    # Prepend compiled apps of an Library
-    :ok = assert LibraryHandler.prepend_compiled_apps(moved_files)
-
-    File.rm_rf(File.cwd!() <> "/_build/test/lib/elixir_uuid")
-
-    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
-  end
-
-  test "Compile an Elixir Library with port - command_execution" do
-    System.put_env("PROJECT_PATH", File.cwd!())
-    temp_name = "uuid-1.2.2"
-    # Clean up both test and dev directories
-    File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/test/extensions/#{temp_name}")
-    File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/test/extensions/temp-#{temp_name}")
-    File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/dev/extensions/#{temp_name}")
-    File.rm_rf(System.get_env("PROJECT_PATH") <> "/deployment/dev/extensions/temp-#{temp_name}")
-    path = "test/support/elixir-uuid-1.2.1.tar.gz"
-    :ok = LibraryHandler.extract(:tar, path, temp_name)
-
-    :ok =
-      assert LibraryHandler.do_compile(%{
-               app: "uuid",
-               version: "1.2.2",
-               compile_type: :port
-             })
-
-    # Clean up both test and dev directories at the end
-    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
-  end
-
-  test "Compile an Elixir Library with mix - command_execution" do
-    {:error, _error} =
-      assert LibraryHandler.do_compile(%{
-               app: "elixir-uuid",
-               version: "1.2.1",
-               compile_type: :mix
-             })
-  end
-
-  test "Extract and move tar file" do
-    System.put_env("PROJECT_PATH", File.cwd!())
-    temp_name = "test1"
-    # Clean up both test and dev directories
-    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/temp-#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/temp-#{temp_name}")
-    path = "test/support/elixir-uuid-1.2.1.tar.gz"
-    :ok = LibraryHandler.extract(:tar, path, temp_name)
-
-    path1 = "test/support/mishka_developer_tools-0.1.8.tar.gz"
-    {:error, _error} = assert LibraryHandler.extract(:tar, path1, temp_name)
-    # Clean up both test and dev directories at the end
-    File.rm_rf(File.cwd!() <> "/deployment/test/extensions/#{temp_name}")
-    File.rm_rf(File.cwd!() <> "/deployment/dev/extensions/#{temp_name}")
+    :ok
   end
 
   test "Read app file" do
-    System.put_env("PROJECT_PATH", File.cwd!())
-
     {:ok, data} =
       assert LibraryHandler.read_app(
                :req,
@@ -103,9 +20,9 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     {:error, _error} = assert LibraryHandler.read_app(:req1, "_build/test/lib/req/ebin/req.app")
   end
 
-  test "Application ensure/load" do
-    Application.stop(:req)
-    Application.unload(:req)
+  test "Application ensure/load is idempotent" do
+    :ok = assert LibraryHandler.application_ensure(:req)
+    # Calling it again on an already-loaded/started app must still succeed (boot-replay safety).
     :ok = assert LibraryHandler.application_ensure(:req)
     {:error, _error} = assert LibraryHandler.application_ensure(:req1)
   end
@@ -122,10 +39,75 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
   end
 
   test "Extensions path" do
-    "/deployment/test/extensions" =~ assert LibraryHandler.extensions_path()
+    assert LibraryHandler.extensions_path() =~ "/deployment/test/extensions"
   end
 
-  test "Mix command_execution error" do
-    {:error, _error} = assert LibraryHandler.command_execution(:mix, "", "")
+  test "Extensions path can be overridden via application env" do
+    Application.put_env(:mishka_installer, :extensions_path, "/tmp/custom-extensions")
+    assert LibraryHandler.extensions_path() == "/tmp/custom-extensions"
+  after
+    Application.delete_env(:mishka_installer, :extensions_path)
+  end
+
+  test "Prepend compiled apps adds the ebin to the code path" do
+    app = :"lib_handler_prepend_#{System.unique_integer([:positive])}"
+    dir = Path.join(System.tmp_dir!(), "#{app}")
+    {^app, _module, ebin} = EbinFixture.build_fake_app(dir, app, "0.1.0")
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    :ok = assert LibraryHandler.prepend_compiled_apps([{app, ebin}])
+    assert String.to_charlist(ebin) in :code.get_path()
+
+    {:error, [%{action: :prepend_compiled_apps}]} =
+      assert LibraryHandler.prepend_compiled_apps([{:nope, "/does/not/exist/ebin"}])
+  end
+
+  test "Compare version with installed app" do
+    # `:req` is installed at 0.6.1 in the test build.
+    :ok = assert LibraryHandler.compare_version_with_installed_app(:req, "99.0.0")
+
+    {:error, [%{action: :compare_version_with_installed_app}]} =
+      assert LibraryHandler.compare_version_with_installed_app(:req, "0.0.1")
+
+    # An app that is not installed is always allowed.
+    :ok =
+      assert LibraryHandler.compare_version_with_installed_app(:not_installed_app_xyz, "1.0.0")
+  end
+
+  test "Extract a pre-built ebin tarball into the extensions directory" do
+    app = :"lib_handler_extract_#{System.unique_integer([:positive])}"
+    {tarball, ^app, _module} = EbinFixture.tar_fake_app(app, "0.1.0")
+    name = "#{app}-0.1.0"
+    dest = "#{LibraryHandler.extensions_path()}/#{name}"
+    on_exit(fn -> File.rm_rf!(dest) end)
+
+    :ok = assert LibraryHandler.extract(:tar, tarball, name)
+    assert File.dir?("#{dest}/ebin")
+    assert File.exists?("#{dest}/ebin/#{app}.app")
+  end
+
+  test "Extract rejects an archive without an ebin directory" do
+    # A tarball whose only entry is a stray file (no `ebin/`).
+    uniq = System.unique_integer([:positive])
+    src = Path.join(System.tmp_dir!(), "no-ebin-#{uniq}")
+    File.mkdir_p!(src)
+    File.write!(Path.join(src, "readme.txt"), "hello")
+    tar = Path.join(System.tmp_dir!(), "no-ebin-#{uniq}.tar.gz")
+
+    :ok =
+      :erl_tar.create(
+        String.to_charlist(tar),
+        [{~c"readme.txt", String.to_charlist(Path.join(src, "readme.txt"))}],
+        [:compressed]
+      )
+
+    tarball = File.read!(tar)
+    File.rm_rf!(src)
+    File.rm!(tar)
+
+    name = "no-ebin-#{uniq}"
+    on_exit(fn -> File.rm_rf!("#{LibraryHandler.extensions_path()}/#{name}") end)
+
+    {:error, [%{action: :extract}]} = assert LibraryHandler.extract(:tar, tarball, name)
   end
 end

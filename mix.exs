@@ -21,12 +21,9 @@ defmodule MishkaInstaller.MixProject do
       test_coverage: [
         ignore_modules: [
           MishkaInstaller.MnesiaRepo.State,
-          MishkaInstaller.Installer.PortHandler,
           MishkaInstaller.MnesiaRepo,
           MishkaInstaller.Installer.CompileHandler,
-          MishkaInstaller.Installer.Collect,
-          Collectable.MishkaInstaller.Installer.Collect,
-          ~r/\.Support.MishkaPlugin\./
+          ~r/\.Support\./
         ]
       ]
     ]
