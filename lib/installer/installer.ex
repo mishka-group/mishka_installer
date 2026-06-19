@@ -607,7 +607,7 @@ defmodule MishkaInstaller.Installer.Installer do
 
     if natives != [] do
       Logger.warning(
-        "[installer] #{app} ships native artifacts (#{inspect(natives)}); they must match this host's OS/arch/ERTS."
+        "[mishka_installer.installer] #{app} ships native artifacts (#{inspect(natives)}); they must match this host's OS/arch/ERTS."
       )
     end
 

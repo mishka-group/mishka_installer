@@ -29,6 +29,7 @@ defmodule MishkaInstaller.Event.EventHandler do
   @impl true
   @spec init(keyword()) :: {:ok, keyword()}
   def init(state \\ []) do
+    Logger.metadata(domain: [:mishka_installer, :event])
     MishkaInstaller.subscribe("mnesia")
     {:ok, Keyword.merge(state, running: [], queues: QueueAssistant.new())}
   end
@@ -130,7 +131,7 @@ defmodule MishkaInstaller.Event.EventHandler do
         event = List.first(running)
 
         unless perform(event) do
-          Logger.error("[event] compile error for event #{inspect(event)}")
+          Logger.error("[mishka_installer.event] compile error for event #{inspect(event)}")
         end
 
         send(self(), :run_queues)
@@ -167,7 +168,7 @@ defmodule MishkaInstaller.Event.EventHandler do
     case Event.start() do
       {:ok, _sorted_events} ->
         :persistent_term.put(:event_status, "ready")
-        Logger.info("[event] plugins synchronized")
+        Logger.info("[mishka_installer.event] plugins synchronized")
         MishkaInstaller.broadcast("mnesia", :event_status, "ready")
         telemetry(:synchronized, %{node: node()})
         Keyword.merge(state, status: :synchronized)
@@ -206,7 +207,10 @@ defmodule MishkaInstaller.Event.EventHandler do
     true
   rescue
     error ->
-      Logger.error("[event] compile failed for event #{inspect(event)}: #{inspect(error)}")
+      Logger.error(
+        "[mishka_installer.event] compile failed for event #{inspect(event)}: #{inspect(error)}"
+      )
+
       telemetry(:compile, %{event: event, result: :error})
       false
   end

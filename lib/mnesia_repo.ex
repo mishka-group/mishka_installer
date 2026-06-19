@@ -103,6 +103,8 @@ defmodule MishkaInstaller.MnesiaRepo do
   ################################################################################
   @impl true
   def init(_state) do
+    Logger.metadata(domain: [:mishka_installer, :mnesia])
+
     :telemetry.span(@telemetry ++ [:init], %{node: node()}, fn ->
       result = bootstrap()
       {result, %{node: node(), result: elem(result, 0), tables: local_tables()}}
@@ -113,13 +115,16 @@ defmodule MishkaInstaller.MnesiaRepo do
   def handle_call(:state, _from, state), do: {:reply, state, state}
 
   def handle_call(request, from, state) do
-    Logger.warning("[mnesia] unexpected call from #{inspect(from)}: #{inspect(request)}")
+    Logger.warning(
+      "[mishka_installer.mnesia] unexpected call from #{inspect(from)}: #{inspect(request)}"
+    )
+
     {:noreply, state}
   end
 
   @impl true
   def handle_cast(msg, state) do
-    Logger.warning("[mnesia] unexpected cast: #{inspect(msg)}")
+    Logger.warning("[mishka_installer.mnesia] unexpected cast: #{inspect(msg)}")
     {:noreply, state}
   end
 
@@ -132,7 +137,10 @@ defmodule MishkaInstaller.MnesiaRepo do
     healthy? = missing == []
 
     unless healthy?,
-      do: Logger.warning("[mnesia] health check found missing tables: #{inspect(missing)}")
+      do:
+        Logger.warning(
+          "[mishka_installer.mnesia] health check found missing tables: #{inspect(missing)}"
+        )
 
     :telemetry.execute(
       @telemetry ++ [:health_check],
@@ -144,7 +152,7 @@ defmodule MishkaInstaller.MnesiaRepo do
   end
 
   def handle_info(info, state) do
-    Logger.warning("[mnesia] unexpected info: #{inspect(info)}")
+    Logger.warning("[mishka_installer.mnesia] unexpected info: #{inspect(info)}")
     {:noreply, state}
   end
 
@@ -174,7 +182,7 @@ defmodule MishkaInstaller.MnesiaRepo do
       {:ok, %State{tables: local_tables(), schemas: schemas(), essential: essential}}
     else
       Logger.critical(
-        "[mnesia] node mismatch: #{inspect(node())} is not in #{inspect(:mnesia.system_info(:db_nodes))}"
+        "[mishka_installer.mnesia] node mismatch: #{inspect(node())} is not in #{inspect(:mnesia.system_info(:db_nodes))}"
       )
 
       {:stop, :node_name_mismatch}
@@ -188,7 +196,7 @@ defmodule MishkaInstaller.MnesiaRepo do
   end
 
   defp configure_dir(dir) do
-    Logger.debug("[mnesia] stopping to (re)load the schema")
+    Logger.debug("[mishka_installer.mnesia] stopping to (re)load the schema")
     MnesiaAssistant.stop() |> MError.error_description()
     File.mkdir_p(dir) |> MError.error_description(@identifier)
     Application.put_env(:mnesia, :dir, to_charlist(dir))
@@ -218,25 +226,31 @@ defmodule MishkaInstaller.MnesiaRepo do
         |> case do
           {:ok, :atomic} ->
             Table.wait_for_tables([item], :infinity)
-            Logger.debug("[mnesia] essential table ready: #{inspect(item)}")
+            Logger.debug("[mishka_installer.mnesia] essential table ready: #{inspect(item)}")
             table_event(item, :created)
 
           {:error, {:aborted, {:already_exists, _}}, _} ->
             table_event(item, :already_exists)
 
           error ->
-            Logger.error("[mnesia] could not create table #{inspect(item)}: #{inspect(error)}")
+            Logger.error(
+              "[mishka_installer.mnesia] could not create table #{inspect(item)}: #{inspect(error)}"
+            )
+
             table_event(item, :error)
         end
 
       true ->
-        Logger.warning("[mnesia] skipping #{inspect(item)}: no database_config/0 exported")
+        Logger.warning(
+          "[mishka_installer.mnesia] skipping #{inspect(item)}: no database_config/0 exported"
+        )
+
         :ok
     end
   end
 
   defp synchronized() do
-    Logger.info("[mnesia] tables synchronized on #{inspect(node())}")
+    Logger.info("[mishka_installer.mnesia] tables synchronized on #{inspect(node())}")
 
     MishkaInstaller.broadcast("mnesia", :synchronized, %{
       identifier: @identifier,

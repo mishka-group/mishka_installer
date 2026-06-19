@@ -30,6 +30,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   @impl true
   @spec init(keyword()) :: {:ok, keyword()}
   def init(state \\ []) do
+    Logger.metadata(domain: [:mishka_installer, :installer])
     MishkaInstaller.subscribe("mnesia")
     {:ok, Keyword.merge(state, running: [], queues: MishkaInstaller.QueueAssistant.new())}
   end
@@ -117,12 +118,12 @@ defmodule MishkaInstaller.Installer.CompileHandler do
       if length(running) != 0 do
         case Installer.install(List.first(running)) do
           {:ok, %{extension: extension} = data} ->
-            Logger.info("[installer] #{extension.app} installed and activated")
+            Logger.info("[mishka_installer.installer] #{extension.app} installed and activated")
             MishkaInstaller.broadcast("installer", :install, data)
             telemetry(:install, %{app: extension.app, result: :ok})
 
           {:error, error} ->
-            Logger.error("[installer] install error: #{inspect(error)}")
+            Logger.error("[mishka_installer.installer] install error: #{inspect(error)}")
             telemetry(:install, %{app: nil, result: :error})
         end
 
@@ -145,7 +146,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
 
     :persistent_term.put(:compile_status, "ready")
     MishkaInstaller.broadcast("mnesia", :compile_synchronized, %{identifier: :compile_handler})
-    Logger.debug("[installer] run-time apps synchronized")
+    Logger.debug("[mishka_installer.installer] run-time apps synchronized")
 
     {:noreply, state}
   end
@@ -162,11 +163,14 @@ defmodule MishkaInstaller.Installer.CompileHandler do
     with :ok <- LibraryHandler.prepend_compiled_apps(item.prepend_paths),
          :ok <- LibraryHandler.unload(String.to_atom(item.app)),
          :ok <- LibraryHandler.application_ensure(String.to_atom(item.app)) do
-      Logger.debug("[installer] re-loaded installed app: #{item.app}")
+      Logger.debug("[mishka_installer.installer] re-loaded installed app: #{item.app}")
       telemetry(:replay, %{app: item.app, result: :ok})
     else
       error ->
-        Logger.error("[installer] skipped re-loading #{item.app} on boot: #{inspect(error)}")
+        Logger.error(
+          "[mishka_installer.installer] skipped re-loading #{item.app} on boot: #{inspect(error)}"
+        )
+
         telemetry(:replay, %{app: item.app, result: :error})
     end
   end

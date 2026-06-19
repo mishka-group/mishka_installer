@@ -43,12 +43,12 @@ defmodule MishkaInstaller.MnesiaAssistant.Error do
   """
   @spec error_description(term(), term()) :: {:ok, :atomic} | {:error, term(), term()}
   def error_description(error, identifier) when error in [{:atomic, :ok}, :ok] do
-    Logger.debug("Identifier: #{inspect(identifier)} ::: Mnesia action completed successfully.")
+    Logger.debug("[mishka_installer.mnesia] #{inspect(identifier)} action completed")
     {:ok, :atomic}
   end
 
   def error_description(:starting, identifier) do
-    Logger.debug("Identifier: #{inspect(identifier)} ::: Mnesia action is starting.")
+    Logger.debug("[mishka_installer.mnesia] #{inspect(identifier)} starting")
     {:ok, :atomic}
   end
 
@@ -65,7 +65,7 @@ defmodule MishkaInstaller.MnesiaAssistant.Error do
       converted = error_description(error)
 
       Logger.error(
-        "Identifier: #{inspect(identifier)} ::: MnesiaError: #{inspect(error)} ::: #{inspect(converted)}"
+        "[mishka_installer.mnesia] #{inspect(identifier)} error: #{inspect(error)} (#{inspect(converted)})"
       )
 
       {:error, error, describe(converted)}
@@ -78,7 +78,7 @@ defmodule MishkaInstaller.MnesiaAssistant.Error do
     converted = error_description(error)
 
     Logger.error(
-      "Identifier: #{inspect(identifier)} ::: MnesiaError: #{inspect(error)} ::: #{inspect(converted)}"
+      "[mishka_installer.mnesia] #{inspect(identifier)} error: #{inspect(error)} (#{inspect(converted)})"
     )
 
     {:error, error, converted}
@@ -88,7 +88,7 @@ defmodule MishkaInstaller.MnesiaAssistant.Error do
     converted = error_description(error)
 
     Logger.debug(
-      "Identifier: #{inspect(identifier)} ::: Mnesia resource already exists ::: #{inspect(converted)}"
+      "[mishka_installer.mnesia] #{inspect(identifier)} already exists: #{inspect(converted)}"
     )
 
     {:error, error, describe(converted)}
