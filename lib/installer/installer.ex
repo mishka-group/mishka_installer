@@ -75,15 +75,13 @@ defmodule MishkaInstaller.Installer.Installer do
     field(:app, String.t(), enforce: true, derives: "validate(not_empty_string)")
     # This type can be used when you want to introduce a runtime library version.
     field(:version, String.t(), enforce: true, derives: "validate(not_empty_string)")
-    # Where the pre-built package comes from. `:path` is a local directory (already inside the
-    # extensions dir); the rest download a `tar.gz` artifact. See `MishkaInstaller.Installer.Downloader`.
+    # `:path` (a local package dir) or download a `tar.gz` artifact (`:url`/`:github_*`).
     field(:type, download_type(),
       default: :path,
       derives: "validate(enum=Atom[path::url::github_tag::github_latest_release])"
     )
 
-    # For `:path` it is the local package directory; for `:url` the artifact URL; for `:github_*`
-    # the `"owner/repo"`.
+    # `:path` = local package dir; `:url` = artifact URL; `:github_*` = "owner/repo".
     field(:path, String.t(), enforce: true, derives: "validate(not_empty_string)")
     # The release tag for `:github_tag` downloads.
     field(:tag, String.t(), derives: "validate(not_empty_string)")
@@ -555,9 +553,6 @@ defmodule MishkaInstaller.Installer.Installer do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
-  # Resolve the pre-built package on disk and return its canonical directory (`<app>-<version>`)
-  # inside the extensions dir. `:path` uses a local package; the rest download + extract an
-  # artifact. Nothing is ever compiled here.
   defp fetch_package(%{type: :path} = data) do
     dest = "#{LibraryHandler.extensions_path()}/#{data.app}-#{data.version}"
 
@@ -586,7 +581,6 @@ defmodule MishkaInstaller.Installer.Installer do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
-  # When a checksum is supplied, the downloaded artifact must match it before we extract or load it.
   defp verify_checksum(_body, nil), do: :ok
 
   defp verify_checksum(body, expected) do
@@ -600,8 +594,6 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  # Native code (NIF / port driver) is OS/arch/ERTS specific and is not portable across machines.
-  # We surface it loudly rather than fail, since a same-target artifact is legitimate.
   defp warn_on_native(dest, app) do
     natives = Path.wildcard("#{dest}/priv/**/*.{so,dll,dylib}")
 
@@ -614,9 +606,6 @@ defmodule MishkaInstaller.Installer.Installer do
     :ok
   end
 
-  # Only lowercase letters, digits and underscores are allowed in an app name. This is checked
-  # **before** any `String.to_atom/1` so an attacker-influenced name cannot exhaust the global
-  # atom table.
   defp valid_name(app) do
     if Regex.match?(@name_pattern, "#{app}") and String.length("#{app}") <= 255 do
       :ok
@@ -628,7 +617,6 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  # The atom is created exactly once, at controlled install time, after `valid_name/1`.
   defp safe_atom(app), do: String.to_atom(app)
 
   defp app_resource(path, app), do: "#{path}/ebin/#{app}.app"
@@ -648,7 +636,6 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  # Path-traversal guard: the package must live inside the extensions directory.
   defp allowed_extract_path(extract_path) do
     allowed = LibraryHandler.extensions_path()
 
@@ -679,8 +666,6 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  # Add the `ebin` to the code path, then (re)load and start the app. On any failure after the
-  # code path is touched, roll back so the node is left clean (no half-installed state).
   defp install_steps(data, dest) do
     app = safe_atom(data.app)
     ebin = "#{dest}/ebin"

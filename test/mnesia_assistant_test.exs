@@ -117,4 +117,49 @@ defmodule MishkaInstaller.MnesiaAssistantTest do
       assert table in Information.system_info(:local_tables)
     end
   end
+
+  # Proves the PRODUCTION storage path: a `disc_copies` table backed by an on-disk schema keeps its
+  # data across a real Mnesia stop/start (a reboot). The rest of the suite uses `ram_copies`, so this
+  # is the only test that exercises disc persistence.
+  describe "disc_copies persistence" do
+    setup do
+      prev_dir = :mnesia.system_info(:directory)
+      tmp = Path.join(System.tmp_dir!(), "mnesia-disc-#{System.unique_integer([:positive])}")
+      :mnesia.stop()
+      Application.put_env(:mnesia, :dir, String.to_charlist(tmp))
+      File.mkdir_p!(tmp)
+      :ok = :mnesia.create_schema([node()])
+      :ok = :mnesia.start()
+
+      on_exit(fn ->
+        :mnesia.stop()
+        File.rm_rf!(tmp)
+        Application.put_env(:mnesia, :dir, prev_dir)
+      end)
+
+      :ok
+    end
+
+    test "a disc_copies record survives a mnesia stop/start" do
+      table = :"disc_persist_#{System.unique_integer([:positive])}"
+
+      {:atomic, :ok} =
+        Table.create_table(table,
+          attributes: [:id, :name],
+          disc_copies: [node()],
+          record_name: table
+        )
+
+      :ok = Table.wait_for_tables([table], 5000)
+      {:atomic, :ok} = Transaction.transaction(fn -> Query.write({table, 1, "persisted"}) end)
+
+      # simulate a reboot — stop and restart Mnesia with the same on-disk dir
+      :stopped = :mnesia.stop()
+      :ok = :mnesia.start()
+      :ok = Table.wait_for_tables([table], 5000)
+
+      assert {:atomic, [{^table, 1, "persisted"}]} =
+               Transaction.transaction(fn -> Query.read(table, 1) end)
+    end
+  end
 end

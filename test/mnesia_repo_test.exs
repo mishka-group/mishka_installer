@@ -99,4 +99,32 @@ defmodule MishkaInstaller.MnesiaRepoTest do
     assert {Installer, info} = Enum.find(MnesiaRepo.schemas(), fn {t, _} -> t == Installer end)
     assert Keyword.has_key?(info, :storage_type)
   end
+
+  test "a restart on the same dir re-announces without wiping the running DB" do
+    start_supervised!(MnesiaRepo)
+    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+
+    {:ok, _} = Installer.write(%{app: "keep_me", version: "1.0.0", path: "p"})
+    assert Installer.get(:app, "keep_me")
+
+    :ok = stop_supervised(MnesiaRepo)
+    start_supervised!(MnesiaRepo)
+    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+
+    assert Installer.get(:app, "keep_me")
+  end
+
+  test "refuses to start when no configured cluster node is reachable" do
+    tmp = Path.join(System.tmp_dir!(), "mnesia-cluster-#{System.unique_integer([:positive])}")
+
+    Application.put_env(:mishka_installer, MnesiaRepo,
+      mnesia_dir: tmp,
+      essential: [Installer],
+      cluster_nodes: [:"ghost@127.0.0.1"]
+    )
+
+    on_exit(fn -> File.rm_rf!(tmp) end)
+
+    assert {:error, _} = start_supervised(MnesiaRepo)
+  end
 end

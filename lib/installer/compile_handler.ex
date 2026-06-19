@@ -136,11 +136,6 @@ defmodule MishkaInstaller.Installer.CompileHandler do
     {:noreply, new_state}
   end
 
-  # Boot replay: code paths and loaded/started apps do NOT survive a restart, so every previously
-  # installed library (persisted in the `Installer` table) must be re-added to the code path and
-  # re-loaded here once Mnesia is synchronized. Each app is fault-isolated: a missing/corrupt
-  # extension is logged and skipped so it cannot freeze the whole system, and `:compile_status` is
-  # still set to "ready" for the apps that did re-load.
   def handle_info(%{status: :synchronized, channel: "mnesia"}, state) do
     Enum.each(Installer.get(), &replay/1)
 

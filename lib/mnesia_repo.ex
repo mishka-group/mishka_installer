@@ -14,12 +14,26 @@ defmodule MishkaInstaller.MnesiaRepo do
   ```elixir
   config :mishka_installer, MishkaInstaller.MnesiaRepo,
     mnesia_dir: "/var/lib/my_app/mnesia",
-    essential: [MishkaInstaller.Event.Event, MishkaInstaller.Installer.Installer]
+    essential: [MishkaInstaller.Event.Event, MishkaInstaller.Installer.Installer],
+    cluster_nodes: [:"app@10.0.0.2", :"app@10.0.0.3"],
+    wait_timeout: 60_000,
+    wait_retries: 5
   ```
 
   - `:mnesia_dir` — where Mnesia stores its files. Defaults to `".mnesia/<env>"` under the project.
   - `:essential` — modules whose `database_config/0` defines a table to create on boot. Defaults to
     `[MishkaInstaller.Installer.Installer, MishkaInstaller.Event.Event]`.
+  - `:cluster_nodes` — other (already distribution-connected) nodes to join. `[]` (default) =
+    standalone single node. When set, this node connects, makes its schema `disc_copies`, and keeps
+    a local `disc_copies` copy of each essential table.
+  - `:wait_timeout` / `:wait_retries` — one wait "slice" (ms) and how many slices to wait while
+    `disc_copies` tables load from disk into RAM before giving up. Raise these for large datasets.
+
+  > #### Restart {: .info}
+  >
+  > On a restart where Mnesia is already running on the configured dir with the essential tables
+  > loaded, boot is a no-op re-announce — it does **not** stop/re-init Mnesia under the running
+  > event/installer processes.
 
   ## Telemetry
 
@@ -46,6 +60,8 @@ defmodule MishkaInstaller.MnesiaRepo do
   @identifier :mishka_mnesia_repo
   @telemetry [:mishka_installer, :mnesia]
   @health_interval 10_000
+  @wait_timeout 60_000
+  @wait_retries 5
 
   defmodule State do
     @moduledoc false
@@ -89,13 +105,6 @@ defmodule MishkaInstaller.MnesiaRepo do
            ]}
         ]
     end)
-  end
-
-  @doc "Returns the absolute path of the Mnesia schema file."
-  @spec schema_path() :: binary()
-  def schema_path() do
-    dir = System.get_env("Mishka_MNESIA_SCHEMA") || :mnesia.system_info(:directory)
-    Path.join(dir, "mishka.schema")
   end
 
   ################################################################################
@@ -167,25 +176,131 @@ defmodule MishkaInstaller.MnesiaRepo do
   ################################################################################
   defp bootstrap() do
     config = config()
-    configure_dir(config[:mnesia_dir])
 
+    if already_running?(config) do
+      Logger.debug(
+        "[mishka_installer.mnesia] already running on #{inspect(node())}; re-announcing"
+      )
+
+      synchronized()
+      schedule_health_check()
+      {:ok, initial_state(config)}
+    else
+      full_boot(config)
+    end
+  end
+
+  defp full_boot(config) do
+    configure_dir(config[:mnesia_dir])
+    essential = config[:essential]
+    cluster = config[:cluster_nodes]
+
+    with :ok <- start_or_join(cluster),
+         :ok <- wait_for(local_tables(), config),
+         :ok <- setup_essential_tables(essential, cluster),
+         :ok <- wait_for(essential, config) do
+      synchronized()
+      schedule_health_check()
+      {:ok, initial_state(config)}
+    end
+  end
+
+  defp initial_state(config) do
+    %State{tables: local_tables(), schemas: schemas(), essential: config[:essential]}
+  end
+
+  defp already_running?(config) do
+    :mnesia.system_info(:is_running) == :yes and
+      Path.expand("#{:mnesia.system_info(:directory)}") == Path.expand(config[:mnesia_dir]) and
+      Enum.all?(config[:essential], &(&1 in local_tables()))
+  end
+
+  defp start_or_join([]) do
     if node() in :mnesia.system_info(:db_nodes) do
       maybe_create_schema()
       MnesiaAssistant.start() |> MError.error_description(@identifier)
-      Table.wait_for_tables(local_tables(), :infinity)
-
-      essential = config[:essential]
-      create_essential_tables(essential)
-      synchronized()
-      schedule_health_check()
-
-      {:ok, %State{tables: local_tables(), schemas: schemas(), essential: essential}}
+      :ok
     else
       Logger.critical(
-        "[mishka_installer.mnesia] node mismatch: #{inspect(node())} is not in #{inspect(:mnesia.system_info(:db_nodes))}"
+        "[mishka_installer.mnesia] node mismatch: #{inspect(node())} owns a different schema dir"
       )
 
       {:stop, :node_name_mismatch}
+    end
+  end
+
+  defp start_or_join(nodes) do
+    MnesiaAssistant.start() |> MError.error_description(@identifier)
+
+    case :mnesia.change_config(:extra_db_nodes, nodes) do
+      {:ok, connected} when connected != [] ->
+        :mnesia.change_table_copy_type(:schema, node(), :disc_copies)
+        Logger.info("[mishka_installer.mnesia] joined cluster nodes: #{inspect(connected)}")
+        :ok
+
+      {:ok, []} ->
+        Logger.critical(
+          "[mishka_installer.mnesia] could not reach any cluster node in #{inspect(nodes)}"
+        )
+
+        {:stop, :no_cluster_nodes_reachable}
+
+      {:error, reason} ->
+        {:stop, {:cluster_join_failed, reason}}
+    end
+  end
+
+  defp setup_essential_tables(essentials, []), do: create_essential_tables(essentials)
+
+  defp setup_essential_tables(essentials, _cluster) do
+    case Enum.filter(essentials, &(copy_essential_table(&1) == :error)) do
+      [] -> :ok
+      failed -> {:stop, {:essential_table_copy_failed, failed}}
+    end
+  end
+
+  defp copy_essential_table(item) do
+    case :mnesia.add_table_copy(item, node(), :disc_copies) do
+      {:atomic, :ok} ->
+        table_event(item, :copied)
+        :ok
+
+      {:aborted, {:already_exists, _, _}} ->
+        table_event(item, :already_loaded)
+        :ok
+
+      error ->
+        Logger.error(
+          "[mishka_installer.mnesia] could not copy table #{inspect(item)}: #{inspect(error)}"
+        )
+
+        table_event(item, :error)
+        :error
+    end
+  end
+
+  defp wait_for(tables, config), do: wait_for(tables, config, config[:wait_retries])
+
+  defp wait_for(tables, _config, 0) do
+    Logger.critical("[mishka_installer.mnesia] tables still not available: #{inspect(tables)}")
+    {:stop, {:mnesia_tables_unavailable, tables}}
+  end
+
+  defp wait_for(tables, config, retries) do
+    case Table.wait_for_tables(tables, config[:wait_timeout]) do
+      :ok ->
+        :ok
+
+      {:timeout, remaining} ->
+        Logger.warning(
+          "[mishka_installer.mnesia] still loading #{inspect(remaining)} (large disc tables?); waiting…"
+        )
+
+        wait_for(remaining, config, retries - 1)
+
+      {:error, reason} ->
+        Logger.critical("[mishka_installer.mnesia] tables unavailable: #{inspect(reason)}")
+        {:stop, {:mnesia_tables_unavailable, reason}}
     end
   end
 
@@ -193,6 +308,9 @@ defmodule MishkaInstaller.MnesiaRepo do
     Application.get_env(:mishka_installer, __MODULE__, [])
     |> Keyword.put_new(:mnesia_dir, ".mnesia/#{MishkaInstaller.__information__().env}")
     |> Keyword.put_new(:essential, [Installer, Event])
+    |> Keyword.put_new(:cluster_nodes, [])
+    |> Keyword.put_new(:wait_timeout, @wait_timeout)
+    |> Keyword.put_new(:wait_retries, @wait_retries)
   end
 
   defp configure_dir(dir) do
@@ -211,13 +329,21 @@ defmodule MishkaInstaller.MnesiaRepo do
   end
 
   defp create_essential_tables(essentials) do
-    Enum.each(essentials, &create_essential_table/1)
+    case Enum.filter(essentials, &(create_essential_table(&1) == :error)) do
+      [] ->
+        :ok
+
+      failed ->
+        Logger.critical("[mishka_installer.mnesia] essential tables failed: #{inspect(failed)}")
+        {:stop, {:essential_table_failed, failed}}
+    end
   end
 
   defp create_essential_table(item) do
     cond do
       item in local_tables() ->
         table_event(item, :already_loaded)
+        :ok
 
       Code.ensure_loaded?(item) and function_exported?(item, :database_config, 0) ->
         item
@@ -225,12 +351,13 @@ defmodule MishkaInstaller.MnesiaRepo do
         |> MError.error_description(item)
         |> case do
           {:ok, :atomic} ->
-            Table.wait_for_tables([item], :infinity)
-            Logger.debug("[mishka_installer.mnesia] essential table ready: #{inspect(item)}")
+            Logger.debug("[mishka_installer.mnesia] essential table created: #{inspect(item)}")
             table_event(item, :created)
+            :ok
 
           {:error, {:aborted, {:already_exists, _}}, _} ->
             table_event(item, :already_exists)
+            :ok
 
           error ->
             Logger.error(
@@ -238,14 +365,15 @@ defmodule MishkaInstaller.MnesiaRepo do
             )
 
             table_event(item, :error)
+            :error
         end
 
       true ->
-        Logger.warning(
-          "[mishka_installer.mnesia] skipping #{inspect(item)}: no database_config/0 exported"
+        Logger.error(
+          "[mishka_installer.mnesia] essential #{inspect(item)} exports no database_config/0"
         )
 
-        :ok
+        :error
     end
   end
 
