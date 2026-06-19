@@ -28,6 +28,24 @@ defmodule MishkaInstaller.MnesiaAssistant do
   def stop(), do: :mnesia.stop()
 
   @doc """
+  Connects this (running, empty-schema) node to the cluster `nodes`. Delegates to
+  `:mnesia.change_config/2`. Returns `{:ok, connected_nodes}` or `{:error, reason}`.
+  """
+  @spec change_config([node()]) :: {:ok, [node()]} | {:error, term()}
+  def change_config(nodes), do: :mnesia.change_config(:extra_db_nodes, nodes)
+
+  @doc """
+  Subscribes the calling process to Mnesia `what` events (e.g. `:system`).
+  Delegates to `:mnesia.subscribe/1`.
+  """
+  @spec subscribe(term()) :: {:ok, node()} | {:error, term()}
+  def subscribe(what), do: :mnesia.subscribe(what)
+
+  @doc "Unsubscribes from Mnesia `what` events. Delegates to `:mnesia.unsubscribe/1`."
+  @spec unsubscribe(term()) :: {:ok, node()} | {:error, term()}
+  def unsubscribe(what), do: :mnesia.unsubscribe(what)
+
+  @doc """
   Translates a result selector into the Erlang match-spec result body. See
   `MishkaInstaller.Helper.Extra.erlang_result/1`.
   """

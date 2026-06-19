@@ -8,7 +8,9 @@ defmodule MishkaInstaller.MnesiaRepoTest do
     [:mishka_installer, :mnesia, :init, :stop],
     [:mishka_installer, :mnesia, :table],
     [:mishka_installer, :mnesia, :synchronized],
-    [:mishka_installer, :mnesia, :health_check]
+    [:mishka_installer, :mnesia, :health_check],
+    [:mishka_installer, :mnesia, :cluster, :nodeup],
+    [:mishka_installer, :mnesia, :cluster, :nodedown]
   ]
 
   setup do
@@ -41,7 +43,7 @@ defmodule MishkaInstaller.MnesiaRepoTest do
       File.rm_rf!(tmp)
     end)
 
-    :ok
+    {:ok, tmp: tmp}
   end
 
   test "boots, creates the essential tables and broadcasts :synchronized" do
@@ -114,17 +116,94 @@ defmodule MishkaInstaller.MnesiaRepoTest do
     assert Installer.get(:app, "keep_me")
   end
 
-  test "refuses to start when no configured cluster node is reachable" do
-    tmp = Path.join(System.tmp_dir!(), "mnesia-cluster-#{System.unique_integer([:positive])}")
+  describe "dynamic membership" do
+    test "a node with no configured peers stays passive (dynamic membership off)" do
+      # The default / single-node case: no `cluster_nodes` => no monitoring, node events are no-ops.
+      pid = start_supervised!(MnesiaRepo)
+      assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
 
-    Application.put_env(:mishka_installer, MnesiaRepo,
-      mnesia_dir: tmp,
-      essential: [Installer],
-      cluster_nodes: [:"ghost@127.0.0.1"]
-    )
+      assert MnesiaRepo.state().dynamic == false
 
-    on_exit(fn -> File.rm_rf!(tmp) end)
+      send(pid, {:nodeup, :"x@127.0.0.1"})
+      send(pid, {:nodedown, :"x@127.0.0.1"})
 
-    assert {:error, _} = start_supervised(MnesiaRepo)
+      refute_receive {:telemetry, [:mishka_installer, :mnesia, :cluster, _kind], _meas, _meta},
+                     300
+
+      assert Process.alive?(pid)
+    end
+
+    test "a joiner whose seed is unreachable boots :pending instead of crashing", ctx do
+      Application.put_env(:mishka_installer, MnesiaRepo,
+        mnesia_dir: ctx.tmp,
+        essential: [Installer],
+        cluster_nodes: [:"ghost@127.0.0.1"]
+      )
+
+      pid = start_supervised!(MnesiaRepo)
+
+      assert Process.alive?(pid)
+      assert MnesiaRepo.state().status == :pending
+      # Configuring peers turns dynamic membership on, so the node now watches for the seed.
+      assert MnesiaRepo.state().dynamic == true
+      # We never created the essential table locally, so a later join can't split-brain.
+      refute Installer in :mnesia.system_info(:local_tables)
+      refute_receive %{status: :synchronized, channel: "mnesia"}, 300
+    end
+
+    test "{:nodeup, peer} for an unconfigured node is ignored", ctx do
+      Application.put_env(:mishka_installer, MnesiaRepo,
+        mnesia_dir: ctx.tmp,
+        essential: [Installer],
+        cluster_nodes: [:"seed@127.0.0.1"]
+      )
+
+      pid = start_supervised!(MnesiaRepo)
+      assert MnesiaRepo.state().status == :pending
+
+      send(pid, {:nodeup, :"random@127.0.0.1"})
+
+      assert_receive {:telemetry, [:mishka_installer, :mnesia, :cluster, :nodeup], _meas,
+                      %{peer: :"random@127.0.0.1", action: :ignored}}
+    end
+
+    test "{:nodeup, seed} re-attempts the join while :pending", ctx do
+      Application.put_env(:mishka_installer, MnesiaRepo,
+        mnesia_dir: ctx.tmp,
+        essential: [Installer],
+        cluster_nodes: [:"seed@127.0.0.1"]
+      )
+
+      pid = start_supervised!(MnesiaRepo)
+      assert MnesiaRepo.state().status == :pending
+
+      # The seed is still unreachable, so the retry can't complete and we stay :pending — but it
+      # proves a pending node re-runs the join when a configured node connects.
+      send(pid, {:nodeup, :"seed@127.0.0.1"})
+
+      assert_receive {:telemetry, [:mishka_installer, :mnesia, :cluster, :nodeup], _meas,
+                      %{peer: :"seed@127.0.0.1", action: :pending}}
+
+      assert MnesiaRepo.state().status == :pending
+    end
+
+    test "{:nodedown, peer} only logs + emits telemetry, never evicting", ctx do
+      Application.put_env(:mishka_installer, MnesiaRepo,
+        mnesia_dir: ctx.tmp,
+        essential: [Installer],
+        cluster_nodes: [:"seed@127.0.0.1"]
+      )
+
+      pid = start_supervised!(MnesiaRepo)
+      assert MnesiaRepo.state().status == :pending
+
+      send(pid, {:nodedown, :"seed@127.0.0.1"})
+
+      assert_receive {:telemetry, [:mishka_installer, :mnesia, :cluster, :nodedown], _meas,
+                      %{peer: :"seed@127.0.0.1", db_member?: false}}
+
+      # Nothing was evicted and the repo keeps running.
+      assert Process.alive?(pid)
+    end
   end
 end

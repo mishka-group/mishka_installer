@@ -1,11 +1,14 @@
 defmodule MishkaInstaller.MnesiaRepo do
   @moduledoc """
-  Boots and supervises the [Mnesia](https://www.erlang.org/doc/man/mnesia) store used by
-  `MishkaInstaller`.
+  Boots, supervises and **dynamically clusters** the [Mnesia](https://www.erlang.org/doc/man/mnesia)
+  store used by `MishkaInstaller`.
 
   On start it (re)configures the Mnesia directory, creates the schema, starts Mnesia, waits for the
   local tables, creates the essential tables, and broadcasts `:synchronized` on the `"mnesia"`
   PubSub channel so the event and installer layers can come online.
+
+  It also watches the BEAM cluster (`:net_kernel.monitor_nodes/1`) and keeps Mnesia membership in
+  sync at runtime: a configured peer that connects *after* boot is joined automatically.
 
   ## Configuration
 
@@ -16,6 +19,7 @@ defmodule MishkaInstaller.MnesiaRepo do
     mnesia_dir: "/var/lib/my_app/mnesia",
     essential: [MishkaInstaller.Event.Event, MishkaInstaller.Installer.Installer],
     cluster_nodes: :auto,
+    dynamic_membership: true,
     wait_timeout: 60_000,
     wait_retries: 5
   ```
@@ -23,12 +27,26 @@ defmodule MishkaInstaller.MnesiaRepo do
   - `:mnesia_dir` — where Mnesia stores its files. Defaults to `".mnesia/<env>"` under the project.
   - `:essential` — modules whose `database_config/0` defines a table to create on boot. Defaults to
     `[MishkaInstaller.Installer.Installer, MishkaInstaller.Event.Event]`.
-  - `:cluster_nodes` — peers to join the Mnesia cluster. `:auto` (default) uses the already
-    distribution-connected nodes (`Node.list/0`), so a cluster formed by `libcluster`/`Node.connect`
-    is joined automatically — no static list needed. Pass an explicit list to override, or `[]` to
-    stay standalone. On join, this node connects, makes its schema `disc_copies` and keeps a local
-    `disc_copies` copy of each essential table. Nodes that connect **after** boot are handled in the
-    cluster phase (monitoring `:nodeup`), not at boot.
+  - `:cluster_nodes` — the seed/existing cluster nodes this node should **join**. `:auto` (default)
+    and `[]` mean **standalone seed** (this node owns the schema). A non-empty list makes this node a
+    **joiner**: it wipes its local schema, connects to those nodes, becomes a `disc_copies` member and
+    copies each essential table. Run **one** seed node (`:auto`/`[]`) and point the others at it
+    (`cluster_nodes: [seed]`). A joiner whose seed is not reachable yet does **not** crash — it boots
+    `:pending` (empty, no tables) and joins as soon as a configured node connects. Forming the BEAM
+    cluster (`libcluster`/`Node.connect`) is a separate, prior step.
+  - `:dynamic_membership` — watch `:net_kernel.monitor_nodes/1` and join configured peers that
+    connect after boot. Defaults to `true`, but it is **only active when `:cluster_nodes` lists
+    peers** — a standalone/default node (`:auto`/`[]`) never watches the cluster and stays fully
+    passive regardless of this flag. Set `false` to opt a clustered node out of runtime monitoring
+    (boot-time join only).
+
+  > #### Cluster limits {: .warning}
+  >
+  > Mnesia has **no automatic split-brain resolution**. On a network partition both sides keep
+  > writing; on heal an `inconsistent_database` event is emitted (alarmed via telemetry + a critical
+  > log) and an **operator** must resolve it. A node going **down** is never auto-evicted (a transient
+  > netsplit would otherwise destroy a healthy replica) — removing a node is an explicit operator
+  > action. Recovery helpers (`force_load_table`/`set_master_nodes`) are not yet implemented.
   - `:wait_timeout` / `:wait_retries` — one wait "slice" (ms) and how many slices to wait while
     `disc_copies` tables load from disk into RAM before giving up. Raise these for large datasets.
 
@@ -45,18 +63,24 @@ defmodule MishkaInstaller.MnesiaRepo do
   - `[:mishka_installer, :mnesia, :init, :start | :stop | :exception]` — a `:telemetry.span/3`
     around boot. `:stop` carries `:duration`; metadata: `:node`, `:result`, `:tables`.
   - `[:mishka_installer, :mnesia, :table]` — once per essential table. Metadata: `:table`,
-    `:status` (`:created` | `:already_exists` | `:already_loaded` | `:error`).
+    `:status` (`:created` | `:already_exists` | `:already_loaded` | `:copied` | `:error`).
   - `[:mishka_installer, :mnesia, :synchronized]` — after the boot broadcast. Metadata: `:node`,
     `:tables`.
   - `[:mishka_installer, :mnesia, :health_check]` — periodic. Measurements: `:table_count`,
     `:schema_count`. Metadata: `:node`, `:healthy?`, `:missing`.
+  - `[:mishka_installer, :mnesia, :inconsistent_database]` — split-brain detected. Metadata:
+    `:node`, `:context`.
+  - `[:mishka_installer, :mnesia, :cluster, :nodeup]` — a node connected. Metadata: `:node`, `:peer`,
+    `:action` (`:joined` | `:connected` | `:already_member` | `:ignored` | `:pending` | `{:error, term}`).
+  - `[:mishka_installer, :mnesia, :cluster, :nodedown]` — a node disconnected (log + alarm only, no
+    eviction). Metadata: `:node`, `:peer`, `:db_member?`.
   """
   use GenServer
   require Logger
   alias MishkaInstaller.Event.Event
   alias MishkaInstaller.Installer.Installer
   alias MishkaInstaller.MnesiaAssistant
-  alias MishkaInstaller.MnesiaAssistant.{Information, Schema, Table}
+  alias MishkaInstaller.MnesiaAssistant.{Schema, Table}
   alias MishkaInstaller.MnesiaAssistant.Error, as: MError
 
   # I got the basic idea from https://github.com/processone/ejabberd
@@ -72,9 +96,10 @@ defmodule MishkaInstaller.MnesiaRepo do
             tables: [atom()],
             schemas: list(),
             essential: [module()],
-            status: atom()
+            status: :pending | :synchronized | :inconsistent,
+            dynamic: boolean()
           }
-    defstruct tables: [], schemas: [], essential: [], status: :started
+    defstruct tables: [], schemas: [], essential: [], status: :pending, dynamic: true
   end
 
   ################################################################################
@@ -163,6 +188,46 @@ defmodule MishkaInstaller.MnesiaRepo do
     {:noreply, state}
   end
 
+  # A configured peer joined the BEAM cluster — reconcile Mnesia membership.
+  def handle_info({:nodeup, peer}, %State{dynamic: true} = state) do
+    {:noreply, on_nodeup(peer, state)}
+  end
+
+  def handle_info({:nodeup, _peer}, state), do: {:noreply, state}
+
+  # A node left the BEAM cluster. We log + alarm only and NEVER auto-evict: Mnesia keeps a downed
+  # node as a known `db_node` and it re-joins on restart; dropping its schema copy on a transient
+  # partition would destroy a healthy replica. Eviction is an explicit operator action.
+  def handle_info({:nodedown, peer}, %State{dynamic: true} = state) do
+    db_member? = peer in db_nodes()
+
+    Logger.warning(
+      "[mishka_installer.mnesia] node down: #{inspect(peer)} (db_member?=#{db_member?}); " <>
+        "not auto-evicting — operator action required to remove it"
+    )
+
+    cluster_event(:nodedown, peer, %{db_member?: db_member?})
+    {:noreply, state}
+  end
+
+  def handle_info({:nodedown, _peer}, state), do: {:noreply, state}
+
+  def handle_info({:mnesia_system_event, {:inconsistent_database, context, node}}, state) do
+    Logger.critical(
+      "[mishka_installer.mnesia] split-brain: #{inspect(context)} with #{inspect(node)} — operator action required"
+    )
+
+    :telemetry.execute(
+      @telemetry ++ [:inconsistent_database],
+      %{system_time: System.system_time()},
+      %{node: node, context: context}
+    )
+
+    {:noreply, %{state | status: :inconsistent}}
+  end
+
+  def handle_info({:mnesia_system_event, _event}, state), do: {:noreply, state}
+
   def handle_info(info, state) do
     Logger.warning("[mishka_installer.mnesia] unexpected info: #{inspect(info)}")
     {:noreply, state}
@@ -175,54 +240,43 @@ defmodule MishkaInstaller.MnesiaRepo do
   def code_change(_old_vsn, state, _extra), do: {:ok, state}
 
   ################################################################################
-  ######################## (▰˘◡˘▰) Helpers (▰˘◡˘▰) ##########################
+  ######################## (▰˘◡˘▰) Boot (▰˘◡˘▰) #############################
   ################################################################################
   defp bootstrap() do
     config = config()
+    # Dynamic membership is only meaningful with configured peers: a standalone/default node
+    # (`:auto`/`[]`) never watches the BEAM cluster — it stays fully passive.
+    dynamic = config[:dynamic_membership] and peers(config[:cluster_nodes]) != []
+    monitor_nodes(dynamic)
 
     if already_running?(config) do
       Logger.debug(
         "[mishka_installer.mnesia] already running on #{inspect(node())}; re-announcing"
       )
 
-      synchronized()
-      schedule_health_check()
-      {:ok, initial_state(config)}
+      ready(config, dynamic)
     else
-      full_boot(config)
+      full_boot(config, dynamic)
     end
   end
 
-  defp full_boot(config) do
+  defp full_boot(config, dynamic) do
     configure_dir(config[:mnesia_dir])
-    essential = config[:essential]
-    cluster = cluster_nodes(config)
-
-    with :ok <- start_or_join(cluster),
-         :ok <- wait_for(local_tables(), config),
-         :ok <- setup_essential_tables(essential, cluster),
-         :ok <- wait_for(essential, config) do
-      synchronized()
-      schedule_health_check()
-      {:ok, initial_state(config)}
-    end
+    boot(peers(config[:cluster_nodes]), config, dynamic)
   end
 
-  defp initial_state(config) do
-    %State{tables: local_tables(), schemas: schemas(), essential: config[:essential]}
-  end
-
-  defp already_running?(config) do
-    :mnesia.system_info(:is_running) == :yes and
-      Path.expand("#{:mnesia.system_info(:directory)}") == Path.expand(config[:mnesia_dir]) and
-      Enum.all?(config[:essential], &(&1 in local_tables()))
-  end
-
-  defp start_or_join([]) do
-    if node() in :mnesia.system_info(:db_nodes) do
+  # Standalone / seed node: own the disc schema and create the essential tables. `:auto` and `[]`
+  # take this path.
+  defp boot([], config, dynamic) do
+    if node() in db_nodes() do
       maybe_create_schema()
-      MnesiaAssistant.start() |> MError.error_description(@identifier)
-      :ok
+      start_and_subscribe()
+
+      with :ok <- wait_for(local_tables(), config),
+           :ok <- create_essential_tables(config[:essential]),
+           :ok <- wait_for(config[:essential], config) do
+        ready(config, dynamic)
+      end
     else
       Logger.critical(
         "[mishka_installer.mnesia] node mismatch: #{inspect(node())} owns a different schema dir"
@@ -232,30 +286,151 @@ defmodule MishkaInstaller.MnesiaRepo do
     end
   end
 
-  defp start_or_join(nodes) do
-    MnesiaAssistant.start() |> MError.error_description(@identifier)
+  # Joining node: wipe any local schema so we join from an empty one (the documented prerequisite),
+  # then try the join. If no configured node is reachable yet we stay `:pending` (still empty, so no
+  # split-brain risk) and finish the join when one connects (see `on_nodeup/2`).
+  defp boot(nodes, config, dynamic) do
+    Schema.delete_schema([node()]) |> MError.error_description(@identifier)
+    start_and_subscribe()
 
-    case :mnesia.change_config(:extra_db_nodes, nodes) do
-      {:ok, connected} when connected != [] ->
-        :mnesia.change_table_copy_type(:schema, node(), :disc_copies)
-        Logger.info("[mishka_installer.mnesia] joined cluster nodes: #{inspect(connected)}")
-        :ok
+    case try_join(nodes, config) do
+      :ok ->
+        ready(config, dynamic)
 
-      {:ok, []} ->
-        Logger.critical(
-          "[mishka_installer.mnesia] could not reach any cluster node in #{inspect(nodes)}"
+      :pending ->
+        Logger.warning(
+          "[mishka_installer.mnesia] no cluster node in #{inspect(nodes)} reachable yet; " <>
+            "waiting to join when one connects"
         )
 
-        {:stop, :no_cluster_nodes_reachable}
-
-      {:error, reason} ->
-        {:stop, {:cluster_join_failed, reason}}
+        {:ok, %State{essential: config[:essential], status: :pending, dynamic: dynamic}}
     end
   end
 
-  defp setup_essential_tables(essentials, []), do: create_essential_tables(essentials)
+  defp ready(config, dynamic) do
+    synchronized()
+    schedule_health_check()
 
-  defp setup_essential_tables(essentials, _cluster) do
+    {:ok,
+     %State{
+       tables: local_tables(),
+       schemas: schemas(),
+       essential: config[:essential],
+       status: :synchronized,
+       dynamic: dynamic
+     }}
+  end
+
+  # Connect to `nodes`, become a `disc_copies` member and copy each essential table. Returns `:ok`
+  # on a successful join or `:pending` when no node is reachable (we retry from `on_nodeup/2`).
+  defp try_join(nodes, config) do
+    case MnesiaAssistant.change_config(nodes) do
+      {:ok, [_ | _] = connected} ->
+        finalize_join(connected, config)
+
+      {:ok, []} ->
+        :pending
+
+      {:error, reason} ->
+        Logger.error(
+          "[mishka_installer.mnesia] cluster join error: #{inspect(reason)}; will retry when a node connects"
+        )
+
+        :pending
+    end
+  end
+
+  defp finalize_join(connected, config) do
+    with {:atomic, :ok} <- Table.change_table_copy_type(:schema, node(), :disc_copies),
+         :ok <- copy_essential_tables(config[:essential]),
+         :ok <- wait_for(config[:essential], config) do
+      Logger.info("[mishka_installer.mnesia] joined cluster nodes: #{inspect(connected)}")
+      :ok
+    else
+      other ->
+        Logger.error(
+          "[mishka_installer.mnesia] join did not complete: #{inspect(other)}; will retry"
+        )
+
+        :pending
+    end
+  end
+
+  ################################################################################
+  ######################## (▰˘◡˘▰) Membership (▰˘◡˘▰) #######################
+  ################################################################################
+  defp on_nodeup(peer, state) do
+    config = config()
+
+    cond do
+      peer not in peers(config[:cluster_nodes]) ->
+        cluster_event(:nodeup, peer, %{action: :ignored})
+        state
+
+      peer in db_nodes() ->
+        cluster_event(:nodeup, peer, %{action: :already_member})
+        state
+
+      state.status == :pending ->
+        join_from_pending(peer, config, state)
+
+      true ->
+        connect_established(peer, state)
+    end
+  end
+
+  # We deferred our join at boot; a configured node is finally up — run the full join now.
+  defp join_from_pending(peer, config, state) do
+    case try_join(peers(config[:cluster_nodes]), config) do
+      :ok ->
+        cluster_event(:nodeup, peer, %{action: :joined})
+        {:ok, new_state} = ready(config, state.dynamic)
+        new_state
+
+      :pending ->
+        cluster_event(:nodeup, peer, %{action: :pending})
+        state
+    end
+  end
+
+  # We already own the data; pull the new peer into our schema (non-destructive — it then copies
+  # what it needs). We never delete a schema here, so an established node can't lose data.
+  defp connect_established(peer, state) do
+    case MnesiaAssistant.change_config([peer]) do
+      {:ok, [_ | _]} ->
+        Logger.info("[mishka_installer.mnesia] connected new cluster node: #{inspect(peer)}")
+        cluster_event(:nodeup, peer, %{action: :connected})
+        %{state | tables: local_tables(), schemas: schemas()}
+
+      {:ok, []} ->
+        cluster_event(:nodeup, peer, %{action: :unreachable})
+        state
+
+      {:error, reason} ->
+        Logger.warning(
+          "[mishka_installer.mnesia] could not connect node #{inspect(peer)}: #{inspect(reason)}"
+        )
+
+        cluster_event(:nodeup, peer, %{action: {:error, reason}})
+        state
+    end
+  end
+
+  ################################################################################
+  ######################## (▰˘◡˘▰) Helpers (▰˘◡˘▰) ##########################
+  ################################################################################
+  defp already_running?(config) do
+    :mnesia.system_info(:is_running) == :yes and
+      Path.expand("#{:mnesia.system_info(:directory)}") == Path.expand(config[:mnesia_dir]) and
+      Enum.all?(config[:essential], &(&1 in local_tables()))
+  end
+
+  defp start_and_subscribe() do
+    MnesiaAssistant.start() |> MError.error_description(@identifier)
+    MnesiaAssistant.subscribe(:system)
+  end
+
+  defp copy_essential_tables(essentials) do
     case Enum.filter(essentials, &(copy_essential_table(&1) == :error)) do
       [] -> :ok
       failed -> {:stop, {:essential_table_copy_failed, failed}}
@@ -263,7 +438,7 @@ defmodule MishkaInstaller.MnesiaRepo do
   end
 
   defp copy_essential_table(item) do
-    case :mnesia.add_table_copy(item, node(), :disc_copies) do
+    case Table.add_table_copy(item, node(), :disc_copies) do
       {:atomic, :ok} ->
         table_event(item, :copied)
         :ok
@@ -312,16 +487,13 @@ defmodule MishkaInstaller.MnesiaRepo do
     |> Keyword.put_new(:mnesia_dir, ".mnesia/#{MishkaInstaller.__information__().env}")
     |> Keyword.put_new(:essential, [Installer, Event])
     |> Keyword.put_new(:cluster_nodes, :auto)
+    |> Keyword.put_new(:dynamic_membership, true)
     |> Keyword.put_new(:wait_timeout, @wait_timeout)
     |> Keyword.put_new(:wait_retries, @wait_retries)
   end
 
-  defp cluster_nodes(config) do
-    case config[:cluster_nodes] do
-      :auto -> Node.list()
-      nodes when is_list(nodes) -> nodes
-    end
-  end
+  defp peers(:auto), do: []
+  defp peers(nodes) when is_list(nodes), do: nodes
 
   defp configure_dir(dir) do
     Logger.debug("[mishka_installer.mnesia] stopping to (re)load the schema")
@@ -332,7 +504,7 @@ defmodule MishkaInstaller.MnesiaRepo do
   end
 
   defp maybe_create_schema() do
-    case Information.system_info(:extra_db_nodes) do
+    case :mnesia.system_info(:extra_db_nodes) do
       [] -> Schema.create_schema([node()]) |> MError.error_description(@identifier)
       _ -> :ok
     end
@@ -411,6 +583,21 @@ defmodule MishkaInstaller.MnesiaRepo do
     )
   end
 
+  defp cluster_event(kind, peer, meta) do
+    :telemetry.execute(
+      @telemetry ++ [:cluster, kind],
+      %{system_time: System.system_time()},
+      Map.merge(%{node: node(), peer: peer}, meta)
+    )
+  end
+
+  defp monitor_nodes(true) do
+    _ = :net_kernel.monitor_nodes(true)
+    :ok
+  end
+
+  defp monitor_nodes(false), do: :ok
+
   defp schedule_health_check() do
     if MishkaInstaller.__information__().env != :test do
       Process.send_after(self(), :health_check, @health_interval)
@@ -418,4 +605,6 @@ defmodule MishkaInstaller.MnesiaRepo do
   end
 
   defp local_tables(), do: :mnesia.system_info(:local_tables)
+
+  defp db_nodes(), do: :mnesia.system_info(:db_nodes)
 end

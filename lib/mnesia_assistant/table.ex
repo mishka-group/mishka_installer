@@ -32,4 +32,21 @@ defmodule MishkaInstaller.MnesiaAssistant.Table do
   """
   @spec all_keys(atom()) :: [term()]
   def all_keys(table), do: :mnesia.all_keys(table)
+
+  @doc """
+  Replicates `table` (or `:schema`) to `node` with the given storage type. Delegates to
+  `:mnesia.add_table_copy/3`. Returns `{:atomic, :ok}` or `{:aborted, reason}`.
+  """
+  @spec add_table_copy(atom(), node(), :ram_copies | :disc_copies | :disc_only_copies) ::
+          {:atomic, :ok} | {:aborted, term()}
+  def add_table_copy(table, node, type), do: :mnesia.add_table_copy(table, node, type)
+
+  @doc """
+  Changes the storage type of `table` (or `:schema`) on `node`. Delegates to
+  `:mnesia.change_table_copy_type/3`. Returns `{:atomic, :ok}` or `{:aborted, reason}`.
+  """
+  @spec change_table_copy_type(atom(), node(), :ram_copies | :disc_copies | :disc_only_copies) ::
+          {:atomic, :ok} | {:aborted, term()}
+  def change_table_copy_type(table, node, type),
+    do: :mnesia.change_table_copy_type(table, node, type)
 end

@@ -50,4 +50,16 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
     assert_receive {:telemetry, [:mishka_installer, :event, :compile], _meas,
                     %{event: "after_login_test", result: :ok}}
   end
+
+  test "a :cluster_recompile from another node rebuilds the event module locally" do
+    event = "remote_evt_#{System.unique_integer([:positive])}"
+
+    send(
+      Process.whereis(EventHandler),
+      %{status: :cluster_recompile, channel: "event", data: %{event: event, origin: :peer@nohost}}
+    )
+
+    assert_receive {:telemetry, [:mishka_installer, :event, :compile], _meas,
+                    %{event: ^event, result: :ok}}
+  end
 end

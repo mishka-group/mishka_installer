@@ -5,6 +5,11 @@ defmodule MishkaInstaller.Event.EventHandler do
   Compile requests are queued and run one at a time so the dynamically generated event modules are
   never created and destroyed concurrently.
 
+  The compiled module is per node (in-memory, not in Mnesia). On boot each node builds its own copy
+  from the replicated table; at runtime a local (re)compile is broadcast cluster-wide so every node
+  rebuilds the affected event from the replicated table — keeping `Hook.call/3` consistent across
+  the cluster.
+
   ## Telemetry
 
   - `[:mishka_installer, :event, :compile]` — emitted after an event module is (re)built.
@@ -31,6 +36,7 @@ defmodule MishkaInstaller.Event.EventHandler do
   def init(state \\ []) do
     Logger.metadata(domain: [:mishka_installer, :event])
     MishkaInstaller.subscribe("mnesia")
+    MishkaInstaller.subscribe("event")
     {:ok, Keyword.merge(state, running: [], queues: QueueAssistant.new())}
   end
 
@@ -50,6 +56,7 @@ defmodule MishkaInstaller.Event.EventHandler do
           {:error, [%{message: message, field: :global, action: status}]}
 
         true ->
+          broadcast_recompile(event)
           :ok
       end
     end
@@ -130,9 +137,9 @@ defmodule MishkaInstaller.Event.EventHandler do
       if length(running) != 0 do
         event = List.first(running)
 
-        unless perform(event) do
-          Logger.error("[mishka_installer.event] compile error for event #{inspect(event)}")
-        end
+        if perform(event),
+          do: broadcast_recompile(event),
+          else: Logger.error("[mishka_installer.event] compile error for event #{inspect(event)}")
 
         send(self(), :run_queues)
         Keyword.merge(state, running: [])
@@ -154,6 +161,15 @@ defmodule MishkaInstaller.Event.EventHandler do
 
   def handle_info(%{status: :compile_synchronized, channel: "mnesia"}, state) do
     {:noreply, synchronized_start(state)}
+  end
+
+  def handle_info(
+        %{status: :cluster_recompile, channel: "event", data: %{event: event, origin: origin}},
+        state
+      )
+      when origin != node() do
+    perform(event)
+    {:noreply, state}
   end
 
   @impl true
@@ -218,6 +234,10 @@ defmodule MishkaInstaller.Event.EventHandler do
   defp purge_create(sorted_plugins, event) do
     :ok = ModuleStateCompiler.purge_create(sorted_plugins, event)
     :ok = MishkaInstaller.broadcast("event", :purge_create, event)
+  end
+
+  defp broadcast_recompile(event) do
+    MishkaInstaller.broadcast("event", :cluster_recompile, %{event: event, origin: node()})
   end
 
   defp telemetry(name, metadata) do
