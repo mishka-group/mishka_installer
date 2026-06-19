@@ -400,10 +400,8 @@ defmodule MishkaInstaller.Event.Event do
   def stop(:event, event, queue) do
     case get(:event, event) do
       [] ->
-        message =
-          "There are no plugins in the database that can be started for this event."
-
-        {:error, [%{message: message, field: :global, action: :restart_event}]}
+        message = "There are no plugins in the database that can be stopped for this event."
+        {:error, [%{message: message, field: :global, action: :stop_event}]}
 
       data ->
         sorted_plugins =
@@ -478,8 +476,8 @@ defmodule MishkaInstaller.Event.Event do
           okey_return() | error_return()
   def unregister(:name, name, queue) do
     with {:ok, db_plg} <- delete(:name, name),
-         :ok <- GenServer.stop(name, :normal),
          :ok <- EventHandler.do_compile(db_plg.event, :unregister, queue) do
+      stop_if_alive(name)
       {:ok, db_plg}
     end
   end
@@ -487,19 +485,19 @@ defmodule MishkaInstaller.Event.Event do
   def unregister(:event, event, queue) do
     case get(:event, event) do
       [] ->
-        message =
-          "There are no plugins in the database that can be started for this event."
-
-        {:error, [%{message: message, field: :global, action: :restart_event}]}
+        message = "There are no plugins in the database that can be unregistered for this event."
+        {:error, [%{message: message, field: :global, action: :unregister_event}]}
 
       data ->
         sorted_plugins =
           Enum.reduce(data, [], fn pl_item, acc ->
-            with {:ok, db_plg} <- delete(:name, pl_item.name),
-                 :ok <- GenServer.stop(pl_item.name, :normal) do
-              acc ++ [db_plg]
-            else
-              _ -> acc
+            case delete(:name, pl_item.name) do
+              {:ok, db_plg} ->
+                stop_if_alive(pl_item.name)
+                acc ++ [db_plg]
+
+              _ ->
+                acc
             end
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
@@ -786,7 +784,7 @@ defmodule MishkaInstaller.Event.Event do
         {:ok, List.flatten(result) |> Enum.uniq()}
 
       {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "deleting", :global, :database)
+        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
     end
   end
 
@@ -995,4 +993,10 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   defp exist_record?(data), do: {:ok, data}
+
+  # Stop a plugin's GenServer only if it is actually running, so unregister can't crash on a plugin
+  # whose process is already down.
+  defp stop_if_alive(name) do
+    if Process.whereis(name), do: GenServer.stop(name, :normal), else: :ok
+  end
 end

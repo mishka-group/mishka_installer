@@ -61,7 +61,7 @@ defmodule MishkaInstaller.MixProject do
 
   defp package() do
     [
-      files: ~w(lib .formatter.exs mix.exs LICENSE README* Changelog.md),
+      files: ~w(lib .formatter.exs mix.exs LICENSE README* CHANGELOG.md),
       licenses: ["Apache-2.0"],
       maintainers: ["Shahryar Tavakkoli"],
       links: %{

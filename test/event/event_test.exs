@@ -1,3 +1,13 @@
+defmodule MishkaInstallerTest.Event.EventTest.AddOne do
+  @moduledoc false
+  def call(state), do: {:reply, Map.update(state, :n, 1, &(&1 + 1))}
+end
+
+defmodule MishkaInstallerTest.Event.EventTest.Double do
+  @moduledoc false
+  def call(state), do: {:reply, Map.update(state, :n, 0, &(&1 * 2))}
+end
+
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
@@ -854,6 +864,20 @@ defmodule MishkaInstallerTest.Event.EventTest do
   end
 
   ###################################################################################
+  ##################### (▰˘◡˘▰) Unregister robustness (▰˘◡˘▰) ##################
+  ###################################################################################
+  describe "unregister robustness ===>" do
+    test "unregister(:name) succeeds even when the plugin process is not running" do
+      {:ok, _} =
+        Event.write(%{name: MishkaTest.NoProc, event: "noproc_evt", extension: :mishka_installer})
+
+      # No GenServer was ever started for MishkaTest.NoProc.
+      assert {:ok, _} = Event.unregister(:name, MishkaTest.NoProc, false)
+      assert is_nil(Event.get(:name, MishkaTest.NoProc))
+    end
+  end
+
+  ###################################################################################
   #################### (▰˘◡˘▰) Inaccessible plugins (▰˘◡˘▰) ###################
   ###################################################################################
   describe "inaccessible plugins ===>" do
@@ -908,6 +932,50 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert Task.await(reader, 15_000) == :ok
       assert Task.await(recompiler, 15_000) == :ok
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) call/2 behaviour (▰˘◡˘▰) #####################
+  ###################################################################################
+  describe "compiled event call/2 ===>" do
+    setup do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      # AddOne (priority 1) runs before Double (priority 2): n -> (n+1) -> *2.
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "transform_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: double,
+          event: "transform_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      :ok = EventHandler.do_compile("transform_evt", :start, false)
+      :ok
+    end
+
+    test "runs the plugins in priority order and transforms the data through the chain" do
+      assert Hook.call("transform_evt", %{n: 5}) == %{n: 12}
+    end
+
+    test "merges :private into the result" do
+      assert Hook.call("transform_evt", %{n: 5}, private: %{tag: "x"}) == %{n: 12, tag: "x"}
+    end
+
+    test ":return short-circuits and gives back the input untouched" do
+      assert Hook.call("transform_evt", %{n: 5}, return: true) == %{n: 5}
     end
   end
 
