@@ -1,7 +1,9 @@
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
+  alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
+  alias MishkaInstaller.Event.Hook
   alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
+  alias MishkaInstallerTest.Support.MishkaPlugin.RegisterOTPSender
 
   setup do
     :persistent_term.put(:compile_status, "ready")
@@ -815,6 +817,126 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert !Process.alive?(pid)
 
       assert is_nil(Event.get(:name, RegisterEmailSender))
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Dependency cycle (▰˘◡˘▰) #####################
+  ###################################################################################
+  describe "dependency cycle detection ===>" do
+    test "register rejects a plugin whose dependencies cycle back to it" do
+      # A depends on B (not registered yet) -> held, but no cycle.
+      {:ok, a} =
+        assert Event.register(RegisterEmailSender, "after_success_login", %{
+                 depends: [RegisterOTPSender]
+               })
+
+      assert a.status == :held
+
+      # B depends on A -> A <-> B, which is rejected.
+      assert {:error, [%{action: :register, field: :depends}]} =
+               Event.register(RegisterOTPSender, "after_success_login", %{
+                 depends: [RegisterEmailSender]
+               })
+    end
+
+    test "no_dependency_cycle/2 is :ok for acyclic deps and errors on a self-cycle" do
+      assert Event.no_dependency_cycle(RegisterEmailSender, []) == :ok
+      assert Event.no_dependency_cycle(RegisterEmailSender, [RegisterOTPSender]) == :ok
+
+      assert {:error, _} =
+               Event.no_dependency_cycle(RegisterEmailSender, [RegisterEmailSender])
+    end
+
+    test "the on_dependency_error/1 callback is injected and defaults to returning the error" do
+      assert RegisterEmailSender.on_dependency_error(:boom) == :boom
+    end
+  end
+
+  ###################################################################################
+  #################### (▰˘◡˘▰) Inaccessible plugins (▰˘◡˘▰) ###################
+  ###################################################################################
+  describe "inaccessible plugins ===>" do
+    test "an event with a started but unloaded plugin compiles to an error stub" do
+      {:ok, _} =
+        assert Event.write(%{
+                 name: MishkaTest.NotLoadedPlugin,
+                 event: "ghost_event",
+                 extension: :mishka_installer,
+                 status: :started
+               })
+
+      :ok = EventHandler.do_compile("ghost_event", :start, false)
+
+      module = ModuleStateCompiler.module_event_name("ghost_event")
+      assert module.mode() == :error
+
+      assert {:error, [%{action: :call, field: :event, plugins: [MishkaTest.NotLoadedPlugin]}]} =
+               Hook.call("ghost_event", %{})
+    end
+
+    test "an event whose plugins are all loaded compiles to a runnable module" do
+      {:ok, _} = assert Event.register(RegisterEmailSender, "after_success_login", %{depends: []})
+      {:ok, _} = assert Event.start(:name, RegisterEmailSender, false)
+
+      module = ModuleStateCompiler.module_event_name("after_success_login")
+      assert module.mode() == :ok
+      assert function_exported?(module, :call, 2)
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Recompile safety (▰˘◡˘▰) #####################
+  ###################################################################################
+  describe "recompile safety ===>" do
+    test "Hook.call never crashes while the event module is recompiled (no purge gap)" do
+      {:ok, _} = assert Event.register(RegisterEmailSender, "after_success_login", %{depends: []})
+      {:ok, _} = assert Event.start(:name, RegisterEmailSender, false)
+      event = "after_success_login"
+
+      reader =
+        Task.async(fn ->
+          Enum.each(1..1000, fn _ -> Hook.call(event, %{counter: 0}) end)
+          :ok
+        end)
+
+      recompiler =
+        Task.async(fn ->
+          Enum.each(1..100, fn _ -> ModuleStateCompiler.purge_create([], event) end)
+          :ok
+        end)
+
+      assert Task.await(reader, 15_000) == :ok
+      assert Task.await(recompiler, 15_000) == :ok
+    end
+  end
+
+  ###################################################################################
+  ##################### (▰˘◡˘▰) Atomic transitions (▰˘◡˘▰) ####################
+  ###################################################################################
+  describe "atomic status transitions ===>" do
+    test "concurrent writes to different fields of the same record don't clobber each other" do
+      {:ok, rec} =
+        assert Event.write(%{
+                 name: MishkaTest.AtomicMod,
+                 event: "atomic_evt",
+                 extension: :mishka_installer
+               })
+
+      id = rec.id
+
+      for _ <- 1..30 do
+        {:ok, _} = Event.write(:id, id, %{status: :registered, priority: 100})
+
+        t1 = Task.async(fn -> Event.write(:id, id, %{status: :stopped}) end)
+        t2 = Task.async(fn -> Event.write(:id, id, %{priority: 7}) end)
+        {:ok, _} = Task.await(t1)
+        {:ok, _} = Task.await(t2)
+
+        final = Event.get(id)
+        assert final.status == :stopped
+        assert final.priority == 7
+      end
     end
   end
 end

@@ -48,17 +48,9 @@ defmodule MishkaInstaller.Event.EventHandler do
     if queue do
       GenServer.cast(__MODULE__, {:do_compile, event, status})
     else
-      MishkaInstaller.broadcast("event", status, %{})
-
-      case perform(event) do
-        false ->
-          message = "An error occurred in the compile of an event."
-          {:error, [%{message: message, field: :global, action: status}]}
-
-        true ->
-          broadcast_recompile(event)
-          :ok
-      end
+      # Synchronous compile, but still run INSIDE the GenServer (via call) so it is serialised with
+      # every other compile and never races a queued one. The caller blocks until the module is built.
+      GenServer.call(__MODULE__, {:do_compile, event, status})
     end
   end
 
@@ -100,6 +92,20 @@ defmodule MishkaInstaller.Event.EventHandler do
   @impl true
   def handle_call(:get, _from, state) do
     {:reply, state, state}
+  end
+
+  def handle_call({:do_compile, event, status}, _from, state) do
+    MishkaInstaller.broadcast("event", status, %{})
+
+    result =
+      if perform(event) do
+        broadcast_recompile(event)
+        :ok
+      else
+        {:error, [%{message: "An error occurred in the compile of an event.", field: :global, action: status}]}
+      end
+
+    {:reply, result, state}
   end
 
   @impl true
@@ -172,6 +178,19 @@ defmodule MishkaInstaller.Event.EventHandler do
     {:noreply, state}
   end
 
+  # Membership changed (a node joined/reconnected): rebuild any event module that drifted while a
+  # node was away. Each rebuild is gated by `is_changed?`, so unchanged events cost nothing.
+  def handle_info(%{status: :cluster_changed, channel: "mnesia"}, state) do
+    if Keyword.get(state, :status) == :synchronized do
+      case Event.group_events() do
+        {:ok, events} -> Enum.each(events, &do_compile(&1, :reconcile))
+        _ -> :ok
+      end
+    end
+
+    {:noreply, state}
+  end
+
   @impl true
   def handle_info(_action, state) do
     {:noreply, state}
@@ -195,29 +214,17 @@ defmodule MishkaInstaller.Event.EventHandler do
   end
 
   defp perform(event) do
-    plugins = Event.get(:event, event)
-
     sorted_plugins =
-      Enum.reduce(plugins, [], fn pl_item, acc ->
-        with :ok <- Event.plugin_status(pl_item.status),
-             :ok <- Event.allowed_events?(pl_item.depends) do
-          acc ++ [pl_item]
-        else
-          _ -> acc
-        end
+      Event.get(:event, event)
+      |> Enum.filter(fn pl ->
+        Event.plugin_status(pl.status) == :ok and Event.allowed_events?(pl.depends) == :ok
       end)
       |> Enum.sort_by(&{&1.priority, &1.name})
 
+    inaccessible = for pl <- sorted_plugins, not plugin_callable?(pl.name), do: pl.name
+
     module = ModuleStateCompiler.module_event_name(event)
-
-    if Code.ensure_loaded?(module) and function_exported?(module, :is_changed?, 1) and
-         module.is_changed?(sorted_plugins) do
-      purge_create(sorted_plugins, event)
-    end
-
-    if !Code.ensure_loaded?(module) and !function_exported?(module, :is_changed?, 1) do
-      purge_create(sorted_plugins, event)
-    end
+    recompile(compiled?(module), module, sorted_plugins, inaccessible, event)
 
     telemetry(:compile, %{event: event, result: :ok})
     true
@@ -231,8 +238,30 @@ defmodule MishkaInstaller.Event.EventHandler do
       false
   end
 
-  defp purge_create(sorted_plugins, event) do
-    :ok = ModuleStateCompiler.purge_create(sorted_plugins, event)
+  # Not compiled yet: build it.
+  defp recompile(false, _module, sorted_plugins, inaccessible, event),
+    do: purge_create(sorted_plugins, inaccessible, event)
+
+  # Already compiled: rebuild only when the plugin set or the accessibility mode changed.
+  defp recompile(true, module, sorted_plugins, inaccessible, event) do
+    desired_mode = if inaccessible == [], do: :ok, else: :error
+
+    if module.is_changed?(sorted_plugins) or safe_mode(module) != desired_mode,
+      do: purge_create(sorted_plugins, inaccessible, event),
+      else: :ok
+  end
+
+  defp compiled?(module),
+    do: Code.ensure_loaded?(module) and function_exported?(module, :is_changed?, 1)
+
+  defp plugin_callable?(name),
+    do: Code.ensure_loaded?(name) and function_exported?(name, :call, 1)
+
+  defp safe_mode(module),
+    do: if(function_exported?(module, :mode, 0), do: module.mode(), else: :ok)
+
+  defp purge_create(sorted_plugins, inaccessible, event) do
+    :ok = ModuleStateCompiler.purge_create(sorted_plugins, event, inaccessible)
     :ok = MishkaInstaller.broadcast("event", :purge_create, event)
   end
 

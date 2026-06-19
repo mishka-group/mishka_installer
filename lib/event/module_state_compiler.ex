@@ -28,6 +28,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   When it comes to reading and running all plugins, this problem only occurs when a
   module is being created and destroyed during the compilation process.
   """
+  require Logger
   alias MishkaInstaller.Helper.Extra
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
 
@@ -55,56 +56,18 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   create([%Event{name: MyPlugin}], "event_name")
   ```
   """
-  @spec create(list(struct()), String.t()) :: :ok | error_return
-  def create(plugins, event) do
+  @spec create(list(struct()), String.t(), list(module())) :: :ok | error_return
+  def create(plugins, event, inaccessible \\ []) do
     module = module_event_name(event)
     escaped_plugins = Macro.escape(plugins)
+    mode = if inaccessible == [], do: :ok, else: :error
 
     ast =
       quote do
         defmodule unquote(module) do
-          def call(state, args \\ []) do
-            private = Keyword.get(args, :private)
-            return_status = Keyword.get(args, :return)
+          unquote(call_ast(mode, event, plugins, inaccessible))
 
-            performed =
-              unquote(Macro.escape(plugins))
-              |> MishkaInstaller.Event.ModuleStateCompiler.perform({:reply, state})
-
-            new_state =
-              if !is_nil(return_status) do
-                state
-              else
-                case performed do
-                  {:ok, data} when is_list(data) ->
-                    if Keyword.keyword?(data) and !is_nil(private),
-                      do: {:ok, Keyword.merge(data, private)},
-                      else: {:ok, data}
-
-                  {:ok, data} when is_map(data) ->
-                    {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
-
-                  # If you have :private, we do not recommend to use this pattern
-                  {:ok, data} ->
-                    {:ok, data}
-
-                  {:error, _errors} = errors ->
-                    errors
-
-                  data when is_list(data) ->
-                    if Keyword.keyword?(data) and !is_nil(private),
-                      do: Keyword.merge(data, private),
-                      else: data
-
-                  data when is_map(data) ->
-                    if !is_nil(private), do: Map.merge(data, private), else: data
-                end
-              end
-
-            new_state
-          rescue
-            _e -> state
-          end
+          def mode(), do: unquote(mode)
 
           def initialize?(), do: true
 
@@ -126,6 +89,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
         end
       end
 
+    # Recompiling replaces the current version of an already-loaded module; silence the conflict.
+    Code.put_compiler_option(:ignore_module_conflict, true)
     [{^module, _}] = Code.compile_quoted(ast, "#{Extra.randstring(8)}")
     {:module, ^module} = Code.ensure_loaded(module)
     :ok
@@ -135,6 +100,81 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
     _ ->
       {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
+  end
+
+  # An event with one or more started-but-not-loaded plugins compiles to an error stub: calling it
+  # returns `{:error, ...}` rather than silently running an incomplete pipeline (a plugin in the
+  # priority chain may be producing data the rest of the event depends on).
+  defp call_ast(:error, _event, _plugins, inaccessible) do
+    quote do
+      def call(_state, _args \\ []) do
+        {:error,
+         [
+           %{
+             message: "This event has plugins that are not loaded; it cannot run.",
+             field: :event,
+             action: :call,
+             plugins: unquote(Macro.escape(inaccessible))
+           }
+         ]}
+      end
+    end
+  end
+
+  defp call_ast(:ok, event, plugins, _inaccessible) do
+    quote do
+      def call(state, args \\ []) do
+        private = Keyword.get(args, :private)
+        return_status = Keyword.get(args, :return)
+
+        performed =
+          unquote(Macro.escape(plugins))
+          |> MishkaInstaller.Event.ModuleStateCompiler.perform({:reply, state})
+
+        new_state =
+          if !is_nil(return_status) do
+            state
+          else
+            case performed do
+              {:ok, data} when is_list(data) ->
+                if Keyword.keyword?(data) and !is_nil(private),
+                  do: {:ok, Keyword.merge(data, private)},
+                  else: {:ok, data}
+
+              {:ok, data} when is_map(data) ->
+                {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
+
+              {:ok, data} ->
+                {:ok, data}
+
+              {:error, _errors} = errors ->
+                errors
+
+              data when is_list(data) ->
+                if Keyword.keyword?(data) and !is_nil(private),
+                  do: Keyword.merge(data, private),
+                  else: data
+
+              data when is_map(data) ->
+                if !is_nil(private), do: Map.merge(data, private), else: data
+            end
+          end
+
+        new_state
+      rescue
+        e ->
+          MishkaInstaller.Event.ModuleStateCompiler.log_call_error(unquote(event), e)
+          state
+      end
+    end
+  end
+
+  @doc false
+  @spec log_call_error(String.t(), Exception.t()) :: :ok
+  def log_call_error(event, error) do
+    Logger.error(
+      "[mishka_installer.event] plugin pipeline raised in event #{inspect(event)}: #{inspect(error)}"
+    )
   end
 
   @doc """
@@ -152,10 +192,14 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   purge_create([%Event{name: MyPlugin}], "event_name")
   ```
   """
-  @spec purge_create(list(struct()), String.t()) :: :ok | error_return
-  def purge_create(plugins, event) do
-    purge(event)
-    create(plugins, event)
+  @spec purge_create(list(struct()), String.t(), list(module())) :: :ok | error_return
+  def purge_create(plugins, event, inaccessible \\ []) do
+    module = module_event_name(event)
+    # Replace the module in place: drop only the previous *old* copy, then recompile. The current
+    # version stays callable until the new one is loaded, so a concurrent `Hook.call/3` never sees a
+    # missing module — the hot read path needs no rescue.
+    :code.purge(module)
+    create(plugins, event, inaccessible)
   end
 
   @doc """
@@ -271,13 +315,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc false
-  @spec perform(list(), {:reply, any()} | {:reply, :halt, any()}) :: any()
+  @spec perform(list(), {:reply, any()}) :: any()
   def perform([], {:reply, state}), do: state
 
-  def perform(_plugins, {:reply, :halt, state}), do: state
-
   def perform([h | t], {:reply, state}) do
-    new_state = apply(h.name, :call, [state])
-    perform(t, new_state)
+    perform(t, apply(h.name, :call, [state]))
   end
 end

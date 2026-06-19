@@ -332,12 +332,21 @@ defmodule MishkaInstaller.Event.Hook do
         GenServer.call(__MODULE__, :get)
       end
 
+      @doc """
+      Called when this plugin cannot be registered/started because of its dependencies (a missing
+      dependency or a `register/3` dependency cycle). Override it to decide what to do; the default
+      just returns the error unchanged.
+      """
+      @spec on_dependency_error(term()) :: term()
+      def on_dependency_error(error), do: error
+
       defoverridable register: 0,
                      start: 0,
                      restart: 0,
                      stop: 0,
                      unregister: 0,
-                     get: 0
+                     get: 0,
+                     on_dependency_error: 1
 
       def __after_compile__(_env, _bytecode) do
         unless Module.defines?(__MODULE__, {:call, 1}) do
@@ -445,7 +454,7 @@ defmodule MishkaInstaller.Event.Hook do
             data -> Keyword.merge(state, status: data.status)
           end
 
-        {:noreply, state}
+        {:noreply, new_state}
       end
 
       @impl true
@@ -537,6 +546,7 @@ defmodule MishkaInstaller.Event.Hook do
           start_helper(module, state, reg_db_plg)
 
         error ->
+          module.on_dependency_error(error)
           MishkaInstaller.broadcast("event", :register_error, error)
           state
       end

@@ -62,4 +62,18 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
     assert_receive {:telemetry, [:mishka_installer, :event, :compile], _meas,
                     %{event: ^event, result: :ok}}
   end
+
+  test "a :cluster_changed broadcast reconciles compiled event modules" do
+    {:ok, _} =
+      Event.write(%{
+        name: MishkaTest.ReconcileMod,
+        event: "reconcile_evt",
+        extension: :mishka_installer
+      })
+
+    send(Process.whereis(EventHandler), %{status: :cluster_changed, channel: "mnesia"})
+
+    assert_receive {:telemetry, [:mishka_installer, :event, :compile], _meas,
+                    %{event: "reconcile_evt", result: :ok}}
+  end
 end

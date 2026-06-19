@@ -147,6 +147,7 @@ defmodule MishkaInstaller.Event.Event do
     with {:ok, _module} <- ensure_loaded(name),
          merged <- Map.merge(initial, %{name: name, extension: name.config(:app), event: event}),
          {:ok, struct} <- builder(merged),
+         :ok <- no_dependency_cycle(struct.name, struct.depends),
          deps_list <- allowed_events(struct.depends),
          {:ok, db_plg} <-
            write(Map.merge(struct, depends_status(deps_list, struct.status))),
@@ -220,11 +221,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :start)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
-        end
+        EventHandler.do_compile(event, :start, queue)
 
         {:ok, sorted_plugins}
     end
@@ -326,11 +323,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :restart)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
-        end
+        EventHandler.do_compile(event, :restart, queue)
 
         {:ok, sorted_plugins}
     end
@@ -425,11 +418,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :stop)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create([], event)
-        end
+        EventHandler.do_compile(event, :stop, queue)
 
         {:ok, sorted_plugins}
     end
@@ -515,11 +504,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :unregister)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create([], event)
-        end
+        EventHandler.do_compile(event, :unregister, queue)
 
         {:ok, sorted_plugins}
     end
@@ -697,21 +682,60 @@ defmodule MishkaInstaller.Event.Event do
   """
   @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
   def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
-    selected = if field == :id, do: get(value), else: get(:name, value)
+    # Read-modify-write in one transaction under a write lock: the record is re-read inside the
+    # transaction and `updated_to` is merged onto the *current* row, so two concurrent transitions
+    # of the same plugin can't clobber each other's fields. Reads (`get/1,2`) are untouched.
+    Transaction.transaction(fn ->
+      case locked_read(field, value) do
+        nil ->
+          :mnesia.abort(:record_not_found)
 
-    case selected do
-      nil ->
+        data ->
+          merged = data |> Map.merge(updated_to) |> Map.merge(%{updated_at: Extra.get_unix_time()})
+
+          case builder({:root, merged, :edit}) do
+            {:ok, struct} ->
+              ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1)))
+              |> List.to_tuple()
+              |> Query.write()
+
+              struct
+
+            {:error, _} = error ->
+              :mnesia.abort(error)
+          end
+      end
+    end)
+    |> case do
+      {:atomic, struct} ->
+        {:ok, struct}
+
+      {:aborted, :record_not_found} ->
         message =
           "The ID of the record you want to update is incorrect or has already been deleted."
 
         {:error, [%{message: message, field: :global, action: :write}]}
 
-      data ->
-        map =
-          Map.merge(data, updated_to)
-          |> Map.merge(%{updated_at: Extra.get_unix_time()})
+      {:aborted, {:error, _} = error} ->
+        error
 
-        write({:root, map, :edit})
+      {:aborted, reason} ->
+        Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
+    end
+  end
+
+  # Reads a single record under a write lock (by id directly, by name via its index then id) and
+  # converts it to a struct, or `nil`. Must run inside a transaction.
+  defp locked_read(:id, id) do
+    :mnesia.read(__MODULE__, id, :write)
+    |> MishkaInstaller.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> List.first()
+  end
+
+  defp locked_read(:name, name) do
+    case :mnesia.index_read(__MODULE__, name, :name) do
+      [record | _] -> locked_read(:id, elem(record, 1))
+      _ -> nil
     end
   end
 
@@ -908,6 +932,42 @@ defmodule MishkaInstaller.Event.Event do
       {:error, [%{message: message, field: :global, action: :hold_statuses}]}
     else
       :ok
+    end
+  end
+
+  @doc """
+  Returns `:ok` when `depends` introduces no dependency cycle back to `name`, otherwise an error.
+  Used by `register/3` to reject plugins that would otherwise stay `:held` forever (e.g. `A → B → A`).
+  """
+  @spec no_dependency_cycle(module(), list()) :: :ok | error_return()
+  def no_dependency_cycle(name, depends) do
+    if depends_reachable?(depends, name, MapSet.new()) do
+      message = "Dependency cycle detected: #{inspect(name)} ultimately depends on itself."
+      {:error, [%{message: message, field: :depends, action: :register}]}
+    else
+      :ok
+    end
+  end
+
+  defp depends_reachable?([], _target, _seen), do: false
+
+  defp depends_reachable?([dep | rest], target, seen) do
+    cond do
+      dep == target ->
+        true
+
+      MapSet.member?(seen, dep) ->
+        depends_reachable?(rest, target, seen)
+
+      true ->
+        sub =
+          case get(:name, dep) do
+            nil -> []
+            plugin -> plugin.depends
+          end
+
+        depends_reachable?(sub, target, MapSet.put(seen, dep)) or
+          depends_reachable?(rest, target, seen)
     end
   end
 

@@ -369,6 +369,7 @@ defmodule MishkaInstaller.MnesiaRepo do
 
       peer in db_nodes() ->
         cluster_event(:nodeup, peer, %{action: :already_member})
+        notify_cluster_changed(peer)
         state
 
       state.status == :pending ->
@@ -385,6 +386,7 @@ defmodule MishkaInstaller.MnesiaRepo do
       :ok ->
         cluster_event(:nodeup, peer, %{action: :joined})
         {:ok, new_state} = ready(config, state.dynamic)
+        notify_cluster_changed(peer)
         new_state
 
       :pending ->
@@ -400,6 +402,7 @@ defmodule MishkaInstaller.MnesiaRepo do
       {:ok, [_ | _]} ->
         Logger.info("[mishka_installer.mnesia] connected new cluster node: #{inspect(peer)}")
         cluster_event(:nodeup, peer, %{action: :connected})
+        notify_cluster_changed(peer)
         %{state | tables: local_tables(), schemas: schemas()}
 
       {:ok, []} ->
@@ -581,6 +584,13 @@ defmodule MishkaInstaller.MnesiaRepo do
       %{system_time: System.system_time()},
       %{table: table, status: status}
     )
+  end
+
+  # Tell the cluster that membership changed so the event layer can rebuild any compiled module that
+  # drifted while a node was away (cheap: a recompile only happens for events whose plugin set
+  # actually changed). Broadcast on the "mnesia" channel — we don't reach up into the event layer.
+  defp notify_cluster_changed(peer) do
+    MishkaInstaller.broadcast("mnesia", :cluster_changed, %{node: node(), peer: peer})
   end
 
   defp cluster_event(kind, peer, meta) do
