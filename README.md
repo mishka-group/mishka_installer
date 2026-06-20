@@ -1,6 +1,6 @@
 # Mishka Installer is a system plugin(event) manager and run time installer for Elixir.
 
-[![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.0-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
+[![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.5-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
 
 <div align="center">
   <pre style="display: inline-block; text-align: left;">
@@ -33,7 +33,7 @@ possible for the developers to write their required applications beyond the core
 
 
 > **NOTICE**: Do not use the master branch; this library is under heavy development.
-> Expect version 0.1.0, and for using the new features, please wait until a new release is out.
+> The current release line is `0.1.5`; for the newest features, please wait until a new release is out.
 
 
 ##### This library is divided into the following main sections:
@@ -78,11 +78,17 @@ the system and convert software sections into separate events.
 defmodule RegisterEmailSender do
   use MishkaInstaller.Event.Hook, event: "after_success_login"
 
+  @impl true
   def call(entries) do
     {:reply, entries}
   end
 end
 ```
+
+> Each plugin runs in **priority** order, but a plugin's `depends` always run **before** it
+> (dependency cycles are rejected at registration). Plugins can optionally report runtime health
+> via `health_check/0` (`Hook.event_health/1`), and the store can run across multiple nodes
+> (`MishkaInstaller.MnesiaRepo` joins/replicates the cluster automatically).
 
 **If you want to change a series of default information, do this:**
 
@@ -152,21 +158,36 @@ various systems, and it provides fundamental capabilities such as the management
 and the application of standard behaviors.
 These features can all be accessed by specified hooks in the library.
 
-> **The installer part is in beta mode, use it carefully and some of its functionality may not work in the Elixir `release`.**
+> **The installer loads _pre-built_ `ebin` artifacts at runtime — it does not compile from source**,
+> so it works inside an Elixir `release` (no `mix`/`Hex`/build context is needed). A publisher ships
+> an already-compiled `ebin` (a local path, or a `tar.gz` from a URL or a GitHub release); the
+> installer extracts it, adds it to the code path, loads and starts it (`:temporary`), and persists a
+> record so it is re-activated on the next boot. Downloads can be verified with a `checksum`, and an
+> optional allow/deny policy (`config :mishka_installer, :allowlist, ...`) restricts which sources and
+> apps may be installed/overwritten.
 
 ##### Example:
 
 ```elixir
 alias MishkaInstaller.Installer.Installer
 
-# Normal calling
-Installer.install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+# Install a local pre-built ebin
+Installer.install(%{app: "some_name", version: "0.1.0", type: :path, path: "/path/to/some_name-0.1.0"})
 
-# Normal calling
-Installer.uninstall(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+# Install from a direct artifact URL
+Installer.install(%{app: "some_name", version: "0.1.0", type: :url, path: "https://.../some_name-ebin.tar.gz"})
 
-# Normal calling
-Installer.async_install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+# Install a specific GitHub release (optionally pick the asset by name)
+Installer.install(%{app: "some_name", version: "0.1.0", type: :github_tag, path: "owner/repo", tag: "0.1.0"})
+
+# Install the latest GitHub release
+Installer.install(%{app: "some_name", version: "0.1.0", type: :github_latest_release, path: "owner/repo"})
+
+# Remove an installed library
+Installer.uninstall(%{app: "some_name", version: "0.1.0"})
+
+# Queue an install through the boot/replay handler (CompileHandler)
+Installer.async_install(%{app: "some_name", version: "0.1.0", type: :url, path: "https://.../some_name.tar.gz"})
 ```
 
 > For more information please see the `MishkaInstaller.Installer.Installer` module.
@@ -183,7 +204,7 @@ function as follows:
 ```elixir
 def deps do
   [
-    {:mishka_installer, "~> 0.1.3"}
+    {:mishka_installer, "~> 0.1.5"}
   ]
 end
 ```

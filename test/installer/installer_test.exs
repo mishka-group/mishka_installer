@@ -158,6 +158,50 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert File.dir?("#{dest}/ebin")
     end
 
+    test "install a pre-built ebin from a GitHub release (:github_latest_release) via Req.Test" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      app = uniq_app("gh_demo")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+
+      # GitHub API call -> release JSON; the asset (served from a CDN) -> the tarball.
+      Req.Test.stub(Downloader, fn conn ->
+        if String.contains?(conn.request_path, "/releases") do
+          Req.Test.json(conn, %{
+            "assets" => [
+              %{
+                "name" => "#{app}.tar.gz",
+                "browser_download_url" => "https://cdn.example.com/#{app}.tar.gz"
+              }
+            ]
+          })
+        else
+          conn
+          |> Plug.Conn.put_resp_content_type("application/gzip", nil)
+          |> Plug.Conn.send_resp(200, tarball)
+        end
+      end)
+
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      {:ok, _output} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :github_latest_release,
+                 path: "owner/#{app}"
+               })
+
+      assert app_atom in started_apps()
+      assert module.hello() == :world
+      assert File.dir?("#{dest}/ebin")
+    end
+
     test "restart persistence: the installed app is re-loaded from the record + on-disk ebin" do
       {app, app_atom, version, pkg, module} = fake_local_app()
 
