@@ -121,19 +121,6 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     end
   end
 
-  # Compile the plugin chain into straight-line, direct calls — no `apply/3`, no list traversal, no
-  # `perform/2` helper. The plugin module names are baked in at compile time; each step asserts the
-  # `{:reply, _}` contract (a non-conforming plugin raises -> the outer rescue returns the input
-  # state, exactly as the old list-walk did). An empty chain compiles to just `state`.
-  defp build_chain(plugins, state_var) do
-    Enum.reduce(plugins, state_var, fn plugin, acc ->
-      quote do
-        {:reply, result} = unquote(plugin.name).call(unquote(acc))
-        result
-      end
-    end)
-  end
-
   defp call_ast(:ok, event, plugins, _inaccessible) do
     # One explicit `state` var, shared by the param, the unrolled chain, and every reference below,
     # so the generated code is hygiene-consistent.
@@ -180,6 +167,24 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
         e ->
           MishkaInstaller.Event.ModuleStateCompiler.log_call_error(unquote(event), e)
           unquote(state)
+      end
+    end
+  end
+
+  # Compile the plugin chain into nested, direct calls — no `apply/3`, no list traversal, no
+  # `perform/2` helper; plugin module names are baked in at compile time. Each step matches the plugin
+  # contract: `{:reply, state}` continues to the next plugin, `{:reply, :halt, state}` stops the chain
+  # and returns that state. Anything else falls through (CaseClauseError) -> the outer rescue returns
+  # the input state, exactly as the old list-walk did. An empty chain compiles to just `state`.
+  defp build_chain([], state_var), do: state_var
+
+  defp build_chain([plugin | rest], state_var) do
+    next = Macro.unique_var(:state, __MODULE__)
+
+    quote do
+      case unquote(plugin.name).call(unquote(state_var)) do
+        {:reply, :halt, halted} -> halted
+        {:reply, unquote(next)} -> unquote(build_chain(rest, next))
       end
     end
   end

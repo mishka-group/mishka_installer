@@ -14,6 +14,16 @@ defmodule MishkaInstallerTest.Event.EventTest.BadReturn do
   def call(_state), do: :oops_not_a_reply
 end
 
+defmodule MishkaInstallerTest.Event.EventTest.Halter do
+  @moduledoc false
+  def call(state), do: {:reply, :halt, Map.put(state, :halted, true)}
+end
+
+defmodule MishkaInstallerTest.Event.EventTest.ShouldNotRun do
+  @moduledoc false
+  def call(state), do: {:reply, Map.put(state, :ran, true)}
+end
+
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
@@ -1054,8 +1064,37 @@ defmodule MishkaInstallerTest.Event.EventTest do
   ###################### (▰˘◡˘▰) Unrolled call chain (▰˘◡˘▰) ##################
   ###################################################################################
   describe "unrolled call chain ===>" do
-    test "the chain is straight-line: the perform/2 list-walk helper no longer exists" do
+    test "the chain is unrolled: the perform/2 list-walk helper no longer exists" do
       refute function_exported?(ModuleStateCompiler, :perform, 2)
+    end
+
+    test "{:reply, :halt, state} stops the chain; later plugins do not run" do
+      halter = MishkaInstallerTest.Event.EventTest.Halter
+      after_halt = MishkaInstallerTest.Event.EventTest.ShouldNotRun
+
+      {:ok, _} =
+        Event.write(%{
+          name: halter,
+          event: "halt_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: after_halt,
+          event: "halt_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      :ok = EventHandler.do_compile("halt_evt", :start, false)
+
+      result = Hook.call("halt_evt", %{})
+      assert result.halted == true
+      refute Map.has_key?(result, :ran)
     end
 
     test "a plugin that breaks the {:reply, _} contract leaves the input state unchanged" do
