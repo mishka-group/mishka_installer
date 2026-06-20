@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.MnesiaAssistant.Schema do
+defmodule MishkaInstaller.Helper.MnesiaAssistant.Schema do
   @moduledoc """
   Mnesia schema creation.
   """

@@ -1,9 +1,9 @@
-defmodule MishkaInstaller.MnesiaAssistantTest do
+defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
   use ExUnit.Case, async: false
   # Some tests drive aborted Mnesia ops the Error module logs; capture those expected logs.
   @moduletag :capture_log
-  alias MishkaInstaller.MnesiaAssistant
-  alias MishkaInstaller.MnesiaAssistant.{Transaction, Query, Table, Error, Information}
+  alias MishkaInstaller.Helper.MnesiaAssistant
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table, Error, Information}
 
   defmodule Rec do
     defstruct [:id, :name, :tag]

@@ -46,8 +46,8 @@ defmodule MishkaInstaller.Installer.Installer do
   require Logger
   alias MishkaInstaller.Helper.{Extra, UUID}
   alias MishkaInstaller.Installer.{Downloader, LibraryHandler, CompileHandler}
-  alias MishkaInstaller.MnesiaAssistant.{Transaction, Query, Table}
-  alias MishkaInstaller.MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
+  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
 
   @type download_type :: :path | :url | :github_tag | :github_latest_release
 
@@ -283,7 +283,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.match_object(pattern) end)
     |> case do
       {:atomic, res} ->
-        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -311,7 +311,8 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
     |> case do
       {:atomic, res} ->
-        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
+        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        |> List.first()
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -339,7 +340,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         |> List.first()
 
       {:aborted, reason} ->

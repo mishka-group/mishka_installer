@@ -1,8 +1,8 @@
 defmodule MishkaInstaller.DistributedMnesiaTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.MnesiaRepo
-  alias MishkaInstaller.MnesiaAssistant
-  alias MishkaInstaller.MnesiaAssistant.{Query, Table, Transaction}
+  alias MishkaInstaller.Helper.MnesiaAssistant
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
 
   @moduletag :distributed
 

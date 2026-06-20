@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.MnesiaAssistant.Information do
+defmodule MishkaInstaller.Helper.MnesiaAssistant.Information do
   @moduledoc """
   Read-only introspection of the running Mnesia system.
   """

@@ -1,8 +1,8 @@
-defmodule MishkaInstaller.MnesiaAssistant.Transaction do
+defmodule MishkaInstaller.Helper.MnesiaAssistant.Transaction do
   @moduledoc """
   Runs Mnesia activities and maps aborted results to the installer's error shape.
   """
-  alias MishkaInstaller.MnesiaAssistant.Error
+  alias MishkaInstaller.Helper.MnesiaAssistant.Error
 
   @doc """
   Runs `fun` inside a Mnesia transaction. Delegates to `:mnesia.transaction/1`.

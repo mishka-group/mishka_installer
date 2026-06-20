@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.MnesiaAssistant.Error do
+defmodule MishkaInstaller.Helper.MnesiaAssistant.Error do
   @moduledoc """
   Turns raw Mnesia results into a normalised `{:ok, :atomic}` / `{:error, error, description}` shape
   and logs them.

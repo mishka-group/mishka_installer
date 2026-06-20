@@ -79,9 +79,9 @@ defmodule MishkaInstaller.MnesiaRepo do
   require Logger
   alias MishkaInstaller.Event.Event
   alias MishkaInstaller.Installer.Installer
-  alias MishkaInstaller.MnesiaAssistant
-  alias MishkaInstaller.MnesiaAssistant.{Schema, Table}
-  alias MishkaInstaller.MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Helper.MnesiaAssistant
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Schema, Table}
+  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
 
   # I got the basic idea from https://github.com/processone/ejabberd
   @identifier :mishka_mnesia_repo

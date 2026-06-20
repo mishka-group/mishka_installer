@@ -4,7 +4,7 @@ defmodule MishkaInstaller.Helper.Extra do
 
   It covers unix timestamps, random strings, and two helpers that build Erlang
   [match specifications](https://www.erlang.org/doc/apps/erts/match_spec) used by the
-  Mnesia query layer (`MishkaInstaller.MnesiaAssistant`).
+  Mnesia query layer (`MishkaInstaller.Helper.MnesiaAssistant`).
   """
 
   @alphabet Enum.concat([?0..?9, ?A..?Z, ?a..?z])

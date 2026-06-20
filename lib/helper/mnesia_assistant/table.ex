@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.MnesiaAssistant.Table do
+defmodule MishkaInstaller.Helper.MnesiaAssistant.Table do
   @moduledoc """
   Table lifecycle helpers (create / wait / clear / keys).
   """

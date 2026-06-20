@@ -1,4 +1,4 @@
-defmodule MishkaInstaller.MnesiaAssistant do
+defmodule MishkaInstaller.Helper.MnesiaAssistant do
   @moduledoc """
   A focused Elixir wrapper around the Erlang [`:mnesia`](https://www.erlang.org/doc/man/mnesia)
   runtime database used by `MishkaInstaller`.
@@ -6,12 +6,12 @@ defmodule MishkaInstaller.MnesiaAssistant do
   It exposes only what the installer needs and standardises a few outputs. The full API is split
   into:
 
-  - `MishkaInstaller.MnesiaAssistant.Schema` — schema creation
-  - `MishkaInstaller.MnesiaAssistant.Table` — table create / wait / clear / keys
-  - `MishkaInstaller.MnesiaAssistant.Query` — read / write / delete / select
-  - `MishkaInstaller.MnesiaAssistant.Transaction` — transaction / ets / error mapping
-  - `MishkaInstaller.MnesiaAssistant.Information` — `system_info`
-  - `MishkaInstaller.MnesiaAssistant.Error` — error description + logging
+  - `MishkaInstaller.Helper.MnesiaAssistant.Schema` — schema creation
+  - `MishkaInstaller.Helper.MnesiaAssistant.Table` — table create / wait / clear / keys
+  - `MishkaInstaller.Helper.MnesiaAssistant.Query` — read / write / delete / select
+  - `MishkaInstaller.Helper.MnesiaAssistant.Transaction` — transaction / ets / error mapping
+  - `MishkaInstaller.Helper.MnesiaAssistant.Information` — `system_info`
+  - `MishkaInstaller.Helper.MnesiaAssistant.Error` — error description + logging
   """
   alias MishkaInstaller.Helper.Extra
 
@@ -69,7 +69,7 @@ defmodule MishkaInstaller.MnesiaAssistant do
   ## Examples
 
   ```elixir
-  iex> MishkaInstaller.MnesiaAssistant.tuple_to_map([{Person, 1, "a"}], [:id, :name], nil, [])
+  iex> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map([{Person, 1, "a"}], [:id, :name], nil, [])
   [%{id: 1, name: "a"}]
   ```
   """

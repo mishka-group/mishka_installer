@@ -1,3 +1,10 @@
+# Unreleased
+
+### Breaking
+
+- [x] Move the Mnesia helpers under the `Helper` namespace: `MishkaInstaller.MnesiaAssistant.*` → `MishkaInstaller.Helper.MnesiaAssistant.*` (files moved to `lib/helper/`). Update any direct references.
+
+
 # Changelog for MishkaInstaller 0.1.1
 
 ### Global

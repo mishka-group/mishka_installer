@@ -643,7 +643,7 @@ defmodule MishkaInstaller.Event.Hook do
 
   @doc false
   def plugin_continue(module, state) do
-    MishkaInstaller.MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
+    MishkaInstaller.Helper.MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
 
     new_state =
       if ready?() do

@@ -41,9 +41,9 @@ defmodule MishkaInstaller.Event.Event do
   """
   use GuardedStruct
   alias MishkaInstaller.Helper.{Extra, UUID}
-  import MishkaInstaller.MnesiaAssistant, only: [er: 1, erl_fields: 4]
-  alias MishkaInstaller.MnesiaAssistant.{Transaction, Query, Table}
-  alias MishkaInstaller.MnesiaAssistant.Error, as: MError
+  import MishkaInstaller.Helper.MnesiaAssistant, only: [er: 1, erl_fields: 4]
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
+  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
   alias MishkaInstaller.Event.EventHandler
 
   @mnesia_info [
@@ -553,7 +553,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.match_object(pattern) end)
     |> case do
       {:atomic, res} ->
-        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -590,7 +590,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        data = MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        data = MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         if field in [:event, :extension], do: data, else: List.first(data)
 
       {:aborted, reason} ->
@@ -607,7 +607,7 @@ defmodule MishkaInstaller.Event.Event do
   @spec dirty_get(:name, module()) :: map() | struct() | nil
   def dirty_get(:name, value) do
     :mnesia.dirty_index_read(__MODULE__, value, :name)
-    |> MishkaInstaller.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
     |> List.first()
   end
 
@@ -631,7 +631,8 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
     |> case do
       {:atomic, res} ->
-        MishkaInstaller.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
+        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        |> List.first()
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -741,7 +742,7 @@ defmodule MishkaInstaller.Event.Event do
   # converts it to a struct, or `nil`. Must run inside a transaction.
   defp locked_read(:id, id) do
     :mnesia.read(__MODULE__, id, :write)
-    |> MishkaInstaller.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
     |> List.first()
   end
 

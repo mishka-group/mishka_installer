@@ -1,8 +1,8 @@
-defmodule MishkaInstaller.MnesiaAssistant.Query do
+defmodule MishkaInstaller.Helper.MnesiaAssistant.Query do
   @moduledoc """
   Record-level Mnesia operations (read / write / delete / select / match).
 
-  Every function must run inside a `MishkaInstaller.MnesiaAssistant.Transaction` activity.
+  Every function must run inside a `MishkaInstaller.Helper.MnesiaAssistant.Transaction` activity.
   """
 
   @doc """
