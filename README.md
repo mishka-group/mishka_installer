@@ -1,31 +1,30 @@
-# 🧩 Mishka Installer
-
-> A runtime **plugin / event engine** and **pre-built library installer** for Elixir.
-
-[![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.5-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
-
 <div align="center">
-  <pre style="display: inline-block; text-align: left;">
-    💖 Hey there! If you like my work, please <b><a href="https://github.com/sponsors/mishka-group">support me financially!</a></b> 💖
-  </pre>
+
+# 🧩 MishkaInstaller
+
+**A runtime plugin / event engine and pre-built library installer for Elixir.** ✨
+
+[![Hex.pm](https://img.shields.io/hexpm/v/mishka_installer.svg?style=flat-square)](https://hex.pm/packages/mishka_installer)
+[![Hex Downloads](https://img.shields.io/hexpm/dt/mishka_installer.svg?style=flat-square)](https://hex.pm/packages/mishka_installer)
+[![CI](https://img.shields.io/github/actions/workflow/status/mishka-group/mishka_installer/ci.yml?style=flat-square)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml)
+[![License](https://img.shields.io/hexpm/l/mishka_installer.svg?style=flat-square)](https://github.com/mishka-group/mishka_installer/blob/master/LICENSE)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-mishka--group-ea4aaa?style=flat-square&logo=github)](https://github.com/sponsors/mishka-group)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-mishkagroup-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/mishkagroup)
+
 </div>
-
-<br />
-
-<p align="center">
-  <a href="https://www.buymeacoffee.com/mishkagroup">
-    <img src="https://github.com/user-attachments/assets/f4d4df7e-dcc4-4d1a-80e1-59c4d99725ab" alt="Support Mishka by Buy Me a Coffee" />
-  </a>
-</p>
-
-> ⚠️ **Low maintenance** — the author currently only responds to pull requests.
-> Don't use `master`; the current release line is `0.1.5`.
 
 ---
 
-## Why?
+> [!WARNING]
+> **🔧 Low maintenance.** The author currently only responds to pull requests. Don't use `master`; the current release line is `0.1.6`.
+
+---
+
+## 💭 Why?
 
 Build apps whose features are **activated as plugins at runtime** — registration, SMS, social login — **without touching the core source**. Each feature becomes an **event**; anyone can attach plugins to it from outside your app.
+
+---
 
 ## ✨ Features
 
@@ -73,9 +72,12 @@ To start a plugin automatically, add its module to your supervision tree:
 children = [RegisterEmailSender, ...]
 ```
 
-> A plugin's `depends` always run **before** it (cycles are rejected at registration). See `MishkaInstaller.Event.Hook`.
+> [!NOTE]
+> A plugin's `depends` always run **before** it (cycles are rejected at registration), and a plugin can return `{:reply, :halt, state}` to stop the rest of the chain. See `MishkaInstaller.Event.Hook`.
 
 [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fmishka-group%2Fmishka_installer%2Fblob%2Fmaster%2Fguidance%2Fevent%2Fhook.livemd)
+
+---
 
 ## 📦 Installer
 
@@ -92,13 +94,16 @@ Installer.install(%{app: "demo", version: "0.1.0", type: :github_latest_release,
 Installer.uninstall(%{app: "demo", version: "0.1.0"})
 ```
 
-Optional `checksum:` (sha256) verification and an allow/deny policy (`config :mishka_installer, :allowlist, ...`). See `MishkaInstaller.Installer.Installer`.
+> [!NOTE]
+> Optional `checksum:` (sha256) verification and an allow/deny policy (`config :mishka_installer, :allowlist, ...`) restrict which sources and apps may be installed. See `MishkaInstaller.Installer.Installer`.
 
-## 📥 Install
+---
+
+## 🚀 Installation
 
 ```elixir
 def deps do
-  [{:mishka_installer, "~> 0.1.5"}]
+  [{:mishka_installer, "~> 0.1.6"}]
 end
 ```
 
@@ -106,6 +111,27 @@ Docs: [hexdocs.pm/mishka_installer](https://hexdocs.pm/mishka_installer)
 
 ---
 
-## 💚 Donate
+## 💖 Funding & sponsorship
 
-Support this project via the **[Sponsor](https://github.com/sponsors/mishka-group)** button on GitHub. All our projects are **open-source** and **free** — community contributions keep them growing.
+MishkaInstaller is open-source software developed by [Mishka Group](https://github.com/mishka-group). If your team or company benefits from it, please consider supporting continued development:
+
+<div align="center">
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-mishka--group-ea4aaa?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/mishka-group)
+&nbsp;&nbsp;&nbsp;
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-mishkagroup-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/mishkagroup)
+
+**☕ Donate / sponsor:**
+[github.com/sponsors/mishka-group](https://github.com/sponsors/mishka-group) · [buymeacoffee.com/mishkagroup](https://www.buymeacoffee.com/mishkagroup)
+
+</div>
+
+Thank you. 💚
+
+---
+
+## 📜 License
+
+Apache License 2.0 — see [`LICENSE`](LICENSE).
+
+Copyright © Mishka Group and contributors.

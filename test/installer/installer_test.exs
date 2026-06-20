@@ -44,7 +44,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       {:ok, _data} =
         assert Installer.write(%{
                  app: "mishka_developer_tools",
-                 version: "0.1.5",
+                 version: "0.1.6",
                  path: "mishka_developer_tools"
                })
     end
@@ -53,7 +53,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert Installer.get() == []
 
       {:ok, _data} =
-        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.6", path: "p"})
 
       assert Installer.get() != []
       assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
@@ -61,14 +61,14 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     test "Update a Library record" do
       {:ok, _data} =
-        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.6", path: "p"})
 
       get_data = Installer.get() |> List.first()
 
       {:ok, struct} =
-        assert Installer.write({:root, Map.merge(get_data, %{version: "0.1.6"}), :edit})
+        assert Installer.write({:root, Map.merge(get_data, %{version: "0.1.7"}), :edit})
 
-      assert struct.version == "0.1.6"
+      assert struct.version == "0.1.7"
       get_data1 = Installer.get() |> List.first()
       assert get_data1.id == get_data.id
       {:ok, struct} = assert Installer.write(:id, get_data.id, %{tag: "1.0.0"})
@@ -77,14 +77,14 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     test "All keys of Libraries Record" do
       {:ok, _data} =
-        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.6", path: "p"})
 
       assert length(Installer.ids()) == 1
     end
 
     test "Unique? Library Record by app" do
       {:ok, _data} =
-        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.6", path: "p"})
 
       assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
       assert is_nil(Installer.get(:app, "mishka_developer_tools1"))
@@ -92,7 +92,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     test "Delete Library Record" do
       {:ok, _data} =
-        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.6", path: "p"})
 
       assert Installer.get() != []
       {:ok, _data} = Installer.delete(:app, "mishka_developer_tools")
@@ -101,7 +101,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     test "Drop all Library records" do
       {:ok, _data} =
-        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.5", path: "p"})
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.6", path: "p"})
 
       assert Installer.get() != []
       {:ok, :atomic} = assert Installer.drop()

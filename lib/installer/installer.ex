@@ -157,8 +157,8 @@ defmodule MishkaInstaller.Installer.Installer do
   # `path` points to the pre-built package placed inside the extensions directory.
   {:ok, lib} = Installer.builder(%{
     app: "mishka_developer_tools",
-    version: "0.1.5",
-    path: "<extensions_path>/mishka_developer_tools-0.1.5"
+    version: "0.1.6",
+    path: "<extensions_path>/mishka_developer_tools-0.1.6"
   })
 
   Installer.install(lib)
@@ -243,8 +243,8 @@ defmodule MishkaInstaller.Installer.Installer do
 
   {:ok, lib} = Installer.builder(%{
     app: "mishka_developer_tools",
-    version: "0.1.5",
-    path: "<extensions_path>/mishka_developer_tools-0.1.5"
+    version: "0.1.6",
+    path: "<extensions_path>/mishka_developer_tools-0.1.6"
   })
 
   Installer.async_install(lib)
