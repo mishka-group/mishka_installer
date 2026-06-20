@@ -936,6 +936,71 @@ defmodule MishkaInstallerTest.Event.EventTest do
   end
 
   ###################################################################################
+  ################## (▰˘◡˘▰) Dependency ordering & graph (▰˘◡˘▰) ###############
+  ###################################################################################
+  describe "dependency ordering (libgraph) ===>" do
+    test "a plugin runs AFTER its dependency, overriding priority" do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      # By priority alone AddOne (1) would run before Double (2): 5 -> 6 -> 12.
+      # AddOne depends on Double, so Double must run first: 5 -> 10 -> 11.
+      {:ok, _} =
+        Event.write(%{
+          name: double,
+          event: "dep_order_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "dep_order_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1,
+          depends: [double]
+        })
+
+      :ok = EventHandler.do_compile("dep_order_evt", :start, false)
+
+      assert Hook.call("dep_order_evt", %{n: 5}) == %{n: 11}
+    end
+
+    test "dependency_order/1 sorts dependencies before dependents, priority breaks ties" do
+      a = %{name: :a, priority: 1, depends: [:b]}
+      b = %{name: :b, priority: 5, depends: []}
+      c = %{name: :c, priority: 2, depends: []}
+
+      ordered = Event.dependency_order([a, b, c]) |> Enum.map(& &1.name)
+      # :b before :a (dependency); among the independents, lower priority first.
+      assert Enum.find_index(ordered, &(&1 == :b)) < Enum.find_index(ordered, &(&1 == :a))
+      assert ordered == [:c, :b, :a] or ordered == [:b, :c, :a]
+    end
+
+    test "connections/0 returns the libgraph dependency graph" do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      {:ok, _} = Event.write(%{name: double, event: "g_evt", extension: :mishka_installer})
+
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "g_evt",
+          extension: :mishka_installer,
+          depends: [double]
+        })
+
+      graph = Event.connections()
+      assert double in Graph.out_neighbors(graph, add_one)
+      assert Graph.is_acyclic?(graph)
+    end
+  end
+
+  ###################################################################################
   ###################### (▰˘◡˘▰) call/2 behaviour (▰˘◡˘▰) #####################
   ###################################################################################
   describe "compiled event call/2 ===>" do
@@ -976,6 +1041,45 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
     test ":return short-circuits and gives back the input untouched" do
       assert Hook.call("transform_evt", %{n: 5}, return: true) == %{n: 5}
+    end
+  end
+
+  ###################################################################################
+  ######################## (▰˘◡˘▰) Plugin profiler (▰˘◡˘▰) ####################
+  ###################################################################################
+  describe "plugin profiler ===>" do
+    test "Hook.profile returns per-plugin timings in execution order" do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "prof_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: double,
+          event: "prof_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      :ok = EventHandler.do_compile("prof_evt", :start, false)
+
+      {:ok, timings} = Hook.profile("prof_evt", %{n: 1})
+      assert Enum.map(timings, & &1.plugin) == [add_one, double]
+      assert Enum.all?(timings, &is_integer(&1.microseconds))
+    end
+
+    test "Hook.profile returns {:error, :not_compiled} for an event that was never compiled" do
+      assert Hook.profile("never_#{System.unique_integer([:positive])}", %{}) ==
+               {:error, :not_compiled}
     end
   end
 

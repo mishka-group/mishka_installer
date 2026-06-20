@@ -46,6 +46,8 @@ defmodule MishkaInstaller.MixProject do
       {:guarded_struct, "~> 0.1.0-beta.8"},
       # Telemetry instrumentation
       {:telemetry, "~> 1.4"},
+      # Plugin dependency graph: cycle detection + start ordering
+      {:libgraph, "~> 0.16"},
 
       # Dev and Test dependencies
       {:ex_doc, "~> 0.40.3", only: :dev, runtime: false}

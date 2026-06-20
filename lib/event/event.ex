@@ -937,37 +937,65 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   Returns `:ok` when `depends` introduces no dependency cycle back to `name`, otherwise an error.
   Used by `register/3` to reject plugins that would otherwise stay `:held` forever (e.g. `A → B → A`).
+  Built on [`libgraph`](https://hexdocs.pm/libgraph): the candidate's edges are added to the live
+  dependency graph and `Graph.is_acyclic?/1` decides.
   """
   @spec no_dependency_cycle(module(), list()) :: :ok | error_return()
   def no_dependency_cycle(name, depends) do
-    if depends_reachable?(depends, name, MapSet.new()) do
+    if Graph.is_acyclic?(dependency_graph(name, depends)) do
+      :ok
+    else
       message = "Dependency cycle detected: #{inspect(name)} ultimately depends on itself."
       {:error, [%{message: message, field: :depends, action: :register}]}
-    else
-      :ok
     end
   end
 
-  defp depends_reachable?([], _target, _seen), do: false
+  @doc """
+  The live plugin dependency graph as a [`libgraph`](https://hexdocs.pm/libgraph) `Graph` (one
+  `plugin -> dependency` edge per `:depends` entry). Useful for inspecting plugin connections, e.g.
+  `Graph.to_dot/1` or `Graph.topsort/1`.
+  """
+  @spec connections() :: Graph.t()
+  def connections(), do: dependency_graph()
 
-  defp depends_reachable?([dep | rest], target, seen) do
-    cond do
-      dep == target ->
-        true
+  @doc """
+  Orders `plugins` (each with `:name`, `:priority`, `:depends`) so a plugin runs **after** the
+  plugins it depends on, breaking ties by `{priority, name}`. The set is assumed acyclic (cycles are
+  rejected at `register/3`); on a stray cycle it falls back to priority order.
+  """
+  @spec dependency_order([struct()]) :: [struct()]
+  def dependency_order(plugins) do
+    order_loop(plugins, MapSet.new(plugins, & &1.name), [])
+  end
 
-      MapSet.member?(seen, dep) ->
-        depends_reachable?(rest, target, seen)
+  defp order_loop([], _pending, acc), do: Enum.reverse(acc)
 
-      true ->
-        sub =
-          case get(:name, dep) do
-            nil -> []
-            plugin -> plugin.depends
-          end
+  defp order_loop(plugins, pending, acc) do
+    ready =
+      plugins
+      |> Enum.filter(fn pl -> Enum.all?(pl.depends, &(not MapSet.member?(pending, &1))) end)
+      |> Enum.sort_by(&{&1.priority, &1.name})
 
-        depends_reachable?(sub, target, MapSet.put(seen, dep)) or
-          depends_reachable?(rest, target, seen)
+    case ready do
+      [] -> Enum.reverse(acc) ++ Enum.sort_by(plugins, &{&1.priority, &1.name})
+      [next | _] -> order_loop(plugins -- [next], MapSet.delete(pending, next.name), [next | acc])
     end
+  end
+
+  defp dependency_graph(extra_name \\ nil, extra_depends \\ []) do
+    candidates = Enum.reject(get(), &(&1.name == extra_name))
+
+    candidates =
+      if(extra_name,
+        do: candidates ++ [%{name: extra_name, depends: extra_depends}],
+        else: candidates
+      )
+
+    Enum.reduce(candidates, Graph.new(), fn pl, graph ->
+      Enum.reduce(pl.depends, Graph.add_vertex(graph, pl.name), fn dep, acc ->
+        Graph.add_edge(acc, pl.name, dep)
+      end)
+    end)
   end
 
   ####################################################################################

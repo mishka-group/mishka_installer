@@ -300,6 +300,86 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   end
 
   ###################################################################################
+  ######################## (▰˘◡˘▰) Allow/deny policy (▰˘◡˘▰) ###################
+  ###################################################################################
+  describe "Installer allow/deny policy ===>" do
+    test "a protected app cannot be installed over (mishka_installer is protected by default)" do
+      {:error, [%{action: :allowlist}]} =
+        assert Installer.install(%{app: "mishka_installer", version: "9.9.9", path: "whatever"})
+    end
+
+    test "a protected app cannot be uninstalled" do
+      {:error, [%{action: :allowlist}]} =
+        assert Installer.uninstall(%{app: "mishka_installer", version: "9.9.9", path: "p"})
+    end
+
+    test "a custom protected app (e.g. the host app) is also blocked" do
+      Application.put_env(:mishka_installer, :allowlist, protected_apps: ["host_app"])
+      on_exit(fn -> Application.delete_env(:mishka_installer, :allowlist) end)
+
+      {:error, [%{action: :allowlist}]} =
+        assert Installer.install(%{app: "host_app", version: "1.0.0", path: "p"})
+    end
+
+    test "a download from a host not in :url_hosts is blocked before downloading" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["github.com"])
+      on_exit(fn -> Application.delete_env(:mishka_installer, :allowlist) end)
+
+      {:error, [%{action: :allowlist}]} =
+        assert Installer.install(%{
+                 app: uniq_app("blocked_url"),
+                 version: "0.1.0",
+                 type: :url,
+                 path: "https://evil.example.com/x.tar.gz"
+               })
+    end
+
+    test "a download from a github repo not in :github_repos is blocked before downloading" do
+      Application.put_env(:mishka_installer, :allowlist, github_repos: ["mishka-group/allowed"])
+      on_exit(fn -> Application.delete_env(:mishka_installer, :allowlist) end)
+
+      {:error, [%{action: :allowlist}]} =
+        assert Installer.install(%{
+                 app: uniq_app("blocked_repo"),
+                 version: "0.1.0",
+                 type: :github_tag,
+                 path: "evil/repo",
+                 tag: "0.1.0"
+               })
+    end
+
+    test "a download from an allowed host passes the policy and installs" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      app = uniq_app("allowed_url")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+
+      on_exit(fn ->
+        cleanup(app_atom, dest)
+        Application.delete_env(:mishka_installer, :allowlist)
+      end)
+
+      {:ok, _output} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz"
+               })
+
+      assert module.hello() == :world
+    end
+  end
+
+  ###################################################################################
   ########################## (▰˘◡˘▰) Helpers (▰˘◡˘▰) ##########################
   ###################################################################################
   defp uniq_app(prefix), do: "mishka_#{prefix}_#{System.unique_integer([:positive])}"

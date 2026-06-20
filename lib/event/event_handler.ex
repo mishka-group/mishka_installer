@@ -226,7 +226,7 @@ defmodule MishkaInstaller.Event.EventHandler do
       |> Enum.filter(fn pl ->
         Event.plugin_status(pl.status) == :ok and Event.allowed_events?(pl.depends) == :ok
       end)
-      |> Enum.sort_by(&{&1.priority, &1.name})
+      |> Event.dependency_order()
 
     inaccessible = for pl <- sorted_plugins, not plugin_callable?(pl.name), do: pl.name
 

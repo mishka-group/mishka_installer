@@ -168,6 +168,7 @@ defmodule MishkaInstaller.Installer.Installer do
   def install(app) do
     with {:ok, data} <- __MODULE__.builder(app),
          :ok <- valid_name(data.app),
+         :ok <- protected_app(data.app),
          {:ok, dest} <- fetch_package(data),
          :ok <- ebin_exist(dest),
          _ <- warn_on_native(dest, data.app),
@@ -210,17 +211,19 @@ defmodule MishkaInstaller.Installer.Installer do
   Installer.uninstall(%__MODULE__{app: "some_name", version: "0.1.0", path: "some_path"})
   ```
   """
-  @spec uninstall(t() | map()) :: :ok
+  @spec uninstall(t() | map()) :: :ok | error_return()
   def uninstall(app) do
-    app_atom = safe_atom(app.app)
-    ext_path = LibraryHandler.extensions_path()
-    Application.stop(app_atom)
-    Application.unload(app_atom)
-    Code.delete_path("#{ext_path}/#{app.app}-#{app.version}/ebin")
-    File.rm_rf!("#{ext_path}/#{app.app}-#{app.version}")
-    delete(:app, app.app)
-    MishkaInstaller.broadcast("installer", :uninstall, app)
-    :ok
+    with :ok <- protected_app(app.app) do
+      app_atom = safe_atom(app.app)
+      ext_path = LibraryHandler.extensions_path()
+      Application.stop(app_atom)
+      Application.unload(app_atom)
+      Code.delete_path("#{ext_path}/#{app.app}-#{app.version}/ebin")
+      File.rm_rf!("#{ext_path}/#{app.app}-#{app.version}")
+      delete(:app, app.app)
+      MishkaInstaller.broadcast("installer", :uninstall, app)
+      :ok
+    end
   end
 
   @doc """
@@ -565,11 +568,59 @@ defmodule MishkaInstaller.Installer.Installer do
   defp fetch_package(data) do
     name = "#{data.app}-#{data.version}"
 
-    with {:ok, body} <- Downloader.download(data.type, download_pkg(data)),
+    with :ok <- allowed_source(data),
+         {:ok, body} <- Downloader.download(data.type, download_pkg(data)),
          :ok <- verify_checksum(body, Map.get(data, :checksum)),
          :ok <- LibraryHandler.extract(:tar, body, name) do
       {:ok, "#{LibraryHandler.extensions_path()}/#{name}"}
     end
+  end
+
+  # Allow/deny policy (configured under `config :mishka_installer, :allowlist, ...`). Empty/absent
+  # lists impose no restriction; a non-empty list is fail-closed (only listed sources are allowed).
+  # `:protected_apps` is always enforced and defaults to protecting `mishka_installer` itself.
+  defp allowed_source(%{type: :url, path: path}), do: allowed_in(:url_hosts, URI.parse(path).host)
+
+  defp allowed_source(%{type: type, path: path})
+       when type in [:github_tag, :github_latest_release],
+       do: allowed_in(:github_repos, String.trim("#{path}"))
+
+  defp allowed_source(_data), do: :ok
+
+  defp allowed_in(key, value) do
+    case allowlist(key, []) do
+      [] -> :ok
+      list -> if "#{value}" in Enum.map(list, &"#{&1}"), do: :ok, else: policy_blocked(key, value)
+    end
+  end
+
+  defp protected_app(app) do
+    if "#{app}" in Enum.map(allowlist(:protected_apps, ["mishka_installer"]), &"#{&1}"),
+      do: policy_blocked(:protected_apps, app),
+      else: :ok
+  end
+
+  defp allowlist(key, default) do
+    Application.get_env(:mishka_installer, :allowlist, []) |> Keyword.get(key, default)
+  end
+
+  defp policy_blocked(kind, value) do
+    Logger.warning("[mishka_installer.installer] blocked by #{kind} policy: #{inspect(value)}")
+
+    :telemetry.execute(
+      [:mishka_installer, :installer, :blocked],
+      %{system_time: System.system_time()},
+      %{kind: kind, value: "#{value}"}
+    )
+
+    {:error,
+     [
+       %{
+         message: "Blocked by #{kind} policy: #{inspect(value)}.",
+         field: :app,
+         action: :allowlist
+       }
+     ]}
   end
 
   defp download_pkg(data) do

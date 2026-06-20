@@ -520,6 +520,47 @@ defmodule MishkaInstaller.Event.Hook do
     module.call(data, args)
   end
 
+  @doc """
+  Profiles an event's compiled plugin chain: runs each plugin once with `state` and returns how long
+  each took, in microseconds, in execution order.
+
+  This is a **development/debugging** helper. It runs the same plugins as `call/3` but is a separate,
+  off-the-hot-path function, so production dispatch keeps zero profiling overhead. For a visual flame
+  graph, add [`flame_on`](https://hexdocs.pm/flame_on) to your host app's `LiveDashboard` and profile
+  `MishkaInstaller.Event.Hook.call/3`.
+
+  Returns `{:ok, [%{plugin: module(), microseconds: non_neg_integer()}]}` or `{:error, :not_compiled}`.
+  """
+  @spec profile(String.t(), any()) :: {:ok, [map()]} | {:error, :not_compiled}
+  def profile(event, state) do
+    module = ModuleStateCompiler.module_event_name(event)
+
+    if function_exported?(module, :initialize, 0) do
+      {_final, timings} =
+        Enum.reduce(module.initialize().plugins, {state, []}, fn plugin, {acc_state, acc} ->
+          {micros, next} = time_plugin(plugin.name, acc_state)
+          {next, [%{plugin: plugin.name, microseconds: micros} | acc]}
+        end)
+
+      {:ok, Enum.reverse(timings)}
+    else
+      {:error, :not_compiled}
+    end
+  end
+
+  # Cold path (profiling only) — a rescue here is fine and keeps one slow/failing plugin from
+  # aborting the whole profile run.
+  defp time_plugin(name, state) do
+    :timer.tc(fn ->
+      case apply(name, :call, [state]) do
+        {:reply, new_state} -> new_state
+        other -> other
+      end
+    end)
+  rescue
+    _ -> {0, state}
+  end
+
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
