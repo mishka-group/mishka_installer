@@ -173,7 +173,7 @@ defmodule MishkaInstaller.MnesiaRepo do
     missing = Enum.reject(state.essential, &(&1 in tables))
     healthy? = missing == []
 
-    unless healthy?,
+    if !healthy?,
       do:
         Logger.warning(
           "[mishka_installer.mnesia] health check found missing tables: #{inspect(missing)}"
