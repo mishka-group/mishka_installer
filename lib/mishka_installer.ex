@@ -216,7 +216,7 @@ defmodule MishkaInstaller do
   if Code.ensure_loaded?(Mix) and function_exported?(Mix, :env, 0) do
     @project_env Mix.env()
   else
-    @project_env nil
+    @project_env :prod
   end
 
   @doc false
@@ -258,7 +258,7 @@ defmodule MishkaInstaller do
   def __information__() do
     env =
       System.get_env("MIX_ENV") || Application.get_env(:mishka_installer, :project_env) ||
-        @project_env || :prod
+        @project_env
 
     %{
       path:
