@@ -153,6 +153,6 @@ Thank you. 💚
 
 ## 📜 License
 
-Apache License 2.0 — see [`LICENSE`](LICENSE).
+Apache License 2.0 — see [`LICENSE`](https://github.com/mishka-group/mishka_installer/blob/master/LICENSE).
 
 Copyright © Mishka Group and contributors.

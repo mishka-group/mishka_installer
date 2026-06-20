@@ -111,8 +111,8 @@ defmodule MishkaInstaller.MnesiaRepo do
     GenServer.start_link(__MODULE__, state, name: __MODULE__)
   end
 
-  @doc "Returns the current repository `t:MishkaInstaller.MnesiaRepo.State.t/0`."
-  @spec state() :: State.t()
+  @doc "Returns the current repository state."
+  @spec state() :: struct()
   def state(), do: GenServer.call(__MODULE__, :state)
 
   @doc """
