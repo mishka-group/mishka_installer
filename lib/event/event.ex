@@ -40,10 +40,10 @@ defmodule MishkaInstaller.Event.Event do
   module is being created and destroyed during the compilation process.
   """
   use GuardedStruct
-  alias MishkaDeveloperTools.Helper.{Extra, UUID}
-  import MnesiaAssistant, only: [er: 1, erl_fields: 4]
-  alias MnesiaAssistant.{Transaction, Query, Table}
-  alias MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Helper.{Extra, UUID}
+  import MishkaInstaller.Helper.MnesiaAssistant, only: [er: 1, erl_fields: 4]
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
+  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
   alias MishkaInstaller.Event.EventHandler
 
   @mnesia_info [
@@ -59,26 +59,30 @@ defmodule MishkaInstaller.Event.Event do
 
   guardedstruct do
     # This type can be used when you want to introduce an plugin id.
-    field(:id, UUID.t(), auto: {UUID, :generate}, derive: "validate(uuid)")
+    field(:id, UUID.t(), auto: {UUID, :generate}, derives: "validate(uuid)")
     # This type can be used when you want to introduce an plugin name.
-    field(:name, module(), enforce: true, derive: "validate(atom)")
+    field(:name, module(), enforce: true, derives: "validate(atom)")
     # This type can be used when you want to introduce an event name.
-    field(:event, String.t(), enforce: true, derive: "validate(not_empty_string)")
+    field(:event, String.t(), enforce: true, derives: "validate(not_empty_string)")
     # This type can be used when you want to introduce a priority of calling an event.
-    field(:priority, integer(), default: 100, derive: "validate(integer, min_len=0, max_len=100)")
+    field(:priority, integer(),
+      default: 100,
+      derives: "validate(integer, min_len=0, max_len=100)"
+    )
+
     # This type can be used when you want to introduce a status for an event.
     field(:status, status(),
-      derive: "validate(enum=Atom[registered::started::stopped::restarted::held])",
+      derives: "validate(enum=Atom[registered::started::stopped::restarted::held])",
       default: :registered
     )
 
     # This type can be used when you want to introduce an event owner extension.
-    field(:extension, atom(), enforce: true, derive: "validate(atom)")
+    field(:extension, atom(), enforce: true, derives: "validate(atom)")
 
     # This type can be used when you want to introduce a list of modules that an event depend on them.
-    field(:depends, list(String.t()), default: [], derive: "validate(list)")
+    field(:depends, list(String.t()), default: [], derives: "validate(list)")
     # This type can be used when you want to introduce an extra data for an event.
-    field(:extra, list(map()), default: [], derive: "validate(list)")
+    field(:extra, list(map()), default: [], derives: "validate(list)")
     # This type can be used when you want to introduce an event inserted_at unix time(timestamp).
     field(:inserted_at, DateTime.t(), auto: {Extra, :get_unix_time})
     # This type can be used when you want to introduce an event updated_at unix time(timestamp).
@@ -143,6 +147,7 @@ defmodule MishkaInstaller.Event.Event do
     with {:ok, _module} <- ensure_loaded(name),
          merged <- Map.merge(initial, %{name: name, extension: name.config(:app), event: event}),
          {:ok, struct} <- builder(merged),
+         :ok <- no_dependency_cycle(struct.name, struct.depends),
          deps_list <- allowed_events(struct.depends),
          {:ok, db_plg} <-
            write(Map.merge(struct, depends_status(deps_list, struct.status))),
@@ -191,6 +196,8 @@ defmodule MishkaInstaller.Event.Event do
          :ok <- allowed_events?(data.depends),
          {:ok, db_plg} <- write(:id, data.id, %{status: :started}),
          :ok <- EventHandler.do_compile(db_plg.event, :start, queue) do
+      # Carry the record so `:held` dependents can re-evaluate and auto-start (see `plugin_dependency_event/3`).
+      MishkaInstaller.broadcast("event", :start, db_plg)
       {:ok, db_plg}
     end
   end
@@ -216,11 +223,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :start)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
-        end
+        EventHandler.do_compile(event, :start, queue)
 
         {:ok, sorted_plugins}
     end
@@ -322,11 +325,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :restart)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create(sorted_plugins, event)
-        end
+        EventHandler.do_compile(event, :restart, queue)
 
         {:ok, sorted_plugins}
     end
@@ -403,10 +402,8 @@ defmodule MishkaInstaller.Event.Event do
   def stop(:event, event, queue) do
     case get(:event, event) do
       [] ->
-        message =
-          "There are no plugins in the database that can be started for this event."
-
-        {:error, [%{message: message, field: :global, action: :restart_event}]}
+        message = "There are no plugins in the database that can be stopped for this event."
+        {:error, [%{message: message, field: :global, action: :stop_event}]}
 
       data ->
         sorted_plugins =
@@ -421,11 +418,7 @@ defmodule MishkaInstaller.Event.Event do
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :stop)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create([], event)
-        end
+        EventHandler.do_compile(event, :stop, queue)
 
         {:ok, sorted_plugins}
     end
@@ -485,8 +478,8 @@ defmodule MishkaInstaller.Event.Event do
           okey_return() | error_return()
   def unregister(:name, name, queue) do
     with {:ok, db_plg} <- delete(:name, name),
-         :ok <- GenServer.stop(name, :normal),
          :ok <- EventHandler.do_compile(db_plg.event, :unregister, queue) do
+      stop_if_alive(name)
       {:ok, db_plg}
     end
   end
@@ -494,28 +487,24 @@ defmodule MishkaInstaller.Event.Event do
   def unregister(:event, event, queue) do
     case get(:event, event) do
       [] ->
-        message =
-          "There are no plugins in the database that can be started for this event."
-
-        {:error, [%{message: message, field: :global, action: :restart_event}]}
+        message = "There are no plugins in the database that can be unregistered for this event."
+        {:error, [%{message: message, field: :global, action: :unregister_event}]}
 
       data ->
         sorted_plugins =
           Enum.reduce(data, [], fn pl_item, acc ->
-            with {:ok, db_plg} <- delete(:name, pl_item.name),
-                 :ok <- GenServer.stop(pl_item.name, :normal) do
-              acc ++ [db_plg]
-            else
-              _ -> acc
+            case delete(:name, pl_item.name) do
+              {:ok, db_plg} ->
+                stop_if_alive(pl_item.name)
+                acc ++ [db_plg]
+
+              _ ->
+                acc
             end
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
-        if queue do
-          EventHandler.do_compile(event, :unregister)
-        else
-          MishkaInstaller.Event.ModuleStateCompiler.purge_create([], event)
-        end
+        EventHandler.do_compile(event, :unregister, queue)
 
         {:ok, sorted_plugins}
     end
@@ -564,7 +553,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.match_object(pattern) end)
     |> case do
       {:atomic, res} ->
-        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -601,13 +590,25 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        data = MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        data = MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         if field in [:event, :extension], do: data, else: List.first(data)
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
         if field in [:event, :extension], do: [], else: nil
     end
+  end
+
+  @doc """
+  Like `get(:name, name)` but a **dirty** (non-transactional) index read — a direct ETS lookup with
+  no lock or commit overhead. Use only where a slightly stale read is fine (e.g. the background plugin
+  status sync), never where you need transactional consistency.
+  """
+  @spec dirty_get(:name, module()) :: map() | struct() | nil
+  def dirty_get(:name, value) do
+    :mnesia.dirty_index_read(__MODULE__, value, :name)
+    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> List.first()
   end
 
   @doc """
@@ -630,7 +631,8 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
     |> case do
       {:atomic, res} ->
-        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, []) |> List.first()
+        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        |> List.first()
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
@@ -693,21 +695,61 @@ defmodule MishkaInstaller.Event.Event do
   """
   @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
   def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
-    selected = if field == :id, do: get(value), else: get(:name, value)
+    # Read-modify-write in one transaction under a write lock: the record is re-read inside the
+    # transaction and `updated_to` is merged onto the *current* row, so two concurrent transitions
+    # of the same plugin can't clobber each other's fields. Reads (`get/1,2`) are untouched.
+    Transaction.transaction(fn ->
+      case locked_read(field, value) do
+        nil ->
+          :mnesia.abort(:record_not_found)
 
-    case selected do
-      nil ->
+        data ->
+          merged =
+            data |> Map.merge(updated_to) |> Map.merge(%{updated_at: Extra.get_unix_time()})
+
+          case builder({:root, merged, :edit}) do
+            {:ok, struct} ->
+              ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1)))
+              |> List.to_tuple()
+              |> Query.write()
+
+              struct
+
+            {:error, _} = error ->
+              :mnesia.abort(error)
+          end
+      end
+    end)
+    |> case do
+      {:atomic, struct} ->
+        {:ok, struct}
+
+      {:aborted, :record_not_found} ->
         message =
           "The ID of the record you want to update is incorrect or has already been deleted."
 
         {:error, [%{message: message, field: :global, action: :write}]}
 
-      data ->
-        map =
-          Map.merge(data, updated_to)
-          |> Map.merge(%{updated_at: Extra.get_unix_time()})
+      {:aborted, {:error, _} = error} ->
+        error
 
-        write({:root, map, :edit})
+      {:aborted, reason} ->
+        Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
+    end
+  end
+
+  # Reads a single record under a write lock (by id directly, by name via its index then id) and
+  # converts it to a struct, or `nil`. Must run inside a transaction.
+  defp locked_read(:id, id) do
+    :mnesia.read(__MODULE__, id, :write)
+    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> List.first()
+  end
+
+  defp locked_read(:name, name) do
+    case :mnesia.index_read(__MODULE__, name, :name) do
+      [record | _] -> locked_read(:id, elem(record, 1))
+      _ -> nil
     end
   end
 
@@ -758,7 +800,7 @@ defmodule MishkaInstaller.Event.Event do
         {:ok, List.flatten(result) |> Enum.uniq()}
 
       {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "deleting", :global, :database)
+        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
     end
   end
 
@@ -907,6 +949,70 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  Returns `:ok` when `depends` introduces no dependency cycle back to `name`, otherwise an error.
+  Used by `register/3` to reject plugins that would otherwise stay `:held` forever (e.g. `A → B → A`).
+  Built on [`libgraph`](https://hexdocs.pm/libgraph): the candidate's edges are added to the live
+  dependency graph and `Graph.is_acyclic?/1` decides.
+  """
+  @spec no_dependency_cycle(module(), list()) :: :ok | error_return()
+  def no_dependency_cycle(name, depends) do
+    if Graph.is_acyclic?(dependency_graph(name, depends)) do
+      :ok
+    else
+      message = "Dependency cycle detected: #{inspect(name)} ultimately depends on itself."
+      {:error, [%{message: message, field: :depends, action: :register}]}
+    end
+  end
+
+  @doc """
+  The live plugin dependency graph as a [`libgraph`](https://hexdocs.pm/libgraph) `Graph` (one
+  `plugin -> dependency` edge per `:depends` entry). Useful for inspecting plugin connections, e.g.
+  `Graph.to_dot/1` or `Graph.topsort/1`.
+  """
+  @spec connections() :: Graph.t()
+  def connections(), do: dependency_graph()
+
+  @doc """
+  Orders `plugins` (each with `:name`, `:priority`, `:depends`) so a plugin runs **after** the
+  plugins it depends on, breaking ties by `{priority, name}`. The set is assumed acyclic (cycles are
+  rejected at `register/3`); on a stray cycle it falls back to priority order.
+  """
+  @spec dependency_order([struct()]) :: [struct()]
+  def dependency_order(plugins) do
+    order_loop(plugins, MapSet.new(plugins, & &1.name), [])
+  end
+
+  defp order_loop([], _pending, acc), do: Enum.reverse(acc)
+
+  defp order_loop(plugins, pending, acc) do
+    ready =
+      plugins
+      |> Enum.filter(fn pl -> Enum.all?(pl.depends, &(not MapSet.member?(pending, &1))) end)
+      |> Enum.sort_by(&{&1.priority, &1.name})
+
+    case ready do
+      [] -> Enum.reverse(acc) ++ Enum.sort_by(plugins, &{&1.priority, &1.name})
+      [next | _] -> order_loop(plugins -- [next], MapSet.delete(pending, next.name), [next | acc])
+    end
+  end
+
+  defp dependency_graph(extra_name \\ nil, extra_depends \\ []) do
+    candidates = Enum.reject(get(), &(&1.name == extra_name))
+
+    candidates =
+      if(extra_name,
+        do: candidates ++ [%{name: extra_name, depends: extra_depends}],
+        else: candidates
+      )
+
+    Enum.reduce(candidates, Graph.new(), fn pl, graph ->
+      Enum.reduce(pl.depends, Graph.add_vertex(graph, pl.name), fn dep, acc ->
+        Graph.add_edge(acc, pl.name, dep)
+      end)
+    end)
+  end
+
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
@@ -931,4 +1037,10 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   defp exist_record?(data), do: {:ok, data}
+
+  # Stop a plugin's GenServer only if it is actually running, so unregister can't crash on a plugin
+  # whose process is already down.
+  defp stop_if_alive(name) do
+    if Process.whereis(name), do: GenServer.stop(name, :normal), else: :ok
+  end
 end

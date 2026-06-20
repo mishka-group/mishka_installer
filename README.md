@@ -1,197 +1,158 @@
-# Mishka Installer is a system plugin(event) manager and run time installer for Elixir.
-
-[![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.0-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
-
 <div align="center">
-  <pre style="display: inline-block; text-align: left;">
-    💖 Hey there! If you like my work, please <b><a href="https://github.com/sponsors/mishka-group">support me financially!</a></b> 💖
-  </pre>
+
+# 🧩 MishkaInstaller
+
+**A runtime plugin / event engine and pre-built library installer for Elixir.** ✨
+
+[![Hex.pm](https://img.shields.io/hexpm/v/mishka_installer.svg?style=flat-square)](https://hex.pm/packages/mishka_installer)
+[![Hex Downloads](https://img.shields.io/hexpm/dt/mishka_installer.svg?style=flat-square)](https://hex.pm/packages/mishka_installer)
+[![CI](https://img.shields.io/github/actions/workflow/status/mishka-group/mishka_installer/ci.yml?style=flat-square)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml)
+[![License](https://img.shields.io/hexpm/l/mishka_installer.svg?style=flat-square)](https://github.com/mishka-group/mishka_installer/blob/master/LICENSE)
+[![GitHub Sponsors](https://img.shields.io/badge/Sponsor-mishka--group-ea4aaa?style=flat-square&logo=github)](https://github.com/sponsors/mishka-group)
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-mishkagroup-ffdd00?style=flat-square&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/mishkagroup)
+
 </div>
 
-<br />
-
-<p align="center">
-  <a href="https://www.buymeacoffee.com/mishkagroup">
-    <img src="https://github.com/user-attachments/assets/f4d4df7e-dcc4-4d1a-80e1-59c4d99725ab" alt="Support Mishka by Buy Me a Coffee" />
-  </a>
-</p>
-
-## Low Maintenance Warning:
-
-> **This library is in low maintenance mode, which means the author is currently only responding to pull requests.**
-
-
-## Build purpose
 ---
 
-Imagine you are going to make an application that will have many plugins built for it in the future.
-But the fact that many manipulations will be made on your source code makes it difficult to
-maintain the application. For example, you present a content management system for your users,
-and now they need to activate a section for registration and `SMS`; the system allows you to
-present your desired input/output absolutely plugin oriented to your users and makes it
-possible for the developers to write their required applications beyond the core source code.
+> [!WARNING]
+> **🔧 Low maintenance.** The author currently only responds to pull requests. Don't use `master`; the current release line is `0.1.6`.
 
-
-> **NOTICE**: Do not use the master branch; this library is under heavy development.
-> Expect version 0.1.0, and for using the new features, please wait until a new release is out.
-
-
-##### This library is divided into the following main sections:
-
-- [Events and Hook](#events-and-hook)
-- [Plugin management system theory and installation of Elixir libraries at runtime](#plugin-management-system-theory-and-installation-of-elixir-libraries-at-runtime)
-
-
-### Events and Hook
 ---
 
-In this section, you can define a series of plugins for each event,
-for example: after **successful registration** or **unsuccessful purchase** from “the store”,
-and for each event, put a set of callbacks in one module.
+## 💭 Why?
 
-After completing this step, when the user wants to create his own plugin,
-the Macro `behaviour` and `Hook` module will call you in its action module.
+Build apps whose features are **activated as plugins at runtime** — registration, SMS, social login — **without touching the core source**. Each feature becomes an **event**; anyone can attach plugins to it from outside your app.
 
-This helps you have a regular and `error-free` system, and the library uses an almost
-integrated structure in all of its events.
+---
 
-> In **Mishka Installer** Library, a series of action or hook functions are
-given to the developer of the main plugin or software, which helps build plugins **outside**/**inside**
-the system and convert software sections into separate events.
+## ✨ Features
 
-**Some of the functions of this module include the following:**
+- 🔌 **Events & Hooks** — register plugins for an event; they run in **priority + dependency** order.
+- ⚡ **Fast dispatch** — each event compiles to a module, so `Hook.call/3` is a direct call: no GenServer, no DB on the read path.
+- 🩺 **Health checks** — optional per-plugin `health_check/0`, inspected via `Hook.event_health/1`.
+- 🌐 **Multi-node** — the Mnesia-backed store joins & replicates across a cluster automatically.
+- 📦 **Runtime installer** — load **pre-built `ebin`** artifacts (local path, URL, or GitHub release). Works in a `mix release`.
 
-- Retrieves the merged configuration for the hook module.
-- Register a plugin for a specific event.
-- Start a plugin of a specific event.
-- Restart a plugin of a specific event.
-- Stop a plugin of a specific event.
-- Unregister a plugin of a specific event.
-- Retrieves a Plugin `GenServer` state.
-- Each plugin has A `GenServer` to do some auto jobs.
+---
 
-> For more information please see the `MishkaInstaller.Event.Hook` module.
+## 🔌 Events & Hooks
 
-##### Example:
+Define a plugin for an event — it auto-registers and runs whenever the event is called:
 
 ```elixir
 defmodule RegisterEmailSender do
   use MishkaInstaller.Event.Hook, event: "after_success_login"
 
-  def call(entries) do
-    {:reply, entries}
-  end
+  @impl true
+  def call(entries), do: {:reply, entries}
 end
 ```
 
-**If you want to change a series of default information, do this:**
-
 ```elixir
+# tweak defaults
 use MishkaInstaller.Event.Hook,
   event: "after_success_login",
   initial: %{depends: [SomeEvent], priority: 20}
 ```
 
-**You can call all plugins of an event:**
+Call every plugin registered for an event:
 
 ```elixir
 alias MishkaInstaller.Event.Hook
 
-# Normal call an event plugins
 Hook.call("after_success_login", params)
-
-# If you want certain entries not to change
-Hook.call("after_success_login", params, [private: something_based_on_your_data])
-
-# If you want the initial entry to be displayed at the end
-Hook.call("after_success_login", params, [return: true])
+Hook.call("after_success_login", params, private: keep_this)  # extra data, untouched by plugins
+Hook.call("after_success_login", params, return: true)        # return the original input
 ```
 
-**Note: If you want your plugin to execute automatically,
-all you need to do is send the name of the module in which you utilized
-the `MishkaInstaller.Event.Hook` to the Application module.**
+To start a plugin automatically, add its module to your supervision tree:
 
 ```elixir
-children = [
-  ...
-  RegisterEmailSender
-]
-
-...
-opts = [strategy: :one_for_one, name: SomeModule.Supervisor]
-Supervisor.start_link(children, opts)
+children = [RegisterEmailSender, ...]
 ```
 
-> This module is a read-only in-memory storage optimized for the fastest possible read times
-> not for write strategies.
+> [!NOTE]
+> A plugin's `depends` always run **before** it (cycles are rejected at registration), and a plugin can return `{:reply, :halt, state}` to stop the rest of the chain. See `MishkaInstaller.Event.Hook`.
 
 [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fmishka-group%2Fmishka_installer%2Fblob%2Fmaster%2Fguidance%2Fevent%2Fhook.livemd)
 
-### Plugin management system theory and installation of Elixir libraries at runtime
 ---
 
-The functionality of this library can be conceptualized as an architectural potential that is
-composed of two primary components, which are as follows:
+## 📦 Installer
 
-1. Event management (Plugin Hook powered by **Elixir Macro**)
-2. Managing removal and installation of Elixir libraries at `runtime`.
-
-When a programmer uses this library for his own software development, we sought to
-ensure that in addition to the established capabilities, he also has access to a set of
-appropriate standards for software development that are based on preset behaviors that can be applied;
-This was our goal.
-
-It streamlines and organizes the work of a group working on a project while also facilitating
-the creation of software.
-Error control and tree structure, which enable us to develop a system that is robust and trustworthy,
-are two of the guiding ideas behind the construction of this library, which has garnered
-attention from people all around the world.
-
-The [MishkaInstaller](https://github.com/mishka-group/mishka_installer) library can be created in
-various systems, and it provides fundamental capabilities such as the management of plugin states
-and the application of standard behaviors.
-These features can all be accessed by specified hooks in the library.
-
-> **The installer part is in beta mode, use it carefully and some of its functionality may not work in the Elixir `release`.**
-
-##### Example:
+Load an **already-compiled `ebin`** at runtime — no source compilation, so it's release-safe:
 
 ```elixir
 alias MishkaInstaller.Installer.Installer
 
-# Normal calling
-Installer.install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+Installer.install(%{app: "demo", version: "0.1.0", type: :path,                  path: "/ext/demo-0.1.0"})
+Installer.install(%{app: "demo", version: "0.1.0", type: :url,                   path: "https://.../demo-ebin.tar.gz"})
+Installer.install(%{app: "demo", version: "0.1.0", type: :github_tag,            path: "owner/repo", tag: "0.1.0"})
+Installer.install(%{app: "demo", version: "0.1.0", type: :github_latest_release, path: "owner/repo"})
 
-# Normal calling
-Installer.uninstall(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
-
-# Normal calling
-Installer.async_install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+Installer.uninstall(%{app: "demo", version: "0.1.0"})
 ```
 
-> For more information please see the `MishkaInstaller.Installer.Installer` module.
+> [!NOTE]
+> Remote installs (`:url`/`:github_*`) are **fail-closed**: they require the source host/repo in `config :mishka_installer, :allowlist, url_hosts:/github_repos:`. Optional `checksum:` (sha256) pins the artifact; `:protected_apps` guards apps from being overwritten/removed. See `MishkaInstaller.Installer.Installer`.
 
-
-## Installing the library:
 ---
 
-It should be noted that this library must be installed in two parts of the plugin and the
-software that wants to display the plugins, and due to its small dependencies, it does
-not cause any problems. To install, just add this library to your "mix.exs" in the "deps"
-function as follows:
+## 🏭 Production deployment
+
+An installed library is a pre-built `ebin` on disk plus a Mnesia record; on every boot it is replayed (put back on the code path and started). So **both** the `ebin`s and the Mnesia data must live on a **persistent (mounted) volume** — otherwise installs do not survive a restart/redeploy. Point both at your volume (here `/data`):
+
+```elixir
+# config/runtime.exs — /data is your mounted volume
+config :mishka_installer,
+  project_path: "/data",
+  extensions_path: "/data/extensions"
+
+config :mishka_installer, MishkaInstaller.MnesiaRepo,
+  mnesia_dir: "/data/mnesia",
+  essential: [MishkaInstaller.Event.Event, MishkaInstaller.Installer.Installer]
+```
+
+`:extensions_path` is where `ebin`s are written; `mnesia_dir` is where the records live; `:essential` are the tables created on boot (the plugin and install stores — keep both). Just depend on `:mishka_installer`; its supervision tree starts automatically outside `:test`.
+
+> A real release restart proof lives in `test/integration/production_release/` — run it with `mix test --only production_release`.
+
+---
+
+## 🚀 Installation
 
 ```elixir
 def deps do
-  [
-    {:mishka_installer, "~> 0.1.3"}
-  ]
+  [{:mishka_installer, "~> 0.1.6"}]
 end
 ```
 
-The docs can be found at https://hexdocs.pm/mishka_installer.
+Docs: [hexdocs.pm/mishka_installer](https://hexdocs.pm/mishka_installer)
 
 ---
 
-# Donate
+## 💖 Funding & sponsorship
 
-You can support this project through the "[Sponsor](https://github.com/sponsors/mishka-group)" button on GitHub donations. All our projects are **open-source** and **free**, and we rely on community contributions to enhance and improve them further.
+MishkaInstaller is open-source software developed by [Mishka Group](https://github.com/mishka-group). If your team or company benefits from it, please consider supporting continued development:
+
+<div align="center">
+
+[![GitHub Sponsors](https://img.shields.io/badge/GitHub_Sponsors-mishka--group-ea4aaa?style=for-the-badge&logo=github&logoColor=white)](https://github.com/sponsors/mishka-group)
+&nbsp;&nbsp;&nbsp;
+[![Buy Me a Coffee](https://img.shields.io/badge/Buy_Me_a_Coffee-mishkagroup-ffdd00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://www.buymeacoffee.com/mishkagroup)
+
+**☕ Donate / sponsor:**
+[github.com/sponsors/mishka-group](https://github.com/sponsors/mishka-group) · [buymeacoffee.com/mishkagroup](https://www.buymeacoffee.com/mishkagroup)
+
+</div>
+
+Thank you. 💚
+
+---
+
+## 📜 License
+
+Apache License 2.0 — see [`LICENSE`](https://github.com/mishka-group/mishka_installer/blob/master/LICENSE).
+
+Copyright © Mishka Group and contributors.

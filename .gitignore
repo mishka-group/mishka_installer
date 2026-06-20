@@ -34,3 +34,5 @@ mishka_installer-*.tar
 .iex.exs
 /.mnesia
 /deployment/
+# Mnesia core dumps (written to CWD on a fatal Mnesia error)
+MnesiaCore.*

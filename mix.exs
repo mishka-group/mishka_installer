@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
 
-  @version "0.1.5"
+  @version "0.1.6"
   @source_url "https://github.com/mishka-group/mishka_installer"
 
   def project do
@@ -11,6 +11,8 @@ defmodule MishkaInstaller.MixProject do
       elixir: "~> 1.17",
       name: "Mishka installer",
       elixirc_paths: elixirc_paths(Mix.env()),
+      # The release restart fixture's source lives under test/ but isn't ExUnit — don't warn on it.
+      test_ignore_filters: [&String.starts_with?(&1, "test/integration/")],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: description(),
@@ -21,12 +23,9 @@ defmodule MishkaInstaller.MixProject do
       test_coverage: [
         ignore_modules: [
           MishkaInstaller.MnesiaRepo.State,
-          MishkaInstaller.Installer.PortHandler,
           MishkaInstaller.MnesiaRepo,
           MishkaInstaller.Installer.CompileHandler,
-          MishkaInstaller.Installer.Collect,
-          Collectable.MishkaInstaller.Installer.Collect,
-          ~r/\.Support.MishkaPlugin\./
+          ~r/\.Support\./
         ]
       ]
     ]
@@ -34,7 +33,7 @@ defmodule MishkaInstaller.MixProject do
 
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :mnesia],
       mod: {MishkaInstaller.Application, []}
     ]
   end
@@ -42,18 +41,18 @@ defmodule MishkaInstaller.MixProject do
   defp deps do
     [
       {:phoenix_pubsub, "~> 2.2"},
-      {:req, "~> 0.5.17"},
+      {:req, "~> 0.6.1"},
       {:plug, "~> 1.19"},
 
-      # Extra tools
-      {:mishka_developer_tools, "~> 0.1.10"},
-      {:guarded_struct, "~> 0.0.5"},
-      # We will cover telemetry in whole project
+      # Schema validation + sanitizing
+      {:guarded_struct, "~> 0.1.0-beta.8"},
+      # Telemetry instrumentation
       {:telemetry, "~> 1.4"},
+      # Plugin dependency graph: cycle detection + start ordering
+      {:libgraph, "~> 0.16"},
 
       # Dev and Test dependencies
-      {:ex_doc, "~> 0.40.1", only: :dev, runtime: false},
-      {:hex_core, "~> 0.15.0", only: :test}
+      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false}
     ]
   end
 
@@ -66,12 +65,13 @@ defmodule MishkaInstaller.MixProject do
 
   defp package() do
     [
-      files: ~w(lib .formatter.exs mix.exs LICENSE README* Changelog.md),
+      files: ~w(lib .formatter.exs mix.exs LICENSE README* CHANGELOG.md),
       licenses: ["Apache-2.0"],
       maintainers: ["Shahryar Tavakkoli"],
       links: %{
         "GitHub" => @source_url,
-        "Changelog" => "https://hexdocs.pm/mishka_installer/changelog.html"
+        "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md",
+        "Sponsor" => "https://github.com/sponsors/mishka-group"
       }
     ]
   end

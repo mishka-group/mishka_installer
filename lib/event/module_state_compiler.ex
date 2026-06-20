@@ -28,7 +28,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   When it comes to reading and running all plugins, this problem only occurs when a
   module is being created and destroyed during the compilation process.
   """
-  alias MishkaDeveloperTools.Helper.Extra
+  require Logger
+  alias MishkaInstaller.Helper.Extra
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
@@ -55,56 +56,18 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   create([%Event{name: MyPlugin}], "event_name")
   ```
   """
-  @spec create(list(struct()), String.t()) :: :ok | error_return
-  def create(plugins, event) do
+  @spec create(list(struct()), String.t(), list(module())) :: :ok | error_return
+  def create(plugins, event, inaccessible \\ []) do
     module = module_event_name(event)
     escaped_plugins = Macro.escape(plugins)
+    mode = if inaccessible == [], do: :ok, else: :error
 
     ast =
       quote do
         defmodule unquote(module) do
-          def call(state, args \\ []) do
-            private = Keyword.get(args, :private)
-            return_status = Keyword.get(args, :return)
+          unquote(call_ast(mode, event, plugins, inaccessible))
 
-            performed =
-              unquote(Macro.escape(plugins))
-              |> MishkaInstaller.Event.ModuleStateCompiler.perform({:reply, state})
-
-            new_state =
-              if !is_nil(return_status) do
-                state
-              else
-                case performed do
-                  {:ok, data} when is_list(data) ->
-                    if Keyword.keyword?(data) and !is_nil(private),
-                      do: {:ok, Keyword.merge(data, private)},
-                      else: {:ok, data}
-
-                  {:ok, data} when is_map(data) ->
-                    {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
-
-                  # If you have :private, we do not recommend to use this pattern
-                  {:ok, data} ->
-                    {:ok, data}
-
-                  {:error, _errors} = errors ->
-                    errors
-
-                  data when is_list(data) ->
-                    if Keyword.keyword?(data) and !is_nil(private),
-                      do: Keyword.merge(data, private),
-                      else: data
-
-                  data when is_map(data) ->
-                    if !is_nil(private), do: Map.merge(data, private), else: data
-                end
-              end
-
-            new_state
-          rescue
-            _e -> state
-          end
+          def mode(), do: unquote(mode)
 
           def initialize?(), do: true
 
@@ -126,6 +89,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
         end
       end
 
+    # Recompiling replaces the current version of an already-loaded module; silence the conflict.
+    Code.put_compiler_option(:ignore_module_conflict, true)
     [{^module, _}] = Code.compile_quoted(ast, "#{Extra.randstring(8)}")
     {:module, ^module} = Code.ensure_loaded(module)
     :ok
@@ -135,6 +100,94 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
     _ ->
       {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
+  end
+
+  # Started-but-not-loaded plugins compile to an error stub: calling it returns `{:error, ...}`.
+  defp call_ast(:error, _event, _plugins, inaccessible) do
+    quote do
+      def call(_state, _args \\ []) do
+        {:error,
+         [
+           %{
+             message: "This event has plugins that are not loaded; it cannot run.",
+             field: :event,
+             action: :call,
+             plugins: unquote(Macro.escape(inaccessible))
+           }
+         ]}
+      end
+    end
+  end
+
+  defp call_ast(:ok, event, plugins, _inaccessible) do
+    # One shared `state` var for the param and the unrolled chain.
+    state = Macro.var(:state, __MODULE__)
+
+    quote do
+      def call(unquote(state), args \\ []) do
+        private = Keyword.get(args, :private)
+        return_status = Keyword.get(args, :return)
+
+        performed = unquote(build_chain(plugins, state))
+
+        new_state =
+          if !is_nil(return_status) do
+            unquote(state)
+          else
+            case performed do
+              {:ok, data} when is_list(data) ->
+                if Keyword.keyword?(data) and !is_nil(private),
+                  do: {:ok, Keyword.merge(data, private)},
+                  else: {:ok, data}
+
+              {:ok, data} when is_map(data) ->
+                {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
+
+              {:ok, data} ->
+                {:ok, data}
+
+              {:error, _errors} = errors ->
+                errors
+
+              data when is_list(data) ->
+                if Keyword.keyword?(data) and !is_nil(private),
+                  do: Keyword.merge(data, private),
+                  else: data
+
+              data when is_map(data) ->
+                if !is_nil(private), do: Map.merge(data, private), else: data
+            end
+          end
+
+        new_state
+      rescue
+        e ->
+          MishkaInstaller.Event.ModuleStateCompiler.log_call_error(unquote(event), e)
+          unquote(state)
+      end
+    end
+  end
+
+  # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
+  defp build_chain([], state_var), do: state_var
+
+  defp build_chain([plugin | rest], state_var) do
+    next = Macro.unique_var(:state, __MODULE__)
+
+    quote do
+      case apply(unquote(plugin.name), :call, [unquote(state_var)]) do
+        {:reply, :halt, halted} -> halted
+        {:reply, unquote(next)} -> unquote(build_chain(rest, next))
+      end
+    end
+  end
+
+  @doc false
+  @spec log_call_error(String.t(), Exception.t()) :: :ok
+  def log_call_error(event, error) do
+    Logger.error(
+      "[mishka_installer.event] plugin pipeline raised in event #{inspect(event)}: #{inspect(error)}"
+    )
   end
 
   @doc """
@@ -152,10 +205,13 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   purge_create([%Event{name: MyPlugin}], "event_name")
   ```
   """
-  @spec purge_create(list(struct()), String.t()) :: :ok | error_return
-  def purge_create(plugins, event) do
-    purge(event)
-    create(plugins, event)
+  @spec purge_create(list(struct()), String.t(), list(module())) :: :ok | error_return
+  def purge_create(plugins, event, inaccessible \\ []) do
+    module = module_event_name(event)
+
+    # Drop only the old copy then recompile; the current version stays callable until the new one loads.
+    :code.purge(module)
+    create(plugins, event, inaccessible)
   end
 
   @doc """
@@ -204,6 +260,19 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
+    # Memoize the immutable event->module mapping in `:persistent_term` (hot path, lock-free reads).
+    case :persistent_term.get({__MODULE__, :name_cache, event}, nil) do
+      nil ->
+        module = build_module_name(event)
+        :persistent_term.put({__MODULE__, :name_cache, event}, module)
+        module
+
+      module ->
+        module
+    end
+  end
+
+  defp build_module_name(event) do
     event
     |> String.trim()
     |> String.replace(" ", "_")
@@ -222,7 +291,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec initialize?(String.t()) :: boolean()
-  def initialize?(event), do: module_event_name(event).initialize?
+  def initialize?(event), do: module_event_name(event).initialize?()
 
   @doc """
   Safely checks if the event module is initialized, rescuing any errors.
@@ -235,7 +304,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   @spec rescue_initialize?(String.t()) :: boolean()
   def rescue_initialize?(event) do
     module = module_event_name(event)
-    module.initialize?
+    module.initialize?()
   rescue
     _ -> false
   end
@@ -268,16 +337,5 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   def safe_initialize?(event) do
     module = module_event_name(event)
     function_exported?(module, :initialize?, 0)
-  end
-
-  @doc false
-  @spec perform(list(), {:reply, any()} | {:reply, :halt, any()}) :: any()
-  def perform([], {:reply, state}), do: state
-
-  def perform(_plugins, {:reply, :halt, state}), do: state
-
-  def perform([h | t], {:reply, state}) do
-    new_state = apply(h.name, :call, [state])
-    perform(t, new_state)
   end
 end

@@ -14,7 +14,7 @@ Mix.install([
 
 Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and SMS; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code.
 
-> **NOTICE**: Do not use the master branch; this library is under heavy development. Expect version 0.1.0, and for using the new features, please wait until a new release is out.
+> **NOTICE**: Do not use the master branch; this library is under heavy development. The current release line is `0.1.6`; for the newest features, please wait until a new release is out.
 
 <!-- livebook:{"break_markdown":true} -->
 
@@ -131,8 +131,10 @@ defmodule UserManagement.Plugins.SendOTPPlugin do
     queue: false,
     initial: %{priority: 20}
 
+  @impl true
   def call(entries) do
     if is_map(entries) and Map.get(entries, :mobile) == "123456789" do
+      # `:halt` stops the chain for this event and returns this value immediately.
       {:reply, :halt, {:ok, "Message is sent!"}}
     else
       {:reply, {:ok, entries}}
@@ -148,6 +150,7 @@ end
 defmodule UserManagement.Plugins.SendEmailPlugin do
   use MishkaInstaller.Event.Hook, event: "after_register", queue: false
 
+  @impl true
   def call(entries) do
     {:reply, {:ok, entries}}
   end
@@ -160,6 +163,7 @@ end
 defmodule UserManagement.Plugins.SendSmsPlugin do
   use MishkaInstaller.Event.Hook, event: "after_login", queue: false
 
+  @impl true
   def call(entries) do
     {:reply, {:error, entries}}
   end

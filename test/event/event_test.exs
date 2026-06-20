@@ -1,7 +1,35 @@
+defmodule MishkaInstallerTest.Event.EventTest.AddOne do
+  @moduledoc false
+  def call(state), do: {:reply, Map.update(state, :n, 1, &(&1 + 1))}
+end
+
+defmodule MishkaInstallerTest.Event.EventTest.Double do
+  @moduledoc false
+  def call(state), do: {:reply, Map.update(state, :n, 0, &(&1 * 2))}
+end
+
+defmodule MishkaInstallerTest.Event.EventTest.BadReturn do
+  @moduledoc false
+  # Violates the {:reply, _} contract on purpose.
+  def call(_state), do: :oops_not_a_reply
+end
+
+defmodule MishkaInstallerTest.Event.EventTest.Halter do
+  @moduledoc false
+  def call(state), do: {:reply, :halt, Map.put(state, :halted, true)}
+end
+
+defmodule MishkaInstallerTest.Event.EventTest.ShouldNotRun do
+  @moduledoc false
+  def call(state), do: {:reply, Map.put(state, :ran, true)}
+end
+
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
+  alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
+  alias MishkaInstaller.Event.Hook
   alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
+  alias MishkaInstallerTest.Support.MishkaPlugin.RegisterOTPSender
 
   setup do
     :persistent_term.put(:compile_status, "ready")
@@ -9,7 +37,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaDeveloperTools.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
 
     on_exit(fn ->
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
@@ -26,7 +54,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
     Process.register(self(), :__mishka_installer_event_test__)
 
-    Application.put_env(:mishka_installer, Mishka.MnesiaRepo,
+    Application.put_env(:mishka_installer, MishkaInstaller.MnesiaRepo,
       mnesia_dir: mnesia_dir,
       essential: [Event]
     )
@@ -48,7 +76,8 @@ defmodule MishkaInstallerTest.Event.EventTest do
   ###################################################################################
   describe "Event Table CRUD QueryTest ===>" do
     test "Create a Plugin record" do
-      {:error, %{message: _msg, fields: [:extension, :event, :name]}} = assert Event.write(%{})
+      {:error, errors} = assert Event.write(%{})
+      assert Enum.sort(Enum.map(errors, & &1.field)) == [:event, :extension, :name]
 
       create = fn ->
         %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}
@@ -814,6 +843,372 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert !Process.alive?(pid)
 
       assert is_nil(Event.get(:name, RegisterEmailSender))
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Dependency cycle (▰˘◡˘▰) #####################
+  ###################################################################################
+  describe "dependency cycle detection ===>" do
+    test "register rejects a plugin whose dependencies cycle back to it" do
+      # A depends on B (not registered yet) -> held, but no cycle.
+      {:ok, a} =
+        assert Event.register(RegisterEmailSender, "after_success_login", %{
+                 depends: [RegisterOTPSender]
+               })
+
+      assert a.status == :held
+
+      # B depends on A -> A <-> B, which is rejected.
+      assert {:error, [%{action: :register, field: :depends}]} =
+               Event.register(RegisterOTPSender, "after_success_login", %{
+                 depends: [RegisterEmailSender]
+               })
+    end
+
+    test "no_dependency_cycle/2 is :ok for acyclic deps and errors on a self-cycle" do
+      assert Event.no_dependency_cycle(RegisterEmailSender, []) == :ok
+      assert Event.no_dependency_cycle(RegisterEmailSender, [RegisterOTPSender]) == :ok
+
+      assert {:error, _} =
+               Event.no_dependency_cycle(RegisterEmailSender, [RegisterEmailSender])
+    end
+
+    test "the on_dependency_error/1 callback is injected and defaults to returning the error" do
+      assert RegisterEmailSender.on_dependency_error(:boom) == :boom
+    end
+  end
+
+  ###################################################################################
+  ##################### (▰˘◡˘▰) Unregister robustness (▰˘◡˘▰) ##################
+  ###################################################################################
+  describe "unregister robustness ===>" do
+    test "unregister(:name) succeeds even when the plugin process is not running" do
+      {:ok, _} =
+        Event.write(%{name: MishkaTest.NoProc, event: "noproc_evt", extension: :mishka_installer})
+
+      # No GenServer was ever started for MishkaTest.NoProc.
+      assert {:ok, _} = Event.unregister(:name, MishkaTest.NoProc, false)
+      assert is_nil(Event.get(:name, MishkaTest.NoProc))
+    end
+  end
+
+  ###################################################################################
+  #################### (▰˘◡˘▰) Inaccessible plugins (▰˘◡˘▰) ###################
+  ###################################################################################
+  describe "inaccessible plugins ===>" do
+    test "an event with a started but unloaded plugin compiles to an error stub" do
+      {:ok, _} =
+        assert Event.write(%{
+                 name: MishkaTest.NotLoadedPlugin,
+                 event: "ghost_event",
+                 extension: :mishka_installer,
+                 status: :started
+               })
+
+      :ok = EventHandler.do_compile("ghost_event", :start, false)
+
+      module = ModuleStateCompiler.module_event_name("ghost_event")
+      assert module.mode() == :error
+
+      assert {:error, [%{action: :call, field: :event, plugins: [MishkaTest.NotLoadedPlugin]}]} =
+               Hook.call("ghost_event", %{})
+    end
+
+    test "an event whose plugins are all loaded compiles to a runnable module" do
+      {:ok, _} = assert Event.register(RegisterEmailSender, "after_success_login", %{depends: []})
+      {:ok, _} = assert Event.start(:name, RegisterEmailSender, false)
+
+      module = ModuleStateCompiler.module_event_name("after_success_login")
+      assert module.mode() == :ok
+      assert function_exported?(module, :call, 2)
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Recompile safety (▰˘◡˘▰) #####################
+  ###################################################################################
+  describe "recompile safety ===>" do
+    test "Hook.call never crashes while the event module is recompiled (no purge gap)" do
+      {:ok, _} = assert Event.register(RegisterEmailSender, "after_success_login", %{depends: []})
+      {:ok, _} = assert Event.start(:name, RegisterEmailSender, false)
+      event = "after_success_login"
+
+      reader =
+        Task.async(fn ->
+          Enum.each(1..1000, fn _ -> Hook.call(event, %{counter: 0}) end)
+          :ok
+        end)
+
+      recompiler =
+        Task.async(fn ->
+          Enum.each(1..100, fn _ -> ModuleStateCompiler.purge_create([], event) end)
+          :ok
+        end)
+
+      assert Task.await(reader, 15_000) == :ok
+      assert Task.await(recompiler, 15_000) == :ok
+    end
+  end
+
+  ###################################################################################
+  ################## (▰˘◡˘▰) Dependency ordering & graph (▰˘◡˘▰) ###############
+  ###################################################################################
+  describe "dependency ordering (libgraph) ===>" do
+    test "a plugin runs AFTER its dependency, overriding priority" do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      # By priority alone AddOne (1) would run before Double (2): 5 -> 6 -> 12.
+      # AddOne depends on Double, so Double must run first: 5 -> 10 -> 11.
+      {:ok, _} =
+        Event.write(%{
+          name: double,
+          event: "dep_order_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "dep_order_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1,
+          depends: [double]
+        })
+
+      :ok = EventHandler.do_compile("dep_order_evt", :start, false)
+
+      assert Hook.call("dep_order_evt", %{n: 5}) == %{n: 11}
+    end
+
+    test "dependency_order/1 sorts dependencies before dependents, priority breaks ties" do
+      a = %{name: :a, priority: 1, depends: [:b]}
+      b = %{name: :b, priority: 5, depends: []}
+      c = %{name: :c, priority: 2, depends: []}
+
+      ordered = Event.dependency_order([a, b, c]) |> Enum.map(& &1.name)
+      # :b before :a (dependency); among the independents, lower priority first.
+      assert Enum.find_index(ordered, &(&1 == :b)) < Enum.find_index(ordered, &(&1 == :a))
+      assert ordered == [:c, :b, :a] or ordered == [:b, :c, :a]
+    end
+
+    test "connections/0 returns the libgraph dependency graph" do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      {:ok, _} = Event.write(%{name: double, event: "g_evt", extension: :mishka_installer})
+
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "g_evt",
+          extension: :mishka_installer,
+          depends: [double]
+        })
+
+      graph = Event.connections()
+      assert double in Graph.out_neighbors(graph, add_one)
+      assert Graph.is_acyclic?(graph)
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) call/2 behaviour (▰˘◡˘▰) #####################
+  ###################################################################################
+  describe "compiled event call/2 ===>" do
+    setup do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      # AddOne (priority 1) runs before Double (priority 2): n -> (n+1) -> *2.
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "transform_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: double,
+          event: "transform_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      :ok = EventHandler.do_compile("transform_evt", :start, false)
+      :ok
+    end
+
+    test "runs the plugins in priority order and transforms the data through the chain" do
+      assert Hook.call("transform_evt", %{n: 5}) == %{n: 12}
+    end
+
+    test "merges :private into the result" do
+      assert Hook.call("transform_evt", %{n: 5}, private: %{tag: "x"}) == %{n: 12, tag: "x"}
+    end
+
+    test ":return short-circuits and gives back the input untouched" do
+      assert Hook.call("transform_evt", %{n: 5}, return: true) == %{n: 5}
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Unrolled call chain (▰˘◡˘▰) ##################
+  ###################################################################################
+  describe "unrolled call chain ===>" do
+    test "the chain is unrolled: the perform/2 list-walk helper no longer exists" do
+      refute function_exported?(ModuleStateCompiler, :perform, 2)
+    end
+
+    test "{:reply, :halt, state} stops the chain; later plugins do not run" do
+      halter = MishkaInstallerTest.Event.EventTest.Halter
+      after_halt = MishkaInstallerTest.Event.EventTest.ShouldNotRun
+
+      {:ok, _} =
+        Event.write(%{
+          name: halter,
+          event: "halt_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: after_halt,
+          event: "halt_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      :ok = EventHandler.do_compile("halt_evt", :start, false)
+
+      result = Hook.call("halt_evt", %{})
+      assert result.halted == true
+      refute Map.has_key?(result, :ran)
+    end
+
+    @tag :capture_log
+    test "a plugin that breaks the {:reply, _} contract leaves the input state unchanged" do
+      bad = MishkaInstallerTest.Event.EventTest.BadReturn
+
+      {:ok, _} =
+        Event.write(%{
+          name: bad,
+          event: "bad_evt",
+          extension: :mishka_installer,
+          status: :started
+        })
+
+      :ok = EventHandler.do_compile("bad_evt", :start, false)
+
+      # The unrolled `case BadReturn.call(state)` matches neither `{:reply, _}` clause, so it raises a
+      # CaseClauseError; the outer rescue catches it and returns the input untouched — same as the old list-walk.
+      assert Hook.call("bad_evt", %{n: 42}) == %{n: 42}
+    end
+  end
+
+  ###################################################################################
+  ######################## (▰˘◡˘▰) Plugin profiler (▰˘◡˘▰) ####################
+  ###################################################################################
+  describe "plugin profiler ===>" do
+    test "Hook.profile returns per-plugin timings in execution order" do
+      add_one = MishkaInstallerTest.Event.EventTest.AddOne
+      double = MishkaInstallerTest.Event.EventTest.Double
+
+      {:ok, _} =
+        Event.write(%{
+          name: add_one,
+          event: "prof_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 1
+        })
+
+      {:ok, _} =
+        Event.write(%{
+          name: double,
+          event: "prof_evt",
+          extension: :mishka_installer,
+          status: :started,
+          priority: 2
+        })
+
+      :ok = EventHandler.do_compile("prof_evt", :start, false)
+
+      {:ok, timings} = Hook.profile("prof_evt", %{n: 1})
+      assert Enum.map(timings, & &1.plugin) == [add_one, double]
+      assert Enum.all?(timings, &is_integer(&1.microseconds))
+    end
+
+    test "Hook.profile returns {:error, :not_compiled} for an event that was never compiled" do
+      assert Hook.profile("never_#{System.unique_integer([:positive])}", %{}) ==
+               {:error, :not_compiled}
+    end
+  end
+
+  ###################################################################################
+  ##################### (▰˘◡˘▰) Atomic transitions (▰˘◡˘▰) ####################
+  ###################################################################################
+  describe "atomic status transitions ===>" do
+    test "concurrent writes to different fields of the same record don't clobber each other" do
+      {:ok, rec} =
+        assert Event.write(%{
+                 name: MishkaTest.AtomicMod,
+                 event: "atomic_evt",
+                 extension: :mishka_installer
+               })
+
+      id = rec.id
+
+      for _ <- 1..30 do
+        {:ok, _} = Event.write(:id, id, %{status: :registered, priority: 100})
+
+        t1 = Task.async(fn -> Event.write(:id, id, %{status: :stopped}) end)
+        t2 = Task.async(fn -> Event.write(:id, id, %{priority: 7}) end)
+        {:ok, _} = Task.await(t1)
+        {:ok, _} = Task.await(t2)
+
+        final = Event.get(id)
+        assert final.status == :stopped
+        assert final.priority == 7
+      end
+    end
+  end
+
+  ###################################################################################
+  ################### (▰˘◡˘▰) Hot/warm path optimizations (▰˘◡˘▰) #############
+  ###################################################################################
+  describe "performance helpers ===>" do
+    test "module_event_name/1 is deterministic and memoized in :persistent_term" do
+      event = "cache_evt_#{System.unique_integer([:positive])}"
+
+      m1 = ModuleStateCompiler.module_event_name(event)
+      m2 = ModuleStateCompiler.module_event_name(event)
+
+      assert is_atom(m1)
+      assert m1 == m2
+      # The second call is a cache hit; the mapping is stored once.
+      assert :persistent_term.get({ModuleStateCompiler, :name_cache, event}) == m1
+    end
+
+    test "dirty_get/2 reads a plugin without a transaction, matching get/2" do
+      assert Event.dirty_get(:name, MishkaTest.Dirty) == nil
+
+      {:ok, _} =
+        Event.write(%{name: MishkaTest.Dirty, event: "dirty_evt", extension: :mishka_installer})
+
+      assert Event.dirty_get(:name, MishkaTest.Dirty) == Event.get(:name, MishkaTest.Dirty)
+      assert Event.dirty_get(:name, MishkaTest.Dirty).name == MishkaTest.Dirty
     end
   end
 end

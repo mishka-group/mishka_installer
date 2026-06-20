@@ -2,7 +2,7 @@ defmodule MishkaInstaller do
   @moduledoc """
   # Mishka Installer is a system plugin(event) manager and run time installer for Elixir.
 
-  [![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/badge/hex-0.1.0-blue.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
+  [![MishkaInstaller CI](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml/badge.svg)](https://github.com/mishka-group/mishka_installer/actions/workflows/ci.yml) [![Hex.pm](https://img.shields.io/hexpm/v/mishka_installer.svg)](https://hex.pm/packages/mishka_installer) [![GitHub license](https://img.shields.io/badge/apache-2.0-green.svg)](https://raw.githubusercontent.com/mishka-group/mishka_installer/master/LICENSE) ![GitHub issues](https://img.shields.io/github/issues/mishka-group/mishka_installer)
 
   ## Build purpose
   ---
@@ -14,9 +14,8 @@ defmodule MishkaInstaller do
   present your desired input/output absolutely plugin oriented to your users and makes it
   possible for the developers to write their required applications beyond the core source code.
 
-
   > **NOTICE**: Do not use the master branch; this library is under heavy development.
-  > Expect version 0.1.0, and for using the new features, please wait until a new release is out.
+  > Expect version 0.1.6, and for using the new features, please wait until a new release is out.
 
 
   ##### This library is divided into the following main sections:
@@ -168,7 +167,7 @@ defmodule MishkaInstaller do
   ```elixir
   def deps do
     [
-      {:mishka_installer, "~> 0.1.1"}
+      {:mishka_installer, "~> 0.1.6"}
     ]
   end
   ```
@@ -217,7 +216,7 @@ defmodule MishkaInstaller do
   if Code.ensure_loaded?(Mix) and function_exported?(Mix, :env, 0) do
     @project_env Mix.env()
   else
-    @project_env nil
+    @project_env :prod
   end
 
   @doc false
@@ -264,7 +263,7 @@ defmodule MishkaInstaller do
     %{
       path:
         System.get_env("PROJECT_PATH") || Application.get_env(:mishka_installer, :project_path),
-      env: if(is_atom(env), do: env, else: String.to_atom(env))
+      env: if(is_binary(env), do: String.to_atom(env), else: env)
     }
   end
 end

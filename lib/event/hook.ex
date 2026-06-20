@@ -246,7 +246,7 @@ defmodule MishkaInstaller.Event.Hook do
 
   [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fmishka-group%2Fmishka_installer%2Fblob%2Fmaster%2Fguidance%2Fevent%2Fhook.livemd)
   """
-  alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
+  alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   @type okey_return :: {:ok, struct() | map() | module() | list(any())}
@@ -258,7 +258,16 @@ defmodule MishkaInstaller.Event.Hook do
   @callback stop() :: okey_return | error_return
   @callback unregister() :: okey_return | error_return
   @callback get() :: keyword()
-  @optional_callbacks register: 0, start: 0, restart: 0, stop: 0, unregister: 0, get: 0
+  @callback health_check() :: :ok | {:degraded, term()} | {:error, term()}
+  @callback on_dependency_error(term()) :: term()
+  @optional_callbacks register: 0,
+                      start: 0,
+                      restart: 0,
+                      stop: 0,
+                      unregister: 0,
+                      get: 0,
+                      health_check: 0,
+                      on_dependency_error: 1
 
   @spec __using__(keyword()) :: Macro.t()
   defmacro __using__(opts \\ []) do
@@ -270,8 +279,7 @@ defmodule MishkaInstaller.Event.Hook do
 
       @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
       @type okey_return :: {:ok, struct() | map() | module() | list(any())}
-      # Based on https://elixirforum.com/t/59168/5
-      # Only keep basic config values that can be serialized at compile time
+      # Keep only compile-time-serializable config values (https://elixirforum.com/t/59168/5).
       @app_config Mix.Project.config()
                   |> Keyword.take([
                     :app,
@@ -290,187 +298,88 @@ defmodule MishkaInstaller.Event.Hook do
       @plugin_event Keyword.get(opts, :event)
       @initial Keyword.get(opts, :initial, %{})
       @plugin_name __MODULE__
-      @wait_for_tables 6000
       @after_compile __MODULE__
       @checking Keyword.get(opts, :checking, 1000)
       @queue Keyword.get(opts, :queue, true)
 
+      # `config/0` carries the plugin's compile-time options; the rest of the macro delegates to `Hook.*`.
       @spec config() :: keyword()
-      def config(),
-        do: Keyword.merge(@app_config, __plugin__: @plugin_name, __event__: @plugin_event)
+      def config() do
+        Keyword.merge(@app_config,
+          __plugin__: @plugin_name,
+          __event__: @plugin_event,
+          __initial__: @initial,
+          __queue__: @queue,
+          __checking__: @checking
+        )
+      end
 
       @spec config(atom()) :: any()
       def config(key), do: Keyword.get(config(), key)
 
       @spec register() :: okey_return | error_return
-      def register() do
-        Event.register(config(:__plugin__), config(:__event__), @initial)
-      end
+      def register(), do: Hook.plugin_register(__MODULE__)
 
       @spec start() :: okey_return | error_return
-      def start() do
-        Event.start(:name, config(:__plugin__), @queue)
-      end
+      def start(), do: Hook.plugin_start(__MODULE__)
 
       @spec restart() :: okey_return | error_return
-      def restart() do
-        Event.restart(:name, config(:__plugin__), @queue)
-      end
+      def restart(), do: Hook.plugin_restart(__MODULE__)
 
       @spec stop() :: okey_return | error_return
-      def stop() do
-        Event.stop(:name, config(:__plugin__), @queue)
-      end
+      def stop(), do: Hook.plugin_stop(__MODULE__)
 
       @spec unregister() :: okey_return | error_return
-      def unregister() do
-        Event.unregister(:name, config(:__plugin__), @queue)
-      end
+      def unregister(), do: Hook.plugin_unregister(__MODULE__)
 
       @spec get() :: keyword()
-      def get() do
-        GenServer.call(__MODULE__, :get)
-      end
+      def get(), do: Hook.plugin_get(__MODULE__)
+
+      @doc "Optional. See `c:MishkaInstaller.Event.Hook.on_dependency_error/1`. Override to react."
+      @spec on_dependency_error(term()) :: term()
+      def on_dependency_error(error), do: Hook.default_dependency_error(error)
+
+      @doc "Optional. See `c:MishkaInstaller.Event.Hook.health_check/0`. Override to report health."
+      @spec health_check() :: :ok | {:degraded, term()} | {:error, term()}
+      def health_check(), do: Hook.default_health_check()
 
       defoverridable register: 0,
                      start: 0,
                      restart: 0,
                      stop: 0,
                      unregister: 0,
-                     get: 0
+                     get: 0,
+                     on_dependency_error: 1,
+                     health_check: 0
 
-      def __after_compile__(_env, _bytecode) do
-        unless Module.defines?(__MODULE__, {:call, 1}) do
-          raise "#{inspect(__MODULE__)} should have call/1 function."
-        end
-
-        if is_nil(config(:__event__)) do
-          raise "#{inspect(__MODULE__)} should be dedicated to an event."
-        end
-      end
+      def __after_compile__(_env, _bytecode), do: Hook.after_compile(__MODULE__)
 
       @spec start_link() :: :ignore | {:error, any()} | {:ok, pid()}
-      def start_link(args \\ []) do
-        GenServer.start_link(@plugin_name, args, name: @plugin_name)
-      end
+      def start_link(args \\ []), do: Hook.plugin_start_link(__MODULE__, args)
 
       @impl true
-      def init(state) do
-        MishkaInstaller.subscribe("event")
-
-        new_state =
-          Keyword.merge(state, name: __MODULE__, event: @plugin_event, status: :starting)
-
-        {:ok, new_state, {:continue, :start_plugin}}
-      end
+      def init(state), do: Hook.plugin_init(__MODULE__, state)
 
       @impl true
-      def handle_continue(:start_plugin, state) do
-        MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
-
-        new_state =
-          if :persistent_term.get(:event_status, nil) == "ready" and
-               :persistent_term.get(:compile_status, nil) == "ready" do
-            Hook.register_start_helper(__MODULE__, state)
-          else
-            Process.send_after(__MODULE__, :start_again, 1000)
-            state
-          end
-
-        Process.send_after(__MODULE__, :status, 1000)
-        {:noreply, new_state}
-      end
+      def handle_continue(:start_plugin, state), do: Hook.plugin_continue(__MODULE__, state)
 
       @impl true
-      def handle_call(:get, _from, state) do
-        {:reply, state, state}
-      end
+      def handle_call(:get, _from, state), do: {:reply, state, state}
+      def handle_call(_reason, _from, state), do: {:reply, state, state}
 
       @impl true
-      def handle_call(_reason, _from, state) do
-        {:reply, state, state}
-      end
+      def handle_info(:start_again, state), do: Hook.plugin_start_again(__MODULE__, state)
 
-      @impl true
-      def handle_info(:start_again, state) do
-        event = Keyword.get(state, :event)
-        db_plg = Event.get(:name, Keyword.get(state, :name))
-        module = MSE.module_event_name(event)
-
-        new_state =
-          if MSE.safe_initialize?(event) and module.is_initialized?(db_plg) do
-            Keyword.merge(state, status: db_plg.status, depends: db_plg.depends)
-          else
-            if is_nil(db_plg) do
-              Hook.register_start_helper(__MODULE__, state)
-            else
-              Hook.start_helper(__MODULE__, state, db_plg)
-            end
-          end
-
-        {:noreply, new_state}
-      end
-
-      @impl true
       def handle_info(%{status: status, data: data}, state)
-          when status in [:start, :stop, :unregister] do
-        event = Keyword.get(state, :event)
-        depends = Keyword.get(state, :depends, [])
-        # We need some state, it will be saved again or not, it should not be loaded if
-        # |__ it is restored
-        event_status = :persistent_term.get(:event_status, nil)
-        compile_status = :persistent_term.get(:compile_status, nil)
+          when status in [:start, :stop, :unregister],
+          do: Hook.plugin_dependency_event(__MODULE__, data, state)
 
-        new_state =
-          with true <- event_status == "ready",
-               true <- compile_status == "ready",
-               true <- event == Map.get(data, :event),
-               true <- Map.get(data, :name) in depends,
-               :ok <- Event.allowed_events?(depends),
-               {:ok, struct} <- Event.write(:name, @plugin_name, %{status: :restarted}),
-               _ok <- EventHandler.do_compile(struct.event, :re_event) do
-            Keyword.merge(state, status: :restarted)
-          else
-            _ -> state
-          end
+      def handle_info(%{status: :re_event, data: _data}, state),
+        do: Hook.plugin_re_event(state)
 
-        {:noreply, new_state}
-      end
+      def handle_info(:status, state), do: Hook.plugin_status_poll(__MODULE__, state)
 
-      @impl true
-      def handle_info(%{status: :re_event, data: _data}, state) do
-        new_state =
-          case Event.get(:name, state[:name]) do
-            nil -> state
-            data -> Keyword.merge(state, status: data.status)
-          end
-
-        {:noreply, state}
-      end
-
-      @impl true
-      def handle_info(:status, state) do
-        Process.send_after(__MODULE__, :status, @checking)
-
-        new_state =
-          with "ready" <- :persistent_term.get(:event_status, nil),
-               "ready" <- :persistent_term.get(:compile_status, nil),
-               {:module, module} <- Code.ensure_loaded(MSE.module_event_name(@plugin_event)),
-               data when not is_nil(data) <-
-                 Enum.find(module.initialize().plugins, &(&1.name == @plugin_name)),
-               plugin <- Event.get(:name, @plugin_name) do
-            if is_nil(plugin), do: state, else: Keyword.merge(state, status: plugin.status)
-          else
-            _ -> state
-          end
-
-        {:noreply, new_state}
-      end
-
-      @impl true
-      def handle_info(_reason, state) do
-        {:noreply, state}
-      end
+      def handle_info(_reason, state), do: {:noreply, state}
     end
   end
 
@@ -511,6 +420,317 @@ defmodule MishkaInstaller.Event.Hook do
     module.call(data, args)
   end
 
+  @doc """
+  Profiles an event's compiled plugin chain: runs each plugin once with `state` and returns how long
+  each took, in microseconds, in execution order.
+
+  This is a **development/debugging** helper. It runs the same plugins as `call/3` but is a separate,
+  off-the-hot-path function, so production dispatch keeps zero profiling overhead. For a visual flame
+  graph, add [`flame_on`](https://hexdocs.pm/flame_on) to your host app's `LiveDashboard` and profile
+  `MishkaInstaller.Event.Hook.call/3`.
+
+  Returns `{:ok, [%{plugin: module(), microseconds: non_neg_integer()}]}` or `{:error, :not_compiled}`.
+  """
+  @spec profile(String.t(), any()) :: {:ok, [map()]} | {:error, :not_compiled}
+  def profile(event, state) do
+    module = ModuleStateCompiler.module_event_name(event)
+
+    if function_exported?(module, :initialize, 0) do
+      {_final, timings} =
+        Enum.reduce(module.initialize().plugins, {state, []}, fn plugin, {acc_state, acc} ->
+          {micros, next} = time_plugin(plugin.name, acc_state)
+          {next, [%{plugin: plugin.name, microseconds: micros} | acc]}
+        end)
+
+      {:ok, Enum.reverse(timings)}
+    else
+      {:error, :not_compiled}
+    end
+  end
+
+  # Cold path: rescue keeps one failing plugin from aborting the whole profile run.
+  defp time_plugin(name, state) do
+    :timer.tc(fn ->
+      case apply(name, :call, [state]) do
+        {:reply, new_state} -> new_state
+        other -> other
+      end
+    end)
+  rescue
+    _ -> {0, state}
+  end
+
+  ####################################################################################
+  ########################## (▰˘◡˘▰) Health (▰˘◡˘▰) ############################
+  ####################################################################################
+  @health_timeout 1000
+
+  @doc """
+  Health report for a single plugin. Combines built-in checks — process `alive?`, module
+  `callable?`, registry `status` — with the plugin's optional `c:health_check/0` probe (run in a
+  time-boxed process, so it never blocks the plugin or the caller).
+
+  `probe` is `:ok | {:degraded, reason} | {:error, reason}` (with `{:error, :timeout}`,
+  `{:error, :no_health_check}`, `{:error, {:raised, _}}` ... for the failure variants). `healthy?`
+  is the overall verdict.
+  """
+  @spec plugin_health(module(), timeout()) :: map()
+  def plugin_health(name, timeout \\ @health_timeout) do
+    db = Event.get(:name, name)
+    alive? = is_pid(Process.whereis(name))
+    callable? = Code.ensure_loaded?(name) and function_exported?(name, :call, 1)
+    status = db && db.status
+    probe = run_health(name, timeout)
+
+    %{
+      plugin: name,
+      status: status,
+      alive?: alive?,
+      callable?: callable?,
+      probe: probe,
+      healthy?: alive? and callable? and probe == :ok and status in [:started, :restarted]
+    }
+  end
+
+  @doc """
+  Health report for an event: whether its module is compiled, its `mode` (`:error` means it has
+  plugins that are started but not loaded — see issue #1), and a report for each plugin in the
+  chain. Plugin probes run concurrently and time-boxed. `healthy?` is the overall verdict.
+  """
+  @spec event_health(String.t(), timeout()) :: map()
+  def event_health(event, timeout \\ @health_timeout) do
+    module = ModuleStateCompiler.module_event_name(event)
+    compiled? = function_exported?(module, :initialize, 0)
+    mode = if function_exported?(module, :mode, 0), do: module.mode(), else: :unknown
+    plugins = if compiled?, do: module.initialize().plugins, else: []
+
+    reports =
+      plugins
+      |> Task.async_stream(&plugin_health(&1.name, timeout),
+        timeout: timeout + 1000,
+        on_timeout: :kill_task,
+        ordered: true
+      )
+      |> Enum.zip(plugins)
+      |> Enum.map(fn
+        {{:ok, report}, _pl} -> report
+        {{:exit, reason}, pl} -> unhealthy_report(pl.name, {:error, {:exit, reason}})
+      end)
+
+    %{
+      event: event,
+      compiled?: compiled?,
+      mode: mode,
+      plugin_count: length(reports),
+      plugins: reports,
+      healthy?: compiled? and mode == :ok and Enum.all?(reports, & &1.healthy?)
+    }
+  end
+
+  @doc "Health report for every event in the system. See `event_health/2`."
+  @spec health(timeout()) :: [map()]
+  def health(timeout \\ @health_timeout) do
+    case Event.group_events() do
+      {:ok, events} -> Enum.map(events, &event_health(&1, timeout))
+      _ -> []
+    end
+  end
+
+  @doc """
+  Runs a plugin's `c:health_check/0` probe in a short-lived monitored process, bounded by `timeout`.
+  Never blocks the plugin's `GenServer` and never crashes the caller: a slow probe yields
+  `{:error, :timeout}`, a raising/exiting one `{:error, {:raised | :exit, _}}`, a non-conforming
+  return `{:error, {:bad_return, _}}`, and a plugin without the callback `{:error, :no_health_check}`.
+  """
+  @spec run_health(module(), timeout()) :: :ok | {:degraded, term()} | {:error, term()}
+  def run_health(plugin, timeout \\ @health_timeout) do
+    if function_exported?(plugin, :health_check, 0) do
+      {pid, ref} =
+        spawn_monitor(fn -> exit({:health_probe, safe_probe(plugin)}) end)
+
+      receive do
+        {:DOWN, ^ref, :process, ^pid, {:health_probe, result}} -> result
+        {:DOWN, ^ref, :process, ^pid, reason} -> {:error, {:exit, reason}}
+      after
+        timeout ->
+          Process.exit(pid, :kill)
+          Process.demonitor(ref, [:flush])
+          {:error, :timeout}
+      end
+    else
+      {:error, :no_health_check}
+    end
+  end
+
+  defp safe_probe(plugin) do
+    normalize_probe(plugin.health_check())
+  rescue
+    e -> {:error, {:raised, e}}
+  catch
+    kind, reason -> {:error, {kind, reason}}
+  end
+
+  defp normalize_probe(:ok), do: :ok
+  defp normalize_probe({:degraded, _} = degraded), do: degraded
+  defp normalize_probe({:error, _} = error), do: error
+  defp normalize_probe(other), do: {:error, {:bad_return, other}}
+
+  defp unhealthy_report(name, probe) do
+    %{plugin: name, status: nil, alive?: false, callable?: false, probe: probe, healthy?: false}
+  end
+
+  ####################################################################################
+  ################# (▰˘◡˘▰) Plugin runtime (macro delegates here) (▰˘◡˘▰) ######
+  ####################################################################################
+  # The macro injects thin wrappers that call these functions; each reads its options via `module.config/1`.
+  @wait_for_tables 6000
+
+  @doc false
+  def plugin_register(module),
+    do:
+      Event.register(
+        module.config(:__plugin__),
+        module.config(:__event__),
+        module.config(:__initial__)
+      )
+
+  @doc false
+  def plugin_start(module),
+    do: Event.start(:name, module.config(:__plugin__), module.config(:__queue__))
+
+  @doc false
+  def plugin_restart(module),
+    do: Event.restart(:name, module.config(:__plugin__), module.config(:__queue__))
+
+  @doc false
+  def plugin_stop(module),
+    do: Event.stop(:name, module.config(:__plugin__), module.config(:__queue__))
+
+  @doc false
+  def plugin_unregister(module),
+    do: Event.unregister(:name, module.config(:__plugin__), module.config(:__queue__))
+
+  @doc false
+  def plugin_get(module), do: GenServer.call(module, :get)
+
+  @doc false
+  def plugin_start_link(module, args), do: GenServer.start_link(module, args, name: module)
+
+  @doc false
+  def default_health_check(), do: :ok
+
+  @doc false
+  def default_dependency_error(error), do: error
+
+  @doc false
+  def after_compile(module) do
+    if !Module.defines?(module, {:call, 1}),
+      do: raise("#{inspect(module)} should have call/1 function.")
+
+    if is_nil(module.config(:__event__)),
+      do: raise("#{inspect(module)} should be dedicated to an event.")
+  end
+
+  @doc false
+  def plugin_init(module, state) do
+    MishkaInstaller.subscribe("event")
+
+    new_state =
+      Keyword.merge(state, name: module, event: module.config(:__event__), status: :starting)
+
+    {:ok, new_state, {:continue, :start_plugin}}
+  end
+
+  @doc false
+  def plugin_continue(module, state) do
+    MishkaInstaller.Helper.MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
+
+    new_state =
+      if ready?() do
+        register_start_helper(module, state)
+      else
+        Process.send_after(module, :start_again, 1000)
+        state
+      end
+
+    Process.send_after(module, :status, module.config(:__checking__))
+    {:noreply, new_state}
+  end
+
+  @doc false
+  def plugin_start_again(module, state) do
+    event = Keyword.get(state, :event)
+    db_plg = Event.get(:name, Keyword.get(state, :name))
+    state_module = ModuleStateCompiler.module_event_name(event)
+
+    new_state =
+      if ModuleStateCompiler.safe_initialize?(event) and state_module.is_initialized?(db_plg) do
+        Keyword.merge(state, status: db_plg.status, depends: db_plg.depends)
+      else
+        if is_nil(db_plg),
+          do: register_start_helper(module, state),
+          else: start_helper(module, state, db_plg)
+      end
+
+    {:noreply, new_state}
+  end
+
+  @doc false
+  def plugin_dependency_event(module, data, state) do
+    event = Keyword.get(state, :event)
+    depends = Keyword.get(state, :depends, [])
+
+    new_state =
+      with true <- ready?(),
+           true <- event == Map.get(data, :event),
+           true <- Map.get(data, :name) in depends,
+           :ok <- Event.allowed_events?(depends),
+           {:ok, struct} <- Event.write(:name, module, %{status: :restarted}),
+           _ok <- EventHandler.do_compile(struct.event, :re_event) do
+        Keyword.merge(state, status: :restarted)
+      else
+        _ -> state
+      end
+
+    {:noreply, new_state}
+  end
+
+  @doc false
+  def plugin_re_event(state) do
+    new_state =
+      case Event.get(:name, state[:name]) do
+        nil -> state
+        data -> Keyword.merge(state, status: data.status)
+      end
+
+    {:noreply, new_state}
+  end
+
+  @doc false
+  def plugin_status_poll(module, state) do
+    Process.send_after(module, :status, module.config(:__checking__))
+
+    new_state =
+      with "ready" <- :persistent_term.get(:event_status, nil),
+           "ready" <- :persistent_term.get(:compile_status, nil),
+           {:module, state_module} <-
+             Code.ensure_loaded(ModuleStateCompiler.module_event_name(module.config(:__event__))),
+           data when not is_nil(data) <-
+             Enum.find(state_module.initialize().plugins, &(&1.name == module)),
+           plugin <- Event.dirty_get(:name, module) do
+        if is_nil(plugin), do: state, else: Keyword.merge(state, status: plugin.status)
+      else
+        _ -> state
+      end
+
+    {:noreply, new_state}
+  end
+
+  defp ready?() do
+    :persistent_term.get(:event_status, nil) == "ready" and
+      :persistent_term.get(:compile_status, nil) == "ready"
+  end
+
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
@@ -537,6 +757,7 @@ defmodule MishkaInstaller.Event.Hook do
           start_helper(module, state, reg_db_plg)
 
         error ->
+          module.on_dependency_error(error)
           MishkaInstaller.broadcast("event", :register_error, error)
           state
       end

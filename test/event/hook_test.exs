@@ -9,7 +9,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaDeveloperTools.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
 
     on_exit(fn ->
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
@@ -26,7 +26,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
     Process.register(self(), :__mishka_installer_event_test__)
 
-    Application.put_env(:mishka_installer, Mishka.MnesiaRepo,
+    Application.put_env(:mishka_installer, MishkaInstaller.MnesiaRepo,
       mnesia_dir: mnesia_dir,
       essential: [Event]
     )
