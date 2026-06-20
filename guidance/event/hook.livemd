@@ -14,7 +14,7 @@ Mix.install([
 
 Imagine you are going to make an application that will have many plugins built for it in the future. But the fact that many manipulations will be made on your source code makes it difficult to maintain the application. For example, you present a content management system for your users, and now they need to activate a section for registration and SMS; the system allows you to present your desired input/output absolutely plugin oriented to your users and makes it possible for the developers to write their required applications beyond the core source code.
 
-> **NOTICE**: Do not use the master branch; this library is under heavy development. The current release line is `0.1.6`; for the newest features, please wait until a new release is out.
+> **NOTICE**: Do not use the master branch; this library is under heavy development. The current release line is `0.1.7`; for the newest features, please wait until a new release is out.
 
 <!-- livebook:{"break_markdown":true} -->
 
@@ -77,10 +77,10 @@ Should you choose to leave this area unchecked, it is possible that it will eval
 
 **Consider the following scenario**:
 
-we have a `user management system`, and after 
-`registering` and `logging` into the system, we are going to carry out a number of actions. 
-On the other hand, we do not intend to alter the primary functions contained within 
-the source code except for the initial instance, and we will add our preferred 
+we have a `user management system`, and after
+`registering` and `logging` into the system, we are going to carry out a number of actions.
+On the other hand, we do not intend to alter the primary functions contained within
+the source code except for the initial instance, and we will add our preferred
 plugins outside of the source code.
 
 ```elixir

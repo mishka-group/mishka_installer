@@ -15,7 +15,7 @@ defmodule MishkaInstaller do
   possible for the developers to write their required applications beyond the core source code.
 
   > **NOTICE**: Do not use the master branch; this library is under heavy development.
-  > Expect version 0.1.6, and for using the new features, please wait until a new release is out.
+  > Expect version 0.1.7, and for using the new features, please wait until a new release is out.
 
 
   ##### This library is divided into the following main sections:
@@ -167,7 +167,7 @@ defmodule MishkaInstaller do
   ```elixir
   def deps do
     [
-      {:mishka_installer, "~> 0.1.6"}
+      {:mishka_installer, "~> 0.1.7"}
     ]
   end
   ```

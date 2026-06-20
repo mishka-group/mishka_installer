@@ -16,7 +16,7 @@
 ---
 
 > [!WARNING]
-> **🔧 Low maintenance.** The author currently only responds to pull requests. Don't use `master`; the current release line is `0.1.6`.
+> **🔧 Low maintenance.** The author currently only responds to pull requests. Don't use `master`; the current release line is `0.1.7`.
 
 ---
 
@@ -124,7 +124,7 @@ config :mishka_installer, MishkaInstaller.MnesiaRepo,
 
 ```elixir
 def deps do
-  [{:mishka_installer, "~> 0.1.6"}]
+  [{:mishka_installer, "~> 0.1.7"}]
 end
 ```
 

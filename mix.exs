@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
 
-  @version "0.1.6"
+  @version "0.1.7"
   @source_url "https://github.com/mishka-group/mishka_installer"
 
   def project do
@@ -45,7 +45,7 @@ defmodule MishkaInstaller.MixProject do
       {:plug, "~> 1.19"},
 
       # Schema validation + sanitizing
-      {:guarded_struct, "~> 0.1.0-beta.8"},
+      {:guarded_struct, "~> 0.1.0"},
       # Telemetry instrumentation
       {:telemetry, "~> 1.4"},
       # Plugin dependency graph: cycle detection + start ordering
