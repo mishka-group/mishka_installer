@@ -203,6 +203,7 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
       end
 
     with {:load, :ok} <- {:load, load},
+         :ok <- load_modules(app_name),
          {:all, {:ok, _apps}} <- {:all, Application.ensure_all_started(app_name)} do
       :ok
     else
@@ -216,6 +217,16 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
         {:error, [%{message: message, field: :app, action: :application_ensure, source: error}]}
     end
+  end
+
+  # Releases boot in embedded mode (no on-demand auto-loading), so explicitly load the installed
+  # app's not-yet-loaded modules from the prepended ebin before starting it.
+  defp load_modules(app_name) do
+    for module <- Application.spec(app_name, :modules) || [], !:code.is_loaded(module) do
+      :code.load_file(module)
+    end
+
+    :ok
   end
 
   @doc """

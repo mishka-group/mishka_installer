@@ -99,6 +99,27 @@ Installer.uninstall(%{app: "demo", version: "0.1.0"})
 
 ---
 
+## 🏭 Production deployment
+
+An installed library is a pre-built `ebin` on disk plus a Mnesia record; on every boot it is replayed (put back on the code path and started). So **both** the `ebin`s and the Mnesia data must live on a **persistent (mounted) volume** — otherwise installs do not survive a restart/redeploy. Point both at your volume (here `/data`):
+
+```elixir
+# config/runtime.exs — /data is your mounted volume
+config :mishka_installer,
+  project_path: "/data",
+  extensions_path: "/data/extensions"
+
+config :mishka_installer, MishkaInstaller.MnesiaRepo,
+  mnesia_dir: "/data/mnesia",
+  essential: [MishkaInstaller.Event.Event, MishkaInstaller.Installer.Installer]
+```
+
+`:extensions_path` is where `ebin`s are written; `mnesia_dir` is where the records live; `:essential` are the tables created on boot (the plugin and install stores — keep both). Just depend on `:mishka_installer`; its supervision tree starts automatically outside `:test`.
+
+> A real release restart proof lives in `test/integration/production_release/` — run it with `mix test --only production_release`.
+
+---
+
 ## 🚀 Installation
 
 ```elixir

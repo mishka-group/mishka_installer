@@ -11,6 +11,8 @@ defmodule MishkaInstaller.MixProject do
       elixir: "~> 1.17",
       name: "Mishka installer",
       elixirc_paths: elixirc_paths(Mix.env()),
+      # The release restart fixture's source lives under test/ but isn't ExUnit — don't warn on it.
+      test_ignore_filters: [&String.starts_with?(&1, "test/integration/")],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: description(),
