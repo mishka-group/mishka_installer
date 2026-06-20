@@ -248,6 +248,20 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
+    # The event-string -> module-atom mapping is immutable, but it runs on the `Hook.call/3` hot
+    # path, so memoize it in `:persistent_term` (write-once per distinct event, then lock-free reads).
+    case :persistent_term.get({__MODULE__, :name_cache, event}, nil) do
+      nil ->
+        module = build_module_name(event)
+        :persistent_term.put({__MODULE__, :name_cache, event}, module)
+        module
+
+      module ->
+        module
+    end
+  end
+
+  defp build_module_name(event) do
     event
     |> String.trim()
     |> String.replace(" ", "_")

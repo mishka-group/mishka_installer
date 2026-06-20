@@ -598,6 +598,18 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
+  Like `get(:name, name)` but a **dirty** (non-transactional) index read — a direct ETS lookup with
+  no lock or commit overhead. Use only where a slightly stale read is fine (e.g. the background plugin
+  status sync), never where you need transactional consistency.
+  """
+  @spec dirty_get(:name, module()) :: map() | struct() | nil
+  def dirty_get(:name, value) do
+    :mnesia.dirty_index_read(__MODULE__, value, :name)
+    |> MishkaInstaller.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> List.first()
+  end
+
+  @doc """
   To get a plugin information from Mnesia database by id.
 
   > #### Security considerations {: .warning}

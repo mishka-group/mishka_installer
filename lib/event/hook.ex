@@ -722,7 +722,7 @@ defmodule MishkaInstaller.Event.Hook do
              Code.ensure_loaded(ModuleStateCompiler.module_event_name(module.config(:__event__))),
            data when not is_nil(data) <-
              Enum.find(state_module.initialize().plugins, &(&1.name == module)),
-           plugin <- Event.get(:name, module) do
+           plugin <- Event.dirty_get(:name, module) do
         if is_nil(plugin), do: state, else: Keyword.merge(state, status: plugin.status)
       else
         _ -> state

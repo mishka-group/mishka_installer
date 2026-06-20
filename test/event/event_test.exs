@@ -1111,4 +1111,31 @@ defmodule MishkaInstallerTest.Event.EventTest do
       end
     end
   end
+
+  ###################################################################################
+  ################### (▰˘◡˘▰) Hot/warm path optimizations (▰˘◡˘▰) #############
+  ###################################################################################
+  describe "performance helpers ===>" do
+    test "module_event_name/1 is deterministic and memoized in :persistent_term" do
+      event = "cache_evt_#{System.unique_integer([:positive])}"
+
+      m1 = ModuleStateCompiler.module_event_name(event)
+      m2 = ModuleStateCompiler.module_event_name(event)
+
+      assert is_atom(m1)
+      assert m1 == m2
+      # The second call is a cache hit; the mapping is stored once.
+      assert :persistent_term.get({ModuleStateCompiler, :name_cache, event}) == m1
+    end
+
+    test "dirty_get/2 reads a plugin without a transaction, matching get/2" do
+      assert Event.dirty_get(:name, MishkaTest.Dirty) == nil
+
+      {:ok, _} =
+        Event.write(%{name: MishkaTest.Dirty, event: "dirty_evt", extension: :mishka_installer})
+
+      assert Event.dirty_get(:name, MishkaTest.Dirty) == Event.get(:name, MishkaTest.Dirty)
+      assert Event.dirty_get(:name, MishkaTest.Dirty).name == MishkaTest.Dirty
+    end
+  end
 end
