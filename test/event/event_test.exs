@@ -1097,6 +1097,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       refute Map.has_key?(result, :ran)
     end
 
+    @tag :capture_log
     test "a plugin that breaks the {:reply, _} contract leaves the input state unchanged" do
       bad = MishkaInstallerTest.Event.EventTest.BadReturn
 
@@ -1110,8 +1111,8 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       :ok = EventHandler.do_compile("bad_evt", :start, false)
 
-      # The unrolled `{:reply, x} = BadReturn.call(state)` raises a MatchError, the outer rescue
-      # catches it and returns the input untouched — exactly the old list-walk behaviour.
+      # The unrolled `case BadReturn.call(state)` matches neither `{:reply, _}` clause, so it raises a
+      # CaseClauseError; the outer rescue catches it and returns the input untouched — same as the old list-walk.
       assert Hook.call("bad_evt", %{n: 42}) == %{n: 42}
     end
   end

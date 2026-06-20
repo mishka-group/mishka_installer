@@ -1,5 +1,7 @@
 defmodule MishkaInstaller.MnesiaAssistantTest do
   use ExUnit.Case, async: false
+  # Some tests drive aborted Mnesia ops the Error module logs; capture those expected logs.
+  @moduletag :capture_log
   alias MishkaInstaller.MnesiaAssistant
   alias MishkaInstaller.MnesiaAssistant.{Transaction, Query, Table, Error, Information}
 
@@ -42,14 +44,51 @@ defmodule MishkaInstaller.MnesiaAssistantTest do
   end
 
   describe "Error.error_description/2" do
+    import ExUnit.CaptureLog
+
     test "success shapes normalise to {:ok, :atomic}" do
       assert Error.error_description(:ok, :test) == {:ok, :atomic}
       assert Error.error_description({:atomic, :ok}, :test) == {:ok, :atomic}
     end
 
-    test "already-exists becomes an error tuple" do
-      assert {:error, {:aborted, {:already_exists, :some_table}}, _desc} =
-               Error.error_description({:aborted, {:already_exists, :some_table}}, :test)
+    test ":starting normalises to {:ok, :atomic} (debug log)" do
+      log =
+        capture_log(fn ->
+          assert Error.error_description(:starting, :booting) == {:ok, :atomic}
+        end)
+
+      assert log =~ "starting"
+    end
+
+    test "already-exists becomes an error tuple (both tuple shapes)" do
+      assert {:error, {:aborted, {:already_exists, :t}}, _} =
+               Error.error_description({:aborted, {:already_exists, :t}}, :test)
+
+      # the {:error, {_, {:already_exists, _}}} shape some schema ops return
+      err = {:error, {:create, {:already_exists, :t}}}
+      assert {:error, ^err, _} = Error.error_description(err, :test)
+    end
+
+    test "an aborted tuple reason in the known error types logs an error and describes it" do
+      err = {:aborted, {:bad_type, :some_table}}
+
+      log =
+        capture_log(fn ->
+          assert {:error, ^err, desc} = Error.error_description(err, :test)
+          assert is_binary(desc) or is_list(desc)
+        end)
+
+      assert log =~ "error:"
+    end
+
+    test "an aborted tuple reason NOT in the known error types falls through to the catch-all" do
+      err = {:aborted, {:totally_custom_reason, :x}}
+      assert {:error, ^err, _desc} = Error.error_description(err, :test)
+    end
+
+    test "a bare (non-tuple) reason is described and returned" do
+      err = {:aborted, :no_exists}
+      assert {:error, ^err, _desc} = Error.error_description(err, :test)
     end
   end
 
@@ -115,6 +154,22 @@ defmodule MishkaInstaller.MnesiaAssistantTest do
 
     test "Information.system_info lists the local table", %{table: table} do
       assert table in Information.system_info(:local_tables)
+    end
+
+    test "add_table_copy / change_table_copy_type / clear_table error paths", %{table: table} do
+      # copying to a node that already holds the table aborts with already_exists
+      assert {:aborted, {:already_exists, ^table, _node}} =
+               Table.add_table_copy(table, node(), :ram_copies)
+
+      # operations on a non-existent table abort
+      assert {:aborted, _} = Table.change_table_copy_type(:ghost_table, node(), :ram_copies)
+      assert {:aborted, _} = Table.clear_table(:ghost_table)
+    end
+
+    test "wait_for_tables/2 times out for a table that never loads" do
+      ghost = :"ghost_#{System.unique_integer([:positive])}"
+      result = Table.wait_for_tables([ghost], 50)
+      assert match?({:timeout, [^ghost]}, result) or match?({:error, _}, result)
     end
   end
 

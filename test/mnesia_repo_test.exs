@@ -117,6 +117,8 @@ defmodule MishkaInstaller.MnesiaRepoTest do
   end
 
   describe "dynamic membership" do
+    # These configure unreachable seed/ghost peers; the repo logs the unreachable/down nodes at `:warning`.
+    @describetag :capture_log
     test "a node with no configured peers stays passive (dynamic membership off)" do
       # The default / single-node case: no `cluster_nodes` => no monitoring, node events are no-ops.
       pid = start_supervised!(MnesiaRepo)

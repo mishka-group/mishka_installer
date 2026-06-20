@@ -102,9 +102,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
   end
 
-  # An event with one or more started-but-not-loaded plugins compiles to an error stub: calling it
-  # returns `{:error, ...}` rather than silently running an incomplete pipeline (a plugin in the
-  # priority chain may be producing data the rest of the event depends on).
+  # Started-but-not-loaded plugins compile to an error stub: calling it returns `{:error, ...}`.
   defp call_ast(:error, _event, _plugins, inaccessible) do
     quote do
       def call(_state, _args \\ []) do
@@ -122,8 +120,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   defp call_ast(:ok, event, plugins, _inaccessible) do
-    # One explicit `state` var, shared by the param, the unrolled chain, and every reference below,
-    # so the generated code is hygiene-consistent.
+    # One shared `state` var for the param and the unrolled chain.
     state = Macro.var(:state, __MODULE__)
 
     quote do
@@ -171,18 +168,14 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     end
   end
 
-  # Compile the plugin chain into nested, direct calls — no `apply/3`, no list traversal, no
-  # `perform/2` helper; plugin module names are baked in at compile time. Each step matches the plugin
-  # contract: `{:reply, state}` continues to the next plugin, `{:reply, :halt, state}` stops the chain
-  # and returns that state. Anything else falls through (CaseClauseError) -> the outer rescue returns
-  # the input state, exactly as the old list-walk did. An empty chain compiles to just `state`.
+  # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
   defp build_chain([], state_var), do: state_var
 
   defp build_chain([plugin | rest], state_var) do
     next = Macro.unique_var(:state, __MODULE__)
 
     quote do
-      case unquote(plugin.name).call(unquote(state_var)) do
+      case apply(unquote(plugin.name), :call, [unquote(state_var)]) do
         {:reply, :halt, halted} -> halted
         {:reply, unquote(next)} -> unquote(build_chain(rest, next))
       end
@@ -215,9 +208,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   @spec purge_create(list(struct()), String.t(), list(module())) :: :ok | error_return
   def purge_create(plugins, event, inaccessible \\ []) do
     module = module_event_name(event)
-    # Replace the module in place: drop only the previous *old* copy, then recompile. The current
-    # version stays callable until the new one is loaded, so a concurrent `Hook.call/3` never sees a
-    # missing module — the hot read path needs no rescue.
+
+    # Drop only the old copy then recompile; the current version stays callable until the new one loads.
     :code.purge(module)
     create(plugins, event, inaccessible)
   end
@@ -268,8 +260,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
-    # The event-string -> module-atom mapping is immutable, but it runs on the `Hook.call/3` hot
-    # path, so memoize it in `:persistent_term` (write-once per distinct event, then lock-free reads).
+    # Memoize the immutable event->module mapping in `:persistent_term` (hot path, lock-free reads).
     case :persistent_term.get({__MODULE__, :name_cache, event}, nil) do
       nil ->
         module = build_module_name(event)
@@ -300,7 +291,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec initialize?(String.t()) :: boolean()
-  def initialize?(event), do: module_event_name(event).initialize?
+  def initialize?(event), do: module_event_name(event).initialize?()
 
   @doc """
   Safely checks if the event module is initialized, rescuing any errors.
@@ -313,7 +304,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   @spec rescue_initialize?(String.t()) :: boolean()
   def rescue_initialize?(event) do
     module = module_event_name(event)
-    module.initialize?
+    module.initialize?()
   rescue
     _ -> false
   end

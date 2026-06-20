@@ -196,6 +196,8 @@ defmodule MishkaInstaller.Event.Event do
          :ok <- allowed_events?(data.depends),
          {:ok, db_plg} <- write(:id, data.id, %{status: :started}),
          :ok <- EventHandler.do_compile(db_plg.event, :start, queue) do
+      # Carry the record so `:held` dependents can re-evaluate and auto-start (see `plugin_dependency_event/3`).
+      MishkaInstaller.broadcast("event", :start, db_plg)
       {:ok, db_plg}
     end
   end

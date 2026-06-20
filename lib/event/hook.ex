@@ -259,13 +259,15 @@ defmodule MishkaInstaller.Event.Hook do
   @callback unregister() :: okey_return | error_return
   @callback get() :: keyword()
   @callback health_check() :: :ok | {:degraded, term()} | {:error, term()}
+  @callback on_dependency_error(term()) :: term()
   @optional_callbacks register: 0,
                       start: 0,
                       restart: 0,
                       stop: 0,
                       unregister: 0,
                       get: 0,
-                      health_check: 0
+                      health_check: 0,
+                      on_dependency_error: 1
 
   @spec __using__(keyword()) :: Macro.t()
   defmacro __using__(opts \\ []) do
@@ -277,8 +279,7 @@ defmodule MishkaInstaller.Event.Hook do
 
       @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
       @type okey_return :: {:ok, struct() | map() | module() | list(any())}
-      # Based on https://elixirforum.com/t/59168/5
-      # Only keep basic config values that can be serialized at compile time
+      # Keep only compile-time-serializable config values (https://elixirforum.com/t/59168/5).
       @app_config Mix.Project.config()
                   |> Keyword.take([
                     :app,
@@ -301,9 +302,7 @@ defmodule MishkaInstaller.Event.Hook do
       @checking Keyword.get(opts, :checking, 1000)
       @queue Keyword.get(opts, :queue, true)
 
-      # `config/0` carries the plugin's compile-time options so the shared `Hook.*` functions below
-      # can read them at runtime; everything else in this macro is a thin delegator (the real logic
-      # lives once in `MishkaInstaller.Event.Hook`, not recompiled into every plugin).
+      # `config/0` carries the plugin's compile-time options; the rest of the macro delegates to `Hook.*`.
       @spec config() :: keyword()
       def config() do
         Keyword.merge(@app_config,
@@ -449,8 +448,7 @@ defmodule MishkaInstaller.Event.Hook do
     end
   end
 
-  # Cold path (profiling only) — a rescue here is fine and keeps one slow/failing plugin from
-  # aborting the whole profile run.
+  # Cold path: rescue keeps one failing plugin from aborting the whole profile run.
   defp time_plugin(name, state) do
     :timer.tc(fn ->
       case apply(name, :call, [state]) do
@@ -584,10 +582,7 @@ defmodule MishkaInstaller.Event.Hook do
   ####################################################################################
   ################# (▰˘◡˘▰) Plugin runtime (macro delegates here) (▰˘◡˘▰) ######
   ####################################################################################
-  # `use MishkaInstaller.Event.Hook` injects only thin wrappers that call the functions below, so
-  # this logic is compiled once here instead of into every plugin module (faster compile, no
-  # duplicated bytecode). Each takes the plugin `module` and reads its compile-time options from
-  # `module.config/1`.
+  # The macro injects thin wrappers that call these functions; each reads its options via `module.config/1`.
   @wait_for_tables 6000
 
   @doc false

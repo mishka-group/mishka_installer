@@ -70,11 +70,15 @@ defmodule MishkaInstaller.MnesiaAssistant.Error do
 
       {:error, error, describe(converted)}
     else
-      error_description(error, identifier)
+      generic_error(error, identifier)
     end
   end
 
   def error_description(error, identifier) do
+    generic_error(error, identifier)
+  end
+
+  defp generic_error(error, identifier) do
     converted = error_description(error)
 
     Logger.error(

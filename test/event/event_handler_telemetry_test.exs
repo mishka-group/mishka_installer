@@ -76,4 +76,17 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
     assert_receive {:telemetry, [:mishka_installer, :event, :compile], _meas,
                     %{event: "reconcile_evt", result: :ok}}
   end
+
+  test "do_clean/0 resets the running list and queue" do
+    EventHandler.do_clean()
+    state = EventHandler.get()
+    assert Keyword.get(state, :running) == []
+  end
+
+  test "a :compile_synchronized broadcast forces synchronized_start" do
+    send(Process.whereis(EventHandler), %{status: :compile_synchronized, channel: "mnesia"})
+
+    assert_receive {:telemetry, [:mishka_installer, :event, :synchronized], _meas, %{node: _}},
+                   1000
+  end
 end

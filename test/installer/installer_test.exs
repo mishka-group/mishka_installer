@@ -202,6 +202,33 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert File.dir?("#{dest}/ebin")
     end
 
+    test "uninstall stops/unloads the app and removes its record + on-disk files" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+      assert app_atom in started_apps()
+
+      :ok = Installer.uninstall(%{app: app, version: version, path: pkg})
+
+      refute app_atom in started_apps()
+      assert is_nil(Installer.get(:app, app))
+      refute File.dir?("#{LibraryHandler.extensions_path()}/#{app}-#{version}")
+    end
+
+    test "async_install queues the install and the CompileHandler activates it" do
+      start_supervised!(MishkaInstaller.Installer.CompileHandler)
+      MishkaInstaller.subscribe("installer")
+      {app, app_atom, version, pkg, module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      :ok = Installer.async_install(%{app: app, version: version, path: pkg})
+
+      assert_receive %{status: :install, channel: "installer"}, 2000
+      assert app_atom in started_apps()
+      assert module.hello() == :world
+    end
+
     test "restart persistence: the installed app is re-loaded from the record + on-disk ebin" do
       {app, app_atom, version, pkg, module} = fake_local_app()
 
@@ -347,6 +374,8 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   ######################## (▰˘◡˘▰) Allow/deny policy (▰˘◡˘▰) ###################
   ###################################################################################
   describe "Installer allow/deny policy ===>" do
+    # Every test here drives a blocked install/uninstall; the policy logs each rejection at `:warning`.
+    @describetag :capture_log
     test "a protected app cannot be installed over (mishka_installer is protected by default)" do
       {:error, [%{action: :allowlist}]} =
         assert Installer.install(%{app: "mishka_installer", version: "9.9.9", path: "whatever"})
