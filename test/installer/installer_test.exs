@@ -18,6 +18,8 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       end
     end)
 
+    on_exit(fn -> Application.delete_env(:mishka_installer, :allowlist) end)
+
     Process.register(self(), :__mishka_installer_test__)
 
     Application.put_env(:mishka_installer, MishkaInstaller.MnesiaRepo,
@@ -131,6 +133,8 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         plug: {Req.Test, Downloader}
       )
 
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
       app = uniq_app("url_demo")
       app_atom = String.to_atom(app)
       version = "0.1.0"
@@ -168,6 +172,8 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       version = "0.1.0"
       {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
       dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+
+      Application.put_env(:mishka_installer, :allowlist, github_repos: ["owner/#{app}"])
 
       # GitHub API call -> release JSON; the asset (served from a CDN) -> the tarball.
       Req.Test.stub(Downloader, fn conn ->
@@ -320,6 +326,8 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         plug: {Req.Test, Downloader}
       )
 
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
       app = uniq_app("sum_ok")
       app_atom = String.to_atom(app)
       version = "0.1.0"
@@ -345,6 +353,8 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       Application.put_env(:mishka_installer, :downloader_req_options,
         plug: {Req.Test, Downloader}
       )
+
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
 
       app = uniq_app("sum_bad")
       app_atom = String.to_atom(app)
@@ -376,6 +386,19 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   describe "Installer allow/deny policy ===>" do
     # Every test here drives a blocked install/uninstall; the policy logs each rejection at `:warning`.
     @describetag :capture_log
+
+    test "a remote install is blocked when no allowlist is configured (fail-closed default)" do
+      app = uniq_app("noallow")
+
+      assert {:error, [%{action: :allowlist}]} =
+               Installer.install(%{
+                 app: app,
+                 version: "0.1.0",
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz"
+               })
+    end
+
     test "a protected app cannot be installed over (mishka_installer is protected by default)" do
       {:error, [%{action: :allowlist}]} =
         assert Installer.install(%{app: "mishka_installer", version: "9.9.9", path: "whatever"})
@@ -449,6 +472,37 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
                })
 
       assert module.hello() == :world
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Path safety (▰˘◡˘▰) ##########################
+  ###################################################################################
+  describe "path safety ===>" do
+    test "install rejects a version that escapes the extensions directory" do
+      outside = Path.join(System.tmp_dir!(), "mishka_evil_#{System.unique_integer([:positive])}")
+      File.mkdir_p!(outside)
+      on_exit(fn -> File.rm_rf!(outside) end)
+
+      assert {:error, [%{action: :package_dir}]} =
+               Installer.install(%{
+                 app: "demo",
+                 version: "0.1.0/../../../../#{outside}",
+                 path: "x"
+               })
+
+      # the guard fires before any filesystem op, so the outside dir is untouched
+      assert File.dir?(outside)
+    end
+
+    test "uninstall rejects a version that escapes the extensions directory" do
+      assert {:error, [%{action: :package_dir}]} =
+               Installer.uninstall(%{app: "demo", version: "0.1.0/../../etc", path: "p"})
+    end
+
+    test "uninstall rejects an invalid app name (path traversal in app)" do
+      assert {:error, [%{action: :valid_name}]} =
+               Installer.uninstall(%{app: "../../etc", version: "0.1.0", path: "p"})
     end
   end
 

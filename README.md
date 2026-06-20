@@ -95,7 +95,7 @@ Installer.uninstall(%{app: "demo", version: "0.1.0"})
 ```
 
 > [!NOTE]
-> Optional `checksum:` (sha256) verification and an allow/deny policy (`config :mishka_installer, :allowlist, ...`) restrict which sources and apps may be installed. See `MishkaInstaller.Installer.Installer`.
+> Remote installs (`:url`/`:github_*`) are **fail-closed**: they require the source host/repo in `config :mishka_installer, :allowlist, url_hosts:/github_repos:`. Optional `checksum:` (sha256) pins the artifact; `:protected_apps` guards apps from being overwritten/removed. See `MishkaInstaller.Installer.Installer`.
 
 ---
 

@@ -110,4 +110,32 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
 
     {:error, [%{action: :extract}]} = assert LibraryHandler.extract(:tar, tarball, name)
   end
+
+  test "Extract rejects an archive with a traversal member (tar-slip)" do
+    uniq = System.unique_integer([:positive])
+    src = Path.join(System.tmp_dir!(), "slip-#{uniq}")
+    File.write!(src, "payload")
+
+    tar = Path.join(System.tmp_dir!(), "slip-#{uniq}.tar.gz")
+
+    :ok =
+      :erl_tar.create(
+        String.to_charlist(tar),
+        [{~c"../escaped-#{uniq}.txt", String.to_charlist(src)}],
+        [:compressed]
+      )
+
+    tarball = File.read!(tar)
+    File.rm!(src)
+    File.rm!(tar)
+
+    # where a "../" member would land if extraction (cwd = temp-<name>) were allowed
+    escaped = "#{LibraryHandler.extensions_path()}/escaped-#{uniq}.txt"
+    on_exit(fn -> File.rm_rf!(escaped) end)
+
+    {:error, [%{action: :extract}]} = assert LibraryHandler.extract(:tar, tarball, "slip-#{uniq}")
+
+    # rejected before extracting — nothing written outside the temp dir
+    refute File.exists?(escaped)
+  end
 end

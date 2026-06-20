@@ -3,6 +3,7 @@
 ### Breaking
 
 - [x] Move the Mnesia helpers under the `Helper` namespace: `MishkaInstaller.MnesiaAssistant.*` → `MishkaInstaller.Helper.MnesiaAssistant.*` (files moved to `lib/helper/`). Update any direct references.
+- [x] The installer allowlist is now **fail-closed**: remote installs (`:url`/`:github_*`) require the source host/repo to be listed in `config :mishka_installer, :allowlist, url_hosts:/github_repos:`. An empty/absent list now blocks all remote installs (previously it allowed any source). Local `:path` installs are unaffected.
 
 
 # Changelog for MishkaInstaller 0.1.1

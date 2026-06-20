@@ -163,16 +163,46 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     File.rm_rf!(temp_path)
     File.mkdir_p!(temp_path)
 
-    :erl_tar.extract({:binary, archived}, [:compressed, {:cwd, String.to_charlist(temp_path)}])
-    |> case do
-      :ok ->
-        finalize_extract(temp_path, "#{base}/#{name}")
+    with :ok <- safe_tar_paths(archived),
+         :ok <-
+           :erl_tar.extract({:binary, archived}, [
+             :compressed,
+             {:cwd, String.to_charlist(temp_path)}
+           ]) do
+      finalize_extract(temp_path, "#{base}/#{name}")
+    else
+      {:error, [%{} | _] = errors} ->
+        File.rm_rf!(temp_path)
+        {:error, errors}
 
       error ->
         File.rm_rf!(temp_path)
         message = "There is a problem in extracting the compressed file of the pre-built library."
         {:error, [%{message: message, field: :path, action: :extract, source: error}]}
     end
+  end
+
+  # Tar-slip guard: a malicious archive can carry members with absolute or `../` paths that escape
+  # the extraction dir. Read the table first and refuse the whole archive if any member is unsafe.
+  defp safe_tar_paths(archived) do
+    case :erl_tar.table({:binary, archived}, [:compressed]) do
+      {:ok, members} ->
+        if Enum.all?(members, &safe_member?/1) do
+          :ok
+        else
+          message = "The archive contains unsafe member paths (absolute or `..` traversal)."
+          {:error, [%{message: message, field: :path, action: :extract}]}
+        end
+
+      error ->
+        message = "Could not read the archive table."
+        {:error, [%{message: message, field: :path, action: :extract, source: error}]}
+    end
+  end
+
+  defp safe_member?(name) do
+    parts = name |> to_string() |> Path.split()
+    not (String.starts_with?(to_string(name), "/") or ".." in parts)
   end
 
   @doc """

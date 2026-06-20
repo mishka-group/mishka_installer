@@ -213,13 +213,14 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   @spec uninstall(t() | map()) :: :ok | error_return()
   def uninstall(app) do
-    with :ok <- protected_app(app.app) do
+    with :ok <- valid_name(app.app),
+         :ok <- protected_app(app.app),
+         {:ok, dir} <- package_dir(app.app, app.version) do
       app_atom = safe_atom(app.app)
-      ext_path = LibraryHandler.extensions_path()
       Application.stop(app_atom)
       Application.unload(app_atom)
-      Code.delete_path("#{ext_path}/#{app.app}-#{app.version}/ebin")
-      File.rm_rf!("#{ext_path}/#{app.app}-#{app.version}")
+      Code.delete_path("#{dir}/ebin")
+      File.rm_rf!(dir)
       delete(:app, app.app)
       MishkaInstaller.broadcast("installer", :uninstall, app)
       :ok
@@ -558,27 +559,26 @@ defmodule MishkaInstaller.Installer.Installer do
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   defp fetch_package(%{type: :path} = data) do
-    dest = "#{LibraryHandler.extensions_path()}/#{data.app}-#{data.version}"
-
-    with :ok <- allowed_extract_path(data.path),
+    with {:ok, dest} <- package_dir(data.app, data.version),
+         :ok <- allowed_extract_path(data.path),
          :ok <- place_package(data.path, dest) do
       {:ok, dest}
     end
   end
 
   defp fetch_package(data) do
-    name = "#{data.app}-#{data.version}"
-
-    with :ok <- allowed_source(data),
+    with {:ok, dest} <- package_dir(data.app, data.version),
+         :ok <- allowed_source(data),
          {:ok, body} <- Downloader.download(data.type, download_pkg(data)),
          :ok <- verify_checksum(body, Map.get(data, :checksum)),
-         :ok <- LibraryHandler.extract(:tar, body, name) do
-      {:ok, "#{LibraryHandler.extensions_path()}/#{name}"}
+         :ok <- LibraryHandler.extract(:tar, body, Path.basename(dest)) do
+      {:ok, dest}
     end
   end
 
-  # Allow/deny policy (configured under `config :mishka_installer, :allowlist, ...`). Empty/absent
-  # lists impose no restriction; a non-empty list is fail-closed (only listed sources are allowed).
+  # Allow/deny policy (configured under `config :mishka_installer, :allowlist, ...`). Fail-closed: a
+  # remote source (`:url`/`:github_*`) is allowed only if its host/repo is in the configured list; an
+  # empty/absent list blocks every remote install. Local `:path` installs never reach here.
   # `:protected_apps` is always enforced and defaults to protecting `mishka_installer` itself.
   defp allowed_source(%{type: :url, path: path}), do: allowed_in(:url_hosts, URI.parse(path).host)
 
@@ -590,7 +590,7 @@ defmodule MishkaInstaller.Installer.Installer do
 
   defp allowed_in(key, value) do
     case allowlist(key, []) do
-      [] -> :ok
+      [] -> policy_blocked(key, value)
       list -> if "#{value}" in Enum.map(list, &"#{&1}"), do: :ok, else: policy_blocked(key, value)
     end
   end
@@ -698,6 +698,20 @@ defmodule MishkaInstaller.Installer.Installer do
 
       {:error,
        [%{message: message, field: :path, action: :allowed_extract_path, allowed: allowed}]}
+    end
+  end
+
+  # `app`/`version` can arrive from an admin web form, so never trust them straight into a path:
+  # build the canonical "<app>-<version>" dir and refuse anything that escapes the extensions dir.
+  defp package_dir(app, version) do
+    base = LibraryHandler.extensions_path()
+    dir = Path.expand("#{app}-#{version}", base)
+
+    if String.starts_with?(dir, Path.expand(base) <> "/") do
+      {:ok, dir}
+    else
+      message = "Invalid app/version: the package path escapes the extensions directory."
+      {:error, [%{message: message, field: :version, action: :package_dir}]}
     end
   end
 
