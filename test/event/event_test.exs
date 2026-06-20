@@ -8,6 +8,12 @@ defmodule MishkaInstallerTest.Event.EventTest.Double do
   def call(state), do: {:reply, Map.update(state, :n, 0, &(&1 * 2))}
 end
 
+defmodule MishkaInstallerTest.Event.EventTest.BadReturn do
+  @moduledoc false
+  # Violates the {:reply, _} contract on purpose.
+  def call(_state), do: :oops_not_a_reply
+end
+
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
@@ -1041,6 +1047,33 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
     test ":return short-circuits and gives back the input untouched" do
       assert Hook.call("transform_evt", %{n: 5}, return: true) == %{n: 5}
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Unrolled call chain (▰˘◡˘▰) ##################
+  ###################################################################################
+  describe "unrolled call chain ===>" do
+    test "the chain is straight-line: the perform/2 list-walk helper no longer exists" do
+      refute function_exported?(ModuleStateCompiler, :perform, 2)
+    end
+
+    test "a plugin that breaks the {:reply, _} contract leaves the input state unchanged" do
+      bad = MishkaInstallerTest.Event.EventTest.BadReturn
+
+      {:ok, _} =
+        Event.write(%{
+          name: bad,
+          event: "bad_evt",
+          extension: :mishka_installer,
+          status: :started
+        })
+
+      :ok = EventHandler.do_compile("bad_evt", :start, false)
+
+      # The unrolled `{:reply, x} = BadReturn.call(state)` raises a MatchError, the outer rescue
+      # catches it and returns the input untouched — exactly the old list-walk behaviour.
+      assert Hook.call("bad_evt", %{n: 42}) == %{n: 42}
     end
   end
 

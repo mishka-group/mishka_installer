@@ -121,19 +121,34 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     end
   end
 
+  # Compile the plugin chain into straight-line, direct calls — no `apply/3`, no list traversal, no
+  # `perform/2` helper. The plugin module names are baked in at compile time; each step asserts the
+  # `{:reply, _}` contract (a non-conforming plugin raises -> the outer rescue returns the input
+  # state, exactly as the old list-walk did). An empty chain compiles to just `state`.
+  defp build_chain(plugins, state_var) do
+    Enum.reduce(plugins, state_var, fn plugin, acc ->
+      quote do
+        {:reply, result} = unquote(plugin.name).call(unquote(acc))
+        result
+      end
+    end)
+  end
+
   defp call_ast(:ok, event, plugins, _inaccessible) do
+    # One explicit `state` var, shared by the param, the unrolled chain, and every reference below,
+    # so the generated code is hygiene-consistent.
+    state = Macro.var(:state, __MODULE__)
+
     quote do
-      def call(state, args \\ []) do
+      def call(unquote(state), args \\ []) do
         private = Keyword.get(args, :private)
         return_status = Keyword.get(args, :return)
 
-        performed =
-          unquote(Macro.escape(plugins))
-          |> MishkaInstaller.Event.ModuleStateCompiler.perform({:reply, state})
+        performed = unquote(build_chain(plugins, state))
 
         new_state =
           if !is_nil(return_status) do
-            state
+            unquote(state)
           else
             case performed do
               {:ok, data} when is_list(data) ->
@@ -164,7 +179,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       rescue
         e ->
           MishkaInstaller.Event.ModuleStateCompiler.log_call_error(unquote(event), e)
-          state
+          unquote(state)
       end
     end
   end
@@ -326,13 +341,5 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   def safe_initialize?(event) do
     module = module_event_name(event)
     function_exported?(module, :initialize?, 0)
-  end
-
-  @doc false
-  @spec perform(list(), {:reply, any()}) :: any()
-  def perform([], {:reply, state}), do: state
-
-  def perform([h | t], {:reply, state}) do
-    perform(t, apply(h.name, :call, [state]))
   end
 end

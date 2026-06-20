@@ -18,7 +18,13 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   end
 
   test "Create a compile time module" do
-    plugin = Event.builder(%{name: MishkaInstallerTest.Support.MishkaPlugin.EventCDeps})
+    {:ok, plugin} =
+      Event.builder(%{
+        name: MishkaInstallerTest.Support.MishkaPlugin.EventCDeps,
+        event: "event_c_extra",
+        extension: :mishka_installer
+      })
+
     :ok = ModuleStateCompiler.create([plugin], "event_c_extra")
 
     module = ModuleStateCompiler.module_event_name("event_c_extra")
@@ -29,7 +35,13 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   end
 
   test "Purge and Create a compile time module" do
-    plugin = Event.builder(%{name: MishkaInstallerTest.Support.MishkaPlugin.Bulk.EventCOTP})
+    {:ok, plugin} =
+      Event.builder(%{
+        name: MishkaInstallerTest.Support.MishkaPlugin.Bulk.EventCOTP,
+        event: "event_c",
+        extension: :mishka_installer
+      })
+
     :ok = ModuleStateCompiler.purge_create([plugin], "event_c")
 
     module = ModuleStateCompiler.module_event_name("event_c")
