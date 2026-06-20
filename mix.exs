@@ -70,7 +70,8 @@ defmodule MishkaInstaller.MixProject do
       maintainers: ["Shahryar Tavakkoli"],
       links: %{
         "GitHub" => @source_url,
-        "Changelog" => "https://hexdocs.pm/mishka_installer/changelog.html"
+        "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md",
+        "Sponsor" => "https://github.com/sponsors/mishka-group"
       }
     ]
   end
