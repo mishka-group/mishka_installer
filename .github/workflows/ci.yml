@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - delete-installer-prove-for-cms
   pull_request:
     branches:
       - master
@@ -20,17 +21,30 @@ jobs:
           - pair:
               elixir: "1.17.1"
               otp: "27.0"
+          - pair:
+              elixir: "1.20.1"
+              otp: "29.0.2"
 
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: erlef/setup-beam@v1
         id: beam
         with:
           otp-version: ${{matrix.pair.otp}}
           elixir-version: ${{matrix.pair.elixir}}
+
+      - name: Cache deps and build
+        uses: actions/cache@v4
+        with:
+          path: |
+            deps
+            _build
+          key: ${{ runner.os }}-mix-${{ matrix.pair.otp }}-${{ matrix.pair.elixir }}-${{ hashFiles('**/mix.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-mix-${{ matrix.pair.otp }}-${{ matrix.pair.elixir }}-
 
       - name: Elixir and Erlang Dependencies
         run: |
@@ -42,6 +56,12 @@ jobs:
           mix deps.get
           mix deps.compile
 
+      - name: Check formatting and compile warnings
+        if: matrix.pair.elixir == '1.20.1'
+        run: |
+          mix format --check-formatted
+          mix compile --warnings-as-errors
+
       - name: Set up environment
         run: |
           echo "PROJECT_PATH=$(pwd)" >> $GITHUB_ENV
@@ -50,5 +70,12 @@ jobs:
       - name: Run test with temporary information
         run: |
           mix test --trace
+        env:
+          PROJECT_PATH: ${{ env.PROJECT_PATH }}
+
+      - name: Run distributed tests
+        run: |
+          epmd -daemon
+          mix test --only distributed --trace
         env:
           PROJECT_PATH: ${{ env.PROJECT_PATH }}
