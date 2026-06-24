@@ -24,12 +24,29 @@ defmodule MishkaInstallerTest.Event.EventTest.ShouldNotRun do
   def call(state), do: {:reply, Map.put(state, :ran, true)}
 end
 
+defmodule MishkaInstallerTest.Event.EventTest.MetaReader do
+  @moduledoc false
+  # Opts into meta with call/2; reports what it received to the test process, returns state unchanged.
+  def call(state, meta) do
+    send(:__mishka_installer_event_test__, {:meta_reader, meta})
+    {:reply, state}
+  end
+end
+
+defmodule MishkaInstallerTest.Event.EventTest.MetaStamp do
+  @moduledoc false
+  # call/2 plugin that uses meta to transform the data.
+  def call(state, meta), do: {:reply, Map.put(state, :stamped_by, meta && meta.actor)}
+end
+
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
   alias MishkaInstaller.Event.Hook
   alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
   alias MishkaInstallerTest.Support.MishkaPlugin.RegisterOTPSender
+  alias MishkaInstallerTest.Support.MishkaPlugin.MetaAuditLog
+  alias MishkaInstallerTest.Event.EventTest.{AddOne, MetaReader, MetaStamp}
 
   setup do
     :persistent_term.put(:compile_status, "ready")
@@ -1058,6 +1075,106 @@ defmodule MishkaInstallerTest.Event.EventTest do
     test ":return short-circuits and gives back the input untouched" do
       assert Hook.call("transform_evt", %{n: 5}, return: true) == %{n: 5}
     end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) meta (call/2 plugins) (▰˘◡˘▰) ################
+  ###################################################################################
+  describe "meta argument — call/2 plugins ===>" do
+    test "a call/2 plugin receives the :meta passed to Hook.call/3" do
+      start_event("meta_read_evt", [{MetaReader, 1}])
+
+      Hook.call("meta_read_evt", %{n: 1}, meta: %{actor: "alice"})
+
+      assert_receive {:meta_reader, %{actor: "alice"}}
+    end
+
+    test "meta is read-only: it is NOT merged into the result (unlike :private)" do
+      start_event("meta_noleak_evt", [{MetaReader, 1}])
+
+      assert Hook.call("meta_noleak_evt", %{n: 1}, meta: %{actor: "alice"}) == %{n: 1}
+    end
+
+    test "a call/2 plugin can use meta to transform the data" do
+      start_event("meta_stamp_evt", [{MetaStamp, 1}])
+
+      assert Hook.call("meta_stamp_evt", %{n: 1}, meta: %{actor: "bob"}) ==
+               %{n: 1, stamped_by: "bob"}
+    end
+
+    test "meta is nil when none is passed" do
+      start_event("meta_nil_evt", [{MetaReader, 1}])
+
+      Hook.call("meta_nil_evt", %{n: 1})
+
+      assert_receive {:meta_reader, nil}
+    end
+
+    test "call/1 plugins are unaffected when :meta is supplied" do
+      start_event("meta_ignored_evt", [{AddOne, 1}])
+
+      assert Hook.call("meta_ignored_evt", %{n: 1}, meta: %{actor: "x"}) == %{n: 2}
+    end
+
+    test "mixed chain: call/1 and call/2 plugins run together; only call/2 receives meta" do
+      start_event("meta_mixed_evt", [{AddOne, 1}, {MetaStamp, 2}])
+
+      assert Hook.call("meta_mixed_evt", %{n: 1}, meta: %{actor: "carol"}) ==
+               %{n: 2, stamped_by: "carol"}
+    end
+
+    test "meta composes with :private — meta goes to the plugin, private into the result" do
+      start_event("meta_private_evt", [{MetaStamp, 1}])
+
+      assert Hook.call("meta_private_evt", %{n: 1}, meta: %{actor: "z"}, private: %{locked: true}) ==
+               %{n: 1, stamped_by: "z", locked: true}
+    end
+
+    test "meta composes with :return — the plugin still gets meta, output is the original input" do
+      start_event("meta_return_evt", [{MetaReader, 1}])
+
+      assert Hook.call("meta_return_evt", %{n: 1}, meta: %{actor: "z"}, return: true) == %{n: 1}
+      assert_receive {:meta_reader, %{actor: "z"}}
+    end
+
+    test "a real support plugin (call/2) merges meta into a new map in its return" do
+      start_event("after_user_login", [{MetaAuditLog, 1}])
+
+      result =
+        Hook.call("after_user_login", %{user_id: 7},
+          meta: %{actor: "admin", ip: "10.0.0.9", at: 1_700_000_000}
+        )
+
+      assert result == %{
+               user_id: 7,
+               audited_by: "admin",
+               audited_ip: "10.0.0.9",
+               audited_at: 1_700_000_000
+             }
+    end
+
+    test "the real support plugin still runs (audit fields nil) when no meta is passed" do
+      start_event("after_user_login", [{MetaAuditLog, 1}])
+
+      assert Hook.call("after_user_login", %{user_id: 7}) ==
+               %{user_id: 7, audited_by: nil, audited_ip: nil, audited_at: nil}
+    end
+  end
+
+  # Registers each {module, priority} for `event` as :started, then compiles the dispatch module.
+  defp start_event(event, plugins) do
+    Enum.each(plugins, fn {mod, priority} ->
+      {:ok, _} =
+        Event.write(%{
+          name: mod,
+          event: event,
+          extension: :mishka_installer,
+          status: :started,
+          priority: priority
+        })
+    end)
+
+    :ok = EventHandler.do_compile(event, :start, false)
   end
 
   ###################################################################################

@@ -190,14 +190,26 @@ defmodule MishkaInstaller.Event.HookTest do
   end
 
   describe "after_compile guards ===>" do
-    test "a plugin without call/1 raises at compile time" do
-      assert_raise RuntimeError, ~r/should have call\/1/, fn ->
+    test "a plugin with neither call/1 nor call/2 raises at compile time" do
+      assert_raise RuntimeError, ~r/call\/1 or call\/2/, fn ->
         Code.eval_string("""
         defmodule MishkaTmp.NoCallPlugin do
           use MishkaInstaller.Event.Hook, event: "tmp_evt"
         end
         """)
       end
+    end
+
+    test "a plugin defining only call/2 compiles without raising" do
+      Code.eval_string("""
+      defmodule MishkaTmp.Call2OnlyPlugin do
+        use MishkaInstaller.Event.Hook, event: "tmp_call2_evt"
+        @impl true
+        def call(state, _meta), do: {:reply, state}
+      end
+      """)
+
+      assert function_exported?(MishkaTmp.Call2OnlyPlugin, :call, 2)
     end
 
     test "a plugin not dedicated to an event raises at compile time" do
