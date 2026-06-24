@@ -262,7 +262,9 @@ defmodule MishkaInstaller.Event.EventHandler do
     do: Code.ensure_loaded?(module) and function_exported?(module, :is_changed?, 1)
 
   defp plugin_callable?(name),
-    do: Code.ensure_loaded?(name) and function_exported?(name, :call, 1)
+    do:
+      Code.ensure_loaded?(name) and
+        (function_exported?(name, :call, 1) or function_exported?(name, :call, 2))
 
   defp safe_mode(module),
     do: if(function_exported?(module, :mode, 0), do: module.mode(), else: :ok)

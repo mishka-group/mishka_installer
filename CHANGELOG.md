@@ -1,3 +1,9 @@
+# Changelog for MishkaInstaller 0.1.8
+
+### Features:
+
+- Add optional :meta arg passing read-only context to `call/2` plugins
+
 # Changelog for MishkaInstaller 0.1.6
 
 ### Features:

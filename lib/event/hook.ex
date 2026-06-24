@@ -252,6 +252,7 @@ defmodule MishkaInstaller.Event.Hook do
   @type okey_return :: {:ok, struct() | map() | module() | list(any())}
 
   @callback call(any()) :: any()
+  @callback call(any(), meta :: any()) :: any()
   @callback register() :: okey_return | error_return
   @callback start() :: okey_return | error_return
   @callback restart() :: okey_return | error_return
@@ -260,7 +261,9 @@ defmodule MishkaInstaller.Event.Hook do
   @callback get() :: keyword()
   @callback health_check() :: :ok | {:degraded, term()} | {:error, term()}
   @callback on_dependency_error(term()) :: term()
-  @optional_callbacks register: 0,
+  @optional_callbacks call: 1,
+                      call: 2,
+                      register: 0,
                       start: 0,
                       restart: 0,
                       stop: 0,
@@ -392,7 +395,9 @@ defmodule MishkaInstaller.Event.Hook do
   ## Parameters
   - `event` (String.t()): The name of the event.
   - `data` (any()): The data to be passed to the event module.
-  - `args` (keyword()): Additional arguments for the call (`private`, `return`).
+  - `args` (keyword()): Additional arguments for the call (`private`, `return`, `meta`). `meta` is
+    read-only side context handed to plugins that opt in with `call/2`; unlike `private` it is never
+    merged into the result.
 
   ## Returns
   - `any()`: The result of the event module's `call/2` function.
@@ -451,7 +456,9 @@ defmodule MishkaInstaller.Event.Hook do
   # Cold path: rescue keeps one failing plugin from aborting the whole profile run.
   defp time_plugin(name, state) do
     :timer.tc(fn ->
-      case apply(name, :call, [state]) do
+      args = if function_exported?(name, :call, 2), do: [state, nil], else: [state]
+
+      case apply(name, :call, args) do
         {:reply, new_state} -> new_state
         other -> other
       end
@@ -478,7 +485,11 @@ defmodule MishkaInstaller.Event.Hook do
   def plugin_health(name, timeout \\ @health_timeout) do
     db = Event.get(:name, name)
     alive? = is_pid(Process.whereis(name))
-    callable? = Code.ensure_loaded?(name) and function_exported?(name, :call, 1)
+
+    callable? =
+      Code.ensure_loaded?(name) and
+        (function_exported?(name, :call, 1) or function_exported?(name, :call, 2))
+
     status = db && db.status
     probe = run_health(name, timeout)
 
@@ -624,8 +635,8 @@ defmodule MishkaInstaller.Event.Hook do
 
   @doc false
   def after_compile(module) do
-    if !Module.defines?(module, {:call, 1}),
-      do: raise("#{inspect(module)} should have call/1 function.")
+    if !Module.defines?(module, {:call, 1}) and !Module.defines?(module, {:call, 2}),
+      do: raise("#{inspect(module)} should define a call/1 or call/2 function.")
 
     if is_nil(module.config(:__event__)),
       do: raise("#{inspect(module)} should be dedicated to an event.")

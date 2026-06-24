@@ -123,12 +123,17 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     # One shared `state` var for the param and the unrolled chain.
     state = Macro.var(:state, __MODULE__)
 
+    # `meta` is read-only side context handed to plugins that opt in with `call/2`. When no plugin uses
+    # it the var is named `_meta`, so the binding never trips an "unused variable" warning.
+    meta = Macro.var(if(any_call2?(plugins), do: :meta, else: :_meta), __MODULE__)
+
     quote do
       def call(unquote(state), args \\ []) do
         private = Keyword.get(args, :private)
         return_status = Keyword.get(args, :return)
+        unquote(meta) = Keyword.get(args, :meta)
 
-        performed = unquote(build_chain(plugins, state))
+        performed = unquote(build_chain(plugins, state, meta))
 
         new_state =
           if !is_nil(return_status) do
@@ -169,18 +174,27 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
-  defp build_chain([], state_var), do: state_var
+  # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
+  # invoked exactly as before. The arity is resolved here, at dispatch-compile time, so the hot path stays
+  # a direct call with no per-invocation arity check.
+  defp build_chain([], state_var, _meta_var), do: state_var
 
-  defp build_chain([plugin | rest], state_var) do
+  defp build_chain([plugin | rest], state_var, meta_var) do
     next = Macro.unique_var(:state, __MODULE__)
+    call_args = if call2?(plugin), do: [state_var, meta_var], else: [state_var]
 
     quote do
-      case apply(unquote(plugin.name), :call, [unquote(state_var)]) do
+      case apply(unquote(plugin.name), :call, unquote(call_args)) do
         {:reply, :halt, halted} -> halted
-        {:reply, unquote(next)} -> unquote(build_chain(rest, next))
+        {:reply, unquote(next)} -> unquote(build_chain(rest, next, meta_var))
       end
     end
   end
+
+  defp any_call2?(plugins), do: Enum.any?(plugins, &call2?/1)
+
+  defp call2?(plugin),
+    do: Code.ensure_loaded?(plugin.name) and function_exported?(plugin.name, :call, 2)
 
   @doc false
   @spec log_call_error(String.t(), Exception.t()) :: :ok
