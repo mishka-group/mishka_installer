@@ -84,6 +84,13 @@ defmodule MishkaInstallerTest.Event.HookTest.LimboPlugin do
   def call(state), do: {:reply, state}
 end
 
+defmodule MishkaInstallerTest.Event.HookTest.OverCapPlugin do
+  @moduledoc false
+  use MishkaInstaller.Event.Hook, event: "over_cap_evt", initial: %{priority: 240}
+  @impl true
+  def call(state), do: {:reply, state}
+end
+
 defmodule MishkaInstallerTest.Event.HookTest.StoppedPlugin do
   @moduledoc false
   use MishkaInstaller.Event.Hook, event: "limbo_evt"
@@ -106,7 +113,8 @@ defmodule MishkaInstaller.Event.HookTest do
     CyclicA,
     CyclicB,
     LimboPlugin,
-    StoppedPlugin
+    StoppedPlugin,
+    OverCapPlugin
   }
 
   setup do
@@ -282,6 +290,19 @@ defmodule MishkaInstaller.Event.HookTest do
 
       assert {:error, [%{action: :register, field: :depends}]} =
                :persistent_term.get({:hook_test, :dep_error})
+    end
+  end
+
+  describe "priority contract (0..100) ===>" do
+    test "a plugin registering above the cap is rejected — visibly, with no dormant record" do
+      log =
+        ExUnit.CaptureLog.capture_log(fn ->
+          start_supervised!(OverCapPlugin)
+          assert_receive %{status: :register_error, channel: "event"}, 2000
+        end)
+
+      assert log =~ "failed to register"
+      assert is_nil(Event.get(:name, OverCapPlugin))
     end
   end
 

@@ -1,3 +1,11 @@
+# Changelog for MishkaInstaller 0.1.10
+
+### Fixed:
+
+- Log an error when a Hook's boot registration fails (previously only a `:register_error`
+  broadcast that nothing listens to by default — e.g. a plugin whose `priority` breaks the
+  0..100 contract was rejected invisibly and sat dormant with no record).
+
 # Changelog for MishkaInstaller 0.1.9
 
 ### Fixed:

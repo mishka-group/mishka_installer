@@ -251,6 +251,8 @@ defmodule MishkaInstaller.Event.Hook do
 
   [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fmishka-group%2Fmishka_installer%2Fblob%2Fmaster%2Fguidance%2Fevent%2Fhook.livemd)
   """
+  require Logger
+
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
@@ -773,6 +775,10 @@ defmodule MishkaInstaller.Event.Hook do
           start_helper(module, state, reg_db_plg)
 
         error ->
+          Logger.error(
+            "[mishka_installer.event] #{inspect(module)} failed to register on #{inspect(module.config(:__event__))}: #{inspect(error)}"
+          )
+
           module.on_dependency_error(error)
           MishkaInstaller.broadcast("event", :register_error, error)
           state
