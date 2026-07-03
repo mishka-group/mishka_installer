@@ -137,6 +137,11 @@ defmodule MishkaInstaller.Event.Hook do
   all you need to do is send the name of the module in which you utilized
   the `MishkaInstaller.Event.Hook` to the Application module.***
 
+  > On every boot the plugin adopts its stored status, with one self-heal: a record still in
+  > `:registered` (it was written, but its very first `start` never completed — an interrupted
+  > boot, an early Mnesia hiccup) is started again automatically. A `:stopped` or `:held`
+  > record is never auto-started — that is the operator's switch and it survives restarts.
+
   ```elixir
   children = [
     ...
@@ -774,7 +779,10 @@ defmodule MishkaInstaller.Event.Hook do
       end
     else
       MishkaInstaller.broadcast("event", :register, db_plg)
-      Keyword.merge(state, status: db_plg.status)
+
+      if db_plg.status == :registered,
+        do: start_helper(module, state, db_plg),
+        else: Keyword.merge(state, status: db_plg.status)
     end
   end
 end

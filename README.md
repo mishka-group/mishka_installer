@@ -124,7 +124,7 @@ config :mishka_installer, MishkaInstaller.MnesiaRepo,
 
 ```elixir
 def deps do
-  [{:mishka_installer, "~> 0.1.7"}]
+  [{:mishka_installer, "~> 0.1.9"}]
 end
 ```
 

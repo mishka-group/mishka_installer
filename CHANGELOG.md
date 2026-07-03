@@ -1,3 +1,12 @@
+# Changelog for MishkaInstaller 0.1.9
+
+### Fixed:
+
+- Self-heal plugins stuck in `:registered` limbo: a Hook whose stored record says `:registered`
+  (its very first `start` never completed — e.g. an interrupted boot between the two Mnesia
+  writes) is now started again at boot instead of silently staying dormant forever. `:stopped`
+  and `:held` records are still respected — the operator's switch survives restarts.
+
 # Changelog for MishkaInstaller 0.1.8
 
 ### Features:

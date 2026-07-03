@@ -77,6 +77,20 @@ defmodule MishkaInstallerTest.Event.HookTest.CyclicA do
   def call(state), do: {:reply, state}
 end
 
+defmodule MishkaInstallerTest.Event.HookTest.LimboPlugin do
+  @moduledoc false
+  use MishkaInstaller.Event.Hook, event: "limbo_evt"
+  @impl true
+  def call(state), do: {:reply, state}
+end
+
+defmodule MishkaInstallerTest.Event.HookTest.StoppedPlugin do
+  @moduledoc false
+  use MishkaInstaller.Event.Hook, event: "limbo_evt"
+  @impl true
+  def call(state), do: {:reply, state}
+end
+
 defmodule MishkaInstaller.Event.HookTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, EventHandler, Hook}
@@ -90,7 +104,9 @@ defmodule MishkaInstaller.Event.HookTest do
     CallBangPlugin,
     RetryPlugin,
     CyclicA,
-    CyclicB
+    CyclicB,
+    LimboPlugin,
+    StoppedPlugin
   }
 
   setup do
@@ -266,6 +282,28 @@ defmodule MishkaInstaller.Event.HookTest do
 
       assert {:error, [%{action: :register, field: :depends}]} =
                :persistent_term.get({:hook_test, :dep_error})
+    end
+  end
+
+  describe "registered-limbo self-heal ===>" do
+    test "a record stuck in :registered (its first start never completed) starts at boot" do
+      assert {:ok, _} = Event.register(LimboPlugin, "limbo_evt", %{})
+      assert status(LimboPlugin) == :registered
+
+      start_supervised!(LimboPlugin)
+      eventually(fn -> status(LimboPlugin) == :started end)
+    end
+
+    test "a :stopped record is respected at boot — never auto-started" do
+      assert {:ok, _} = Event.register(StoppedPlugin, "limbo_evt", %{})
+      assert {:ok, _} = Event.start(:name, StoppedPlugin, false)
+      assert {:ok, _} = Event.stop(:name, StoppedPlugin, false)
+      assert status(StoppedPlugin) == :stopped
+
+      start_supervised!(StoppedPlugin)
+      eventually(fn -> is_pid(Process.whereis(StoppedPlugin)) end)
+      Process.sleep(150)
+      assert status(StoppedPlugin) == :stopped
     end
   end
 
