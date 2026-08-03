@@ -1,3 +1,41 @@
+# Changelog for MishkaInstaller 0.1.11
+
+### Features:
+
+- Add `MishkaInstaller.Event.Event.enable/2` (and `enable/0` on a Hook plugin) as the explicit
+  inverse of `stop/3`, and the **only** transition out of `:stopped`
+- Disabling, unregistering or holding a plugin now holds everything that depends on it,
+  transitively and across events, and switching it back on releases them again — no plugin
+  anywhere keeps a list of its dependents (`Event.sync_dependents/2`, `Event.dependents/1`)
+- `register/3` is an upsert on the plugin name: the fields declared in code (`:priority`,
+  `:extra`, `:depends`) are re-applied on every boot, the runtime ones (`:id`, `:status`,
+  `:inserted_at`) are preserved
+
+### Fixed:
+
+- A status change is now durable: lifecycle writes commit with
+  `MishkaInstaller.Helper.MnesiaAssistant.Transaction.durable_transaction/1` (sync commit + log
+  flush), so a plugin an operator disabled stays disabled after an unclean shutdown. Previously
+  the write only reached the disk on Mnesia's periodic dump (three minutes by default) and a node
+  that died in between came back with the plugin re-enabled
+- The generated `is_changed?/1` compares the incoming chain with the compiled one by equality
+  instead of testing for a subset, so a plugin **leaving** an event (stopped, held, unregistered)
+  rebuilds the chain immediately instead of running until the next boot
+- `restart/3` checks every condition before it writes: a failed restart no longer leaves a status
+  behind that the compiled chain disagrees with, and it can no longer re-enable a stopped plugin
+- `stop/3` accepts a `:held` plugin, so a plugin blocked by a missing dependency can still be
+  switched off by an operator
+- Dependency resolution no longer promotes a plugin without looking at its own status, so a
+  disabled plugin is never resurrected by one of its dependencies starting
+- A plugin held at boot because a dependency on **another** event had not started yet is now
+  released when that dependency starts, instead of staying dark until the next restart
+
+### Breaking:
+
+- `restart/3` returns an error for a `:stopped` plugin; use `enable/2` to switch it back on
+- Registering an already-registered plugin updates the row instead of inserting a second one
+- Statuses of dependent plugins now change on their own when a dependency is stopped or started
+
 # Changelog for MishkaInstaller 0.1.10
 
 ### Fixed:

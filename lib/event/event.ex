@@ -21,6 +21,26 @@ defmodule MishkaInstaller.Event.Event do
 
   > Note that all storages are based on the name of an event. See `MishkaInstaller.Event.Hook` module.
 
+  ## Statuses and dependencies
+
+  A plugin record carries one of `:registered`, `:started`, `:restarted`, `:stopped` and `:held`.
+  Only the last two are meaningful decisions: `:stopped` is an operator's switch and outlives
+  restarts and dependency changes, `:held` means "one of my dependencies is not active" and is
+  managed by the library.
+
+  Each lifecycle function keeps that distinction:
+
+  - `stop/3` disables a plugin — from any status, including `:held` — and holds everything that
+    depends on it, transitively and across events (`sync_dependents/2`).
+  - `enable/2` is the only way out of `:stopped`. `restart/3` and `start/3` refuse it, so no reload
+    or reset path can silently undo the operator.
+  - `start/3`, `restart/3` and `enable/2` release the plugins that were held waiting for them, and a
+    plugin whose dependencies are still inactive is stored as `:held` rather than run.
+  - `unregister/3` counts as an unsatisfied dependency for whatever depended on the removed plugin.
+
+  Every one of these recompiles the events that changed, so the compiled chain and the stored
+  statuses never disagree, and status writes are durable (see `write/3`).
+
   ---
 
   > #### Security considerations {: .warning}
@@ -141,18 +161,59 @@ defmodule MishkaInstaller.Event.Event do
 
   > This function is only responsible for registering the plugin; it does not carry
   > out any activities related to execution. Please refer to function `start/2` in order to execute
+
+  ### Re-registering an existing plugin
+
+  This function is an **upsert keyed on the plugin name**: registering an already-registered plugin
+  never creates a second row, it reconciles the existing one. The fields declared in code
+  (`:priority`, `:extra`, `:depends`) always win, so changing them in a new version of your plugin
+  reaches installs that registered with the old values; the runtime-owned fields (`:id`, `:status`,
+  `:inserted_at`) are preserved, so a plugin an operator disabled stays disabled across upgrades.
+
+  A changed `:depends` is re-checked for cycles and the status is re-evaluated: the plugin moves to
+  `:held` when a new dependency is inactive, and back out of `:held` when its dependencies are
+  satisfied.
   """
   @spec register(module(), String.t(), map()) :: error_return | okey_return
   def register(name, event, initial) do
     with {:ok, _module} <- ensure_loaded(name),
          merged <- Map.merge(initial, %{name: name, extension: name.config(:app), event: event}),
          {:ok, struct} <- builder(merged),
-         :ok <- no_dependency_cycle(struct.name, struct.depends),
-         deps_list <- allowed_events(struct.depends),
-         {:ok, db_plg} <-
-           write(Map.merge(struct, depends_status(deps_list, struct.status))),
+         :ok <- no_dependency_cycle(struct.name, struct.depends) do
+      case get(:name, name) do
+        nil -> insert_registration(struct)
+        record -> reconcile_registration(record, struct)
+      end
+    end
+  end
+
+  defp insert_registration(struct) do
+    deps_list = allowed_events(struct.depends)
+
+    with {:ok, db_plg} <- write(Map.merge(struct, depends_status(deps_list, struct.status))),
          :ok <- MishkaInstaller.broadcast("event", :register, db_plg) do
       {:ok, db_plg}
+    end
+  end
+
+  # The plugin is already in the database: keep its runtime state, take the code-declared fields.
+  # `priority` and `depends` both change the compiled chain, and a status change may release or hold
+  # whatever depends on this plugin, so a real change recompiles and cascades.
+  defp reconcile_registration(record, struct) do
+    updated_to =
+      %{priority: struct.priority, extra: struct.extra, depends: struct.depends}
+      |> Map.put(:status, desired_status(%{record | depends: struct.depends}, :db))
+
+    if Enum.all?(updated_to, fn {key, value} -> Map.get(record, key) == value end) do
+      MishkaInstaller.broadcast("event", :register, record)
+      {:ok, record}
+    else
+      with {:ok, db_plg} <- write(:id, record.id, updated_to),
+           :ok <- MishkaInstaller.broadcast("event", :register, db_plg) do
+        EventHandler.do_compile(db_plg.event, :register)
+        if db_plg.status != record.status, do: sync_dependents(db_plg.name)
+        {:ok, db_plg}
+      end
     end
   end
 
@@ -192,11 +253,11 @@ defmodule MishkaInstaller.Event.Event do
   @spec start(:name | :event, module() | String.t(), boolean()) :: error_return | okey_return
   def start(:name, name, queue) do
     with {:ok, data} <- exist_record?(get(:name, name)),
-         :ok <- plugin_status(data.status),
+         :ok <- startable?(data.status),
          :ok <- allowed_events?(data.depends),
          {:ok, db_plg} <- write(:id, data.id, %{status: :started}),
          :ok <- EventHandler.do_compile(db_plg.event, :start, queue) do
-      # Carry the record so `:held` dependents can re-evaluate and auto-start (see `plugin_dependency_event/3`).
+      sync_dependents(db_plg.name, queue)
       MishkaInstaller.broadcast("event", :start, db_plg)
       {:ok, db_plg}
     end
@@ -213,19 +274,34 @@ defmodule MishkaInstaller.Event.Event do
       data ->
         sorted_plugins =
           Enum.reduce(data, [], fn pl_item, acc ->
-            with :ok <- plugin_status(pl_item.status),
-                 :ok <- allowed_events?(pl_item.depends),
-                 {:ok, db_plg} <- write(:id, pl_item.id, %{status: :started}) do
-              acc ++ [db_plg]
-            else
-              _ -> acc
+            case bulk_start(pl_item) do
+              {:ok, db_plg} -> acc ++ [db_plg]
+              :skip -> acc
             end
           end)
           |> Enum.sort_by(&{&1.priority, &1.name})
 
         EventHandler.do_compile(event, :start, queue)
+        sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
 
         {:ok, sorted_plugins}
+    end
+  end
+
+  # Bulk start (boot path): an operator's `:stopped` is never overridden, and a plugin whose
+  # dependencies are not up yet is recorded as `:held` so it can be released later instead of
+  # sitting in `:registered` forever (a dependency on another event may start after this one).
+  defp bulk_start(%{status: :stopped}), do: :skip
+
+  defp bulk_start(pl_item) do
+    if allowed_events?(pl_item.depends) == :ok do
+      case write(:id, pl_item.id, %{status: :started}) do
+        {:ok, db_plg} -> {:ok, db_plg}
+        _error -> :skip
+      end
+    else
+      if pl_item.status != :held, do: write(:id, pl_item.id, %{status: :held})
+      :skip
     end
   end
 
@@ -295,10 +371,12 @@ defmodule MishkaInstaller.Event.Event do
   @spec restart(:name | :event, module() | String.t(), boolean()) :: error_return | okey_return
   def restart(:name, name, queue) do
     with {:ok, data} <- exist_record?(get(:name, name)),
-         deps_list <- allowed_events(data.depends),
-         {:ok, db_plg} <- write(:id, data.id, depends_status(deps_list, :restarted)),
-         :ok <- plugin_status(db_plg.status),
+         :ok <- startable?(data.status),
+         :ok <- allowed_events?(data.depends),
+         {:ok, db_plg} <- write(:id, data.id, %{status: :restarted}),
          :ok <- EventHandler.do_compile(db_plg.event, :restart, queue) do
+      sync_dependents(db_plg.name, queue)
+      MishkaInstaller.broadcast("event", :restart, db_plg)
       {:ok, db_plg}
     end
   end
@@ -315,9 +393,9 @@ defmodule MishkaInstaller.Event.Event do
         sorted_plugins =
           Enum.reduce(data, [], fn pl_item, acc ->
             with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
-                 deps_list <- allowed_events(data.depends),
-                 {:ok, db_plg} <- write(:id, data.id, depends_status(deps_list, :restarted)),
-                 :ok <- plugin_status(db_plg.status) do
+                 :ok <- startable?(data.status),
+                 :ok <- allowed_events?(data.depends),
+                 {:ok, db_plg} <- write(:id, data.id, %{status: :restarted}) do
               acc ++ [db_plg]
             else
               _ -> acc
@@ -326,8 +404,37 @@ defmodule MishkaInstaller.Event.Event do
           |> Enum.sort_by(&{&1.priority, &1.name})
 
         EventHandler.do_compile(event, :restart, queue)
+        sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
 
         {:ok, sorted_plugins}
+    end
+  end
+
+  @doc """
+  Re-enables a plugin an operator disabled with `stop/3`. This is the **only** transition out of
+  `:stopped`, so no reload, reset or restart path can silently undo a user's decision to switch a
+  plugin off.
+
+  If the plugin's dependencies are not active, it is stored as `:held` instead of `:restarted` and
+  released automatically as soon as they come back — the call still succeeds, since the operator's
+  intent ("this plugin should run") is recorded either way.
+
+  ## Example:
+
+  ```elixir
+  stop(:name, TestApp.User.Auth, true)
+  enable(TestApp.User.Auth)
+  ```
+  """
+  @spec enable(module(), boolean()) :: error_return | okey_return
+  def enable(name, queue \\ true) do
+    with {:ok, data} <- exist_record?(get(:name, name)),
+         deps_list <- allowed_events(data.depends),
+         {:ok, db_plg} <- write(:id, data.id, depends_status(deps_list, :restarted)),
+         :ok <- EventHandler.do_compile(db_plg.event, :enable, queue) do
+      sync_dependents(db_plg.name, queue)
+      MishkaInstaller.broadcast("event", :enable, db_plg)
+      {:ok, db_plg}
     end
   end
 
@@ -392,9 +499,11 @@ defmodule MishkaInstaller.Event.Event do
   @spec stop(:name | :event, module() | String.t(), boolean()) :: okey_return() | error_return()
   def stop(:name, name, queue) do
     with {:ok, data} <- exist_record?(get(:name, name)),
-         :ok <- plugin_status(data.status),
+         :ok <- stoppable?(data.status),
          {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}),
          :ok <- EventHandler.do_compile(db_plg.event, :stop, queue) do
+      sync_dependents(db_plg.name, queue)
+      MishkaInstaller.broadcast("event", :stop, db_plg)
       {:ok, db_plg}
     end
   end
@@ -409,7 +518,7 @@ defmodule MishkaInstaller.Event.Event do
         sorted_plugins =
           Enum.reduce(data, [], fn pl_item, acc ->
             with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
-                 :ok <- plugin_status(data.status),
+                 :ok <- stoppable?(data.status),
                  {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}) do
               acc ++ [db_plg]
             else
@@ -419,6 +528,7 @@ defmodule MishkaInstaller.Event.Event do
           |> Enum.sort_by(&{&1.priority, &1.name})
 
         EventHandler.do_compile(event, :stop, queue)
+        sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
 
         {:ok, sorted_plugins}
     end
@@ -479,6 +589,8 @@ defmodule MishkaInstaller.Event.Event do
   def unregister(:name, name, queue) do
     with {:ok, db_plg} <- delete(:name, name),
          :ok <- EventHandler.do_compile(db_plg.event, :unregister, queue) do
+      sync_dependents(db_plg.name, queue)
+      MishkaInstaller.broadcast("event", :unregister, db_plg)
       stop_if_alive(name)
       {:ok, db_plg}
     end
@@ -505,6 +617,7 @@ defmodule MishkaInstaller.Event.Event do
           |> Enum.sort_by(&{&1.priority, &1.name})
 
         EventHandler.do_compile(event, :unregister, queue)
+        sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
 
         {:ok, sorted_plugins}
     end
@@ -662,7 +775,7 @@ defmodule MishkaInstaller.Event.Event do
         values_tuple =
           ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
 
-        Transaction.transaction(fn -> Query.write(values_tuple) end)
+        Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
         |> case do
           {:atomic, _res} ->
             {:ok, struct}
@@ -681,6 +794,12 @@ defmodule MishkaInstaller.Event.Event do
 
   > The first input can only be name and ID `[:id, :name]`.
 
+  The record is re-read inside the transaction under a write lock and `updated_to` is merged onto
+  the **current** row, so two concurrent transitions of the same plugin cannot clobber each other's
+  fields. The transaction is synchronous (see
+  `MishkaInstaller.Helper.MnesiaAssistant.Transaction.durable_transaction/1`), so a status change is on
+  disk before this function returns and survives an unclean shutdown.
+
   > #### Security considerations {: .warning}
   >
   > It is important to remember that all of the functionalities contained within this
@@ -695,10 +814,7 @@ defmodule MishkaInstaller.Event.Event do
   """
   @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
   def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
-    # Read-modify-write in one transaction under a write lock: the record is re-read inside the
-    # transaction and `updated_to` is merged onto the *current* row, so two concurrent transitions
-    # of the same plugin can't clobber each other's fields. Reads (`get/1,2`) are untouched.
-    Transaction.transaction(fn ->
+    Transaction.durable_transaction(fn ->
       case locked_read(field, value) do
         nil ->
           :mnesia.abort(:record_not_found)
@@ -833,7 +949,9 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :delete}]}
 
       data ->
-        Transaction.transaction(fn -> Query.delete(__MODULE__, Map.get(data, :id), :write) end)
+        Transaction.durable_transaction(fn ->
+          Query.delete(__MODULE__, Map.get(data, :id), :write)
+        end)
         |> case do
           {:atomic, _res} ->
             {:ok, data}
@@ -997,6 +1115,126 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  Every plugin that declares `name` in its `:depends`, i.e. the reverse dependency edge. Dependencies
+  are between **plugins**, so this is global: a dependent registered on another event is included.
+
+  ## Example:
+
+  ```elixir
+  dependents(TestApp.User.Auth)
+  ```
+  """
+  @spec dependents(module()) :: list(struct())
+  def dependents(name), do: Enum.filter(get(), &(name in &1.depends))
+
+  @doc """
+  Re-evaluates everything that depends on `names` after their status changed, and recompiles each
+  affected event exactly once. Called by `start/3`, `restart/3`, `stop/3`, `enable/2` and
+  `unregister/3`; you only need it directly if you write statuses yourself with `write/3`.
+
+  A dependent whose dependencies are no longer all active is written as `:held`; a `:held` dependent
+  whose dependencies are satisfied again is written as `:restarted`. The walk is transitive, so a
+  chain `A -> B -> C` (C depends on B, B depends on A) holds and releases as a unit, and it is
+  cycle-safe: `names` are never re-evaluated and each dependent is visited once per settling round.
+
+  Two statuses are never touched: `:stopped`, which is an operator decision and must outlive any
+  dependency change, and `:registered`, which belongs to a plugin that has not been started yet.
+
+  Returns the list of events that were recompiled.
+
+  ## Example:
+
+  ```elixir
+  write(:name, TestApp.User.Auth, %{status: :stopped})
+  sync_dependents(TestApp.User.Auth)
+  ```
+  """
+  @spec sync_dependents(module() | list(module()), boolean()) :: list(String.t())
+  def sync_dependents(names, queue \\ true) do
+    roots = List.wrap(names)
+    plugins = get()
+    reverse = reverse_depends(plugins)
+    affected = transitive_dependents(roots, reverse, MapSet.new(roots), [])
+
+    {_index, changed} =
+      settle(affected, Map.new(plugins, &{&1.name, &1}), %{}, length(affected) + 1)
+
+    events = changed |> Map.values() |> Enum.map(& &1.event) |> Enum.uniq()
+    Enum.each(events, &EventHandler.do_compile(&1, :re_event, queue))
+    events
+  end
+
+  # `dependency -> [plugins depending on it]`, built once per cascade from a single table read.
+  defp reverse_depends(plugins) do
+    Enum.reduce(plugins, %{}, fn pl, acc ->
+      Enum.reduce(
+        pl.depends,
+        acc,
+        &Map.update(&2, &1, [pl.name], fn list -> [pl.name | list] end)
+      )
+    end)
+  end
+
+  # Breadth-first over the reverse edges, so a dependent is always evaluated after the plugin it
+  # depends on. `seen` starts as the roots, which both skips them and bounds a cyclic graph.
+  defp transitive_dependents([], _reverse, _seen, acc), do: acc
+
+  defp transitive_dependents([name | rest], reverse, seen, acc) do
+    next = Map.get(reverse, name, []) |> Enum.reject(&MapSet.member?(seen, &1))
+    seen = Enum.reduce(next, seen, &MapSet.put(&2, &1))
+    transitive_dependents(rest ++ next, reverse, seen, acc ++ next)
+  end
+
+  # A single pass cannot settle a diamond (a plugin reached before one of its other dependencies was
+  # updated), so passes repeat while anything changes, bounded by the size of the affected set.
+  defp settle(names, index, changed, rounds) when rounds > 0 do
+    {index, changed, dirty?} =
+      Enum.reduce(names, {index, changed, false}, fn name, {index, changed, dirty?} ->
+        record = Map.get(index, name)
+        desired = if is_nil(record), do: nil, else: desired_status(record, index)
+
+        if is_nil(record) or desired == record.status do
+          {index, changed, dirty?}
+        else
+          case write(:id, record.id, %{status: desired}) do
+            {:ok, updated} ->
+              {Map.put(index, name, updated), Map.put(changed, name, updated), true}
+
+            _error ->
+              {index, changed, dirty?}
+          end
+        end
+      end)
+
+    if dirty?, do: settle(names, index, changed, rounds - 1), else: {index, changed}
+  end
+
+  defp settle(_names, index, changed, _rounds), do: {index, changed}
+
+  # The status a plugin should hold given its dependencies, looked up either in a cascade's snapshot
+  # or, with `:db`, in the database.
+  defp desired_status(%{status: :stopped}, _index), do: :stopped
+
+  defp desired_status(%{status: :registered}, _index), do: :registered
+
+  defp desired_status(%{status: status, depends: depends}, index) do
+    cond do
+      !depends_satisfied?(depends, index) -> :held
+      status == :held -> :restarted
+      true -> status
+    end
+  end
+
+  defp depends_satisfied?(depends, :db), do: allowed_events?(depends) == :ok
+
+  defp depends_satisfied?(depends, index),
+    do: Enum.all?(depends, &active?(Map.get(index, &1)))
+
+  defp active?(%{status: status}), do: status in [:started, :restarted]
+
+  defp active?(_record), do: false
+
   defp dependency_graph(extra_name \\ nil, extra_depends \\ []) do
     candidates = Enum.reject(get(), &(&1.name == extra_name))
 
@@ -1028,6 +1266,23 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   def plugin_status(_status), do: :ok
+
+  # `:stopped` is the operator's decision and only `enable/2` may leave it; `:held` may be started,
+  # its dependencies are re-checked by `allowed_events?/1` right after.
+  defp startable?(:stopped) do
+    message = "This plugin is stopped, use `enable/2` to switch it back on."
+    {:error, [%{message: message, field: :global, action: :plugin_status}]}
+  end
+
+  defp startable?(_status), do: :ok
+
+  # Stopping is allowed from any status, including `:held`, but is not repeatable.
+  defp stoppable?(:stopped) do
+    message = "This plugin is already stopped."
+    {:error, [%{message: message, field: :global, action: :plugin_status}]}
+  end
+
+  defp stoppable?(_status), do: :ok
 
   defp exist_record?(nil) do
     message =

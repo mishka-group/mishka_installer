@@ -16,6 +16,23 @@ defmodule MishkaProdTest.Demo do
     end
   end
 
+  def disable_cli do
+    case MishkaInstaller.Event.Event.stop(:name, MishkaProdTest.DurablePlugin, false) do
+      {:ok, plugin} -> IO.puts("DISABLE_OK #{plugin.status}")
+      other -> IO.puts("DISABLE_ERR #{inspect(other)}")
+    end
+  end
+
+  def disable_and_halt do
+    MishkaInstaller.Event.Event.stop(:name, MishkaProdTest.DurablePlugin, false)
+    :erlang.halt(0)
+  end
+
+  def plugin_line do
+    plugin = MishkaInstaller.Event.Event.get(:name, MishkaProdTest.DurablePlugin)
+    IO.puts("PLUGIN status=#{plugin && plugin.status} id=#{plugin && plugin.id}")
+  end
+
   def status_line do
     started? = String.to_atom(@app) in Enum.map(Application.started_applications(), &elem(&1, 0))
     record? = not is_nil(Installer.get(:app, @app))

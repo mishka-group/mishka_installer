@@ -72,8 +72,16 @@ To start a plugin automatically, add its module to your supervision tree:
 children = [RegisterEmailSender, ...]
 ```
 
+Switch a plugin off and on again — `stop/0` disables it, `enable/0` is the only way back:
+
+```elixir
+RegisterEmailSender.stop()    # :stopped — survives restarts, and holds whatever depends on it
+RegisterEmailSender.enable()  # :restarted — releases what it was holding
+```
+
 > [!NOTE]
-> A plugin's `depends` always run **before** it (cycles are rejected at registration), and a plugin can return `{:reply, :halt, state}` to stop the rest of the chain. See `MishkaInstaller.Event.Hook`.
+> A plugin's `depends` always run **before** it (cycles are rejected at registration), and a plugin can return `{:reply, :halt, state}` to stop the rest of the chain.
+> Disabling a plugin holds everything that depends on it, transitively and across events, and re-enabling it releases them — nothing keeps a list of dependents. A plugin an operator stopped is never re-enabled on its own. See `MishkaInstaller.Event.Hook`.
 
 [![Run in Livebook](https://livebook.dev/badge/v1/pink.svg)](https://livebook.dev/run?url=https%3A%2F%2Fgithub.com%2Fmishka-group%2Fmishka_installer%2Fblob%2Fmaster%2Fguidance%2Fevent%2Fhook.livemd)
 
@@ -124,7 +132,7 @@ config :mishka_installer, MishkaInstaller.MnesiaRepo,
 
 ```elixir
 def deps do
-  [{:mishka_installer, "~> 0.1.10"}]
+  [{:mishka_installer, "~> 0.1.11"}]
 end
 ```
 

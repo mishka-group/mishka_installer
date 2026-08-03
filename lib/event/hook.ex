@@ -98,7 +98,8 @@ defmodule MishkaInstaller.Event.Hook do
   - `register/0` - Register a plugin for a specific event.
   - `start/0` - Start a plugin of a specific event.
   - `restart/0` - Restart a plugin of a specific event.
-  - `stop/0` - Stop a plugin of a specific event.
+  - `stop/0` - Stop (disable) a plugin of a specific event.
+  - `enable/0` - Re-enable a plugin that was stopped.
   - `unregister/0` - Unregister a plugin of a specific event.
   - `get/0` - Retrieves a Plugin `GenServer` state.
 
@@ -141,6 +142,10 @@ defmodule MishkaInstaller.Event.Hook do
   > `:registered` (it was written, but its very first `start` never completed — an interrupted
   > boot, an early Mnesia hiccup) is started again automatically. A `:stopped` or `:held`
   > record is never auto-started — that is the operator's switch and it survives restarts.
+  >
+  > Registration is an upsert on the plugin name, so the fields you declare in `initial`
+  > (`:priority`, `:extra`, `:depends`) are re-applied on every boot and reach installs that
+  > registered with an older version of your plugin; the stored status is left alone.
 
   ```elixir
   children = [
@@ -174,7 +179,30 @@ defmodule MishkaInstaller.Event.Hook do
   > simple for you to build and implement your own strategy because of this.
   >
   > You can override these functions:
-  > `register: 0`, `start: 0`, `restart: 0`, `stop: 0`, `unregister: 0`, `get: 0`
+  > `register: 0`, `start: 0`, `restart: 0`, `stop: 0`, `enable: 0`, `unregister: 0`, `get: 0`
+
+  ### Statuses, and what `depends` does
+
+  A plugin is in exactly one of five statuses, and only two of them are decisions someone made:
+
+  | Status | Meaning |
+  | --- | --- |
+  | `:registered` | stored, never started yet |
+  | `:started` / `:restarted` | running, and part of its event's compiled chain |
+  | `:stopped` | **an operator switched it off** — survives restarts and dependency changes |
+  | `:held` | **its dependencies are not all active** — restored automatically when they are |
+
+  `depends: [OtherPlugin]` means "do not run me unless `OtherPlugin` runs". Stopping, unregistering
+  or holding `OtherPlugin` therefore holds this plugin too, transitively, across events, and drops it
+  from its compiled chain within the same call; switching `OtherPlugin` back on releases everything it
+  was holding. All of a plugin's dependencies must be active for it to run, and nothing anywhere keeps
+  a list of "children" — the reverse edges are read from the stored `depends` (see
+  `MishkaInstaller.Event.Event.dependents/1` and `MishkaInstaller.Event.Event.sync_dependents/2`).
+
+  The two decisions never override each other: releasing a dependency never re-enables a plugin an
+  operator stopped, and `restart/0` refuses a `:stopped` plugin — only `enable/0` switches it back on.
+  A `:held` plugin can still be stopped, since "blocked by a dependency" and "switched off" are
+  different things.
 
   ### Consideration:
 
@@ -264,6 +292,7 @@ defmodule MishkaInstaller.Event.Hook do
   @callback start() :: okey_return | error_return
   @callback restart() :: okey_return | error_return
   @callback stop() :: okey_return | error_return
+  @callback enable() :: okey_return | error_return
   @callback unregister() :: okey_return | error_return
   @callback get() :: keyword()
   @callback health_check() :: :ok | {:degraded, term()} | {:error, term()}
@@ -274,6 +303,7 @@ defmodule MishkaInstaller.Event.Hook do
                       start: 0,
                       restart: 0,
                       stop: 0,
+                      enable: 0,
                       unregister: 0,
                       get: 0,
                       health_check: 0,
@@ -339,6 +369,9 @@ defmodule MishkaInstaller.Event.Hook do
       @spec stop() :: okey_return | error_return
       def stop(), do: Hook.plugin_stop(__MODULE__)
 
+      @spec enable() :: okey_return | error_return
+      def enable(), do: Hook.plugin_enable(__MODULE__)
+
       @spec unregister() :: okey_return | error_return
       def unregister(), do: Hook.plugin_unregister(__MODULE__)
 
@@ -357,6 +390,7 @@ defmodule MishkaInstaller.Event.Hook do
                      start: 0,
                      restart: 0,
                      stop: 0,
+                     enable: 0,
                      unregister: 0,
                      get: 0,
                      on_dependency_error: 1,
@@ -380,12 +414,9 @@ defmodule MishkaInstaller.Event.Hook do
       @impl true
       def handle_info(:start_again, state), do: Hook.plugin_start_again(__MODULE__, state)
 
-      def handle_info(%{status: status, data: data}, state)
-          when status in [:start, :stop, :unregister],
-          do: Hook.plugin_dependency_event(__MODULE__, data, state)
-
-      def handle_info(%{status: :re_event, data: _data}, state),
-        do: Hook.plugin_re_event(state)
+      def handle_info(%{status: status, data: _data}, state)
+          when status in [:start, :restart, :enable, :stop, :unregister, :re_event],
+          do: Hook.plugin_re_event(state)
 
       def handle_info(:status, state), do: Hook.plugin_status_poll(__MODULE__, state)
 
@@ -625,6 +656,10 @@ defmodule MishkaInstaller.Event.Hook do
     do: Event.stop(:name, module.config(:__plugin__), module.config(:__queue__))
 
   @doc false
+  def plugin_enable(module),
+    do: Event.enable(module.config(:__plugin__), module.config(:__queue__))
+
+  @doc false
   def plugin_unregister(module),
     do: Event.unregister(:name, module.config(:__plugin__), module.config(:__queue__))
 
@@ -694,31 +729,11 @@ defmodule MishkaInstaller.Event.Hook do
   end
 
   @doc false
-  def plugin_dependency_event(module, data, state) do
-    event = Keyword.get(state, :event)
-    depends = Keyword.get(state, :depends, [])
-
-    new_state =
-      with true <- ready?(),
-           true <- event == Map.get(data, :event),
-           true <- Map.get(data, :name) in depends,
-           :ok <- Event.allowed_events?(depends),
-           {:ok, struct} <- Event.write(:name, module, %{status: :restarted}),
-           _ok <- EventHandler.do_compile(struct.event, :re_event) do
-        Keyword.merge(state, status: :restarted)
-      else
-        _ -> state
-      end
-
-    {:noreply, new_state}
-  end
-
-  @doc false
   def plugin_re_event(state) do
     new_state =
-      case Event.get(:name, state[:name]) do
+      case Event.dirty_get(:name, state[:name]) do
         nil -> state
-        data -> Keyword.merge(state, status: data.status)
+        data -> Keyword.merge(state, status: data.status, depends: data.depends)
       end
 
     {:noreply, new_state}
@@ -767,28 +782,20 @@ defmodule MishkaInstaller.Event.Hook do
   @doc false
   @spec register_start_helper(module(), keyword()) :: keyword()
   def register_start_helper(module, state) do
-    db_plg = Event.get(:name, module)
+    case module.register() do
+      {:ok, db_plg} ->
+        if db_plg.status == :registered,
+          do: start_helper(module, state, db_plg),
+          else: Keyword.merge(state, status: db_plg.status, depends: db_plg.depends)
 
-    if is_nil(db_plg) do
-      case module.register() do
-        {:ok, reg_db_plg} ->
-          start_helper(module, state, reg_db_plg)
+      error ->
+        Logger.error(
+          "[mishka_installer.event] #{inspect(module)} failed to register on #{inspect(module.config(:__event__))}: #{inspect(error)}"
+        )
 
-        error ->
-          Logger.error(
-            "[mishka_installer.event] #{inspect(module)} failed to register on #{inspect(module.config(:__event__))}: #{inspect(error)}"
-          )
-
-          module.on_dependency_error(error)
-          MishkaInstaller.broadcast("event", :register_error, error)
-          state
-      end
-    else
-      MishkaInstaller.broadcast("event", :register, db_plg)
-
-      if db_plg.status == :registered,
-        do: start_helper(module, state, db_plg),
-        else: Keyword.merge(state, status: db_plg.status)
+        module.on_dependency_error(error)
+        MishkaInstaller.broadcast("event", :register_error, error)
+        state
     end
   end
 end
