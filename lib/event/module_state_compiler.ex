@@ -44,6 +44,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   new module.
   - `event` (String.t()): The name of the event for which the module is created.
 
+  The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
+  so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
+  like a plugin joining it, and `MishkaInstaller.Event.EventHandler` rebuilds the module.
+
   > #### Security considerations {: .warning}
   >
   > It is important to remember that all of the functionalities contained within this
@@ -75,12 +79,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
             %{module: unquote(module), plugins: unquote(escaped_plugins)}
           end
 
-          def is_changed?([]) do
-            [] != unquote(escaped_plugins)
-          end
-
           def is_changed?(new_plugins) do
-            !Enum.all?(new_plugins, &(&1 in unquote(escaped_plugins)))
+            new_plugins != unquote(escaped_plugins)
           end
 
           def is_initialized?(new_plugin) do

@@ -13,6 +13,30 @@ defmodule MishkaInstaller.Helper.MnesiaAssistant.Transaction do
   def transaction(fun) when is_function(fun), do: :mnesia.transaction(fun)
 
   @doc """
+  Runs `fun` inside a **durable** transaction: `:mnesia.sync_transaction/1` to commit on every node
+  holding a copy of the table, then `:mnesia.sync_log/0` to flush the transaction log to disk before
+  returning.
+
+  Use it for writes that must survive an unclean node exit. `transaction/1` alone buffers the commit
+  and only reaches the disk on the periodic dump (`dump_log_time_threshold`, three minutes by
+  default), so a node that dies in between comes back with the old record — and a plugin's
+  `:stopped`/`:started` status is an operator's setting, not a cache.
+
+  Returns `{:atomic, result}` or `{:aborted, reason}`.
+  """
+  @spec durable_transaction((-> any())) :: {:atomic, any()} | {:aborted, term()}
+  def durable_transaction(fun) when is_function(fun) do
+    case :mnesia.sync_transaction(fun) do
+      {:atomic, _result} = committed ->
+        :mnesia.sync_log()
+        committed
+
+      aborted ->
+        aborted
+    end
+  end
+
+  @doc """
   Runs `fun` as a fast, dirty `ets` activity. Delegates to `:mnesia.ets/1`.
 
   > Only safe for `ram_copies` tables or read-only access on `disc_copies`.

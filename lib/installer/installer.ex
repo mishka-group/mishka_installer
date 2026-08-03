@@ -373,7 +373,7 @@ defmodule MishkaInstaller.Installer.Installer do
         values_tuple =
           ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
 
-        Transaction.transaction(fn -> Query.write(values_tuple) end)
+        Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
         |> case do
           {:atomic, _res} ->
             {:ok, struct}
@@ -476,7 +476,9 @@ defmodule MishkaInstaller.Installer.Installer do
         {:error, [%{message: message, field: :global, action: :delete}]}
 
       data ->
-        Transaction.transaction(fn -> Query.delete(__MODULE__, Map.get(data, :id), :write) end)
+        Transaction.durable_transaction(fn ->
+          Query.delete(__MODULE__, Map.get(data, :id), :write)
+        end)
         |> case do
           {:atomic, _res} ->
             {:ok, data}
