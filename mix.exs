@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
 
-  @version "0.1.11"
+  @version "0.1.12"
   @source_url "https://github.com/mishka-group/mishka_installer"
 
   def project do
@@ -40,12 +40,12 @@ defmodule MishkaInstaller.MixProject do
 
   defp deps do
     [
-      {:phoenix_pubsub, "~> 2.2"},
-      {:req, "~> 0.6.1"},
-      {:plug, "~> 1.19"},
+      {:phoenix_pubsub, "~> 2.3"},
+      {:req, "~> 0.7"},
+      {:plug, "~> 1.20"},
 
       # Schema validation + sanitizing
-      {:guarded_struct, "~> 0.1.0"},
+      {:guarded_struct, "~> 0.1.1"},
       # Telemetry instrumentation
       {:telemetry, "~> 1.4"},
       # Plugin dependency graph: cycle detection + start ordering

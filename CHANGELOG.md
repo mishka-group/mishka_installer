@@ -1,3 +1,25 @@
+# Changelog for MishkaInstaller 0.1.12
+
+### Fixed:
+
+- Two advisories in the dependency tree, both already fixed upstream and both reached only by
+  updating: `hpax` 1.0.3 -> 1.0.4 (EEF-CVE-2026-58226, HIGH — unauthenticated denial of service via
+  unbounded HPACK integer decoding) and `html_sanitize_ex` 1.5.1 -> 1.5.5 (EEF-CVE-2026-68750 and
+  EEF-CVE-2026-68749, both HIGH, plus three lower ones)
+
+### Changed:
+
+- **(BREAKING CHANGE)** `req` is now `~> 0.7`, up from `~> 0.6.1`. The old requirement was not just
+  this library's business: hex resolves a single `req` for the whole dependency tree, so no
+  application depending on this one could raise `req` in any of its own `mix.exs` files —
+  resolution failed outright rather than choosing a side. Nothing here uses what 0.7 changed
+  (`current_request_steps`, and the `run_finch` / `put_plug` / `run_plug` steps that became adapter
+  modules); the whole Req surface is `Req.request!/1` and a `%Req.Response{}` match
+- Dependency floors raised to what is actually resolved and tested: `phoenix_pubsub ~> 2.3`,
+  `plug ~> 1.20`, `guarded_struct ~> 0.1.1`
+- `read_app/2`'s test no longer pins the version of the library it reads, so a dependency bump stops
+  failing a test that is really about parsing an `.app` file
+
 # Changelog for MishkaInstaller 0.1.11
 
 ### Features:

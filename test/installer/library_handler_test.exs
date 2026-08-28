@@ -15,7 +15,10 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
                System.get_env("PROJECT_PATH") <> "/_build/test/lib/req/ebin/req.app"
              )
 
-    assert Keyword.get(data, :vsn) == ~c"0.6.1"
+    # Against whatever req the build actually has, not a literal: this test is about reading an
+    # .app file, and pinning the version here fails it on every dependency bump for no reason.
+    _ = Application.load(:req)
+    assert Keyword.get(data, :vsn) == Application.spec(:req, :vsn)
     {:error, _error} = assert LibraryHandler.read_app(:req, "_build/test/lib/req/ebin/req1.app")
     {:error, _error} = assert LibraryHandler.read_app(:req1, "_build/test/lib/req/ebin/req.app")
   end
