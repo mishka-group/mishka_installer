@@ -16,6 +16,9 @@ defmodule MishkaInstaller.Event.EventHandler do
     Metadata: `:event`, `:result` (`:ok` | `:error`).
   - `[:mishka_installer, :event, :synchronized]` — emitted once all events have started after the
     Mnesia store is ready. Metadata: `:node`.
+  - `[:mishka_installer, :event, :unregistered_gone]` — emitted on boot for each plugin unregistered
+    because its extension no longer has its module (`MishkaInstaller.Event.Event.unregister_gone/1`).
+    Metadata: `:plugin`, `:event`, `:extension`.
   """
   use GenServer
   require Logger
@@ -207,6 +210,19 @@ defmodule MishkaInstaller.Event.EventHandler do
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   defp synchronized_start(state) do
+    for plugin <- Event.unregister_gone() do
+      Logger.warning(
+        "[mishka_installer.event] unregistered #{inspect(plugin.name)} from #{inspect(plugin.event)}: " <>
+          "#{inspect(plugin.extension)} no longer has this module"
+      )
+
+      telemetry(:unregistered_gone, %{
+        plugin: plugin.name,
+        event: plugin.event,
+        extension: plugin.extension
+      })
+    end
+
     case Event.start() do
       {:ok, _sorted_events} ->
         :persistent_term.put(:event_status, "ready")
@@ -229,6 +245,13 @@ defmodule MishkaInstaller.Event.EventHandler do
       |> Event.dependency_order()
 
     inaccessible = for pl <- sorted_plugins, not plugin_callable?(pl.name), do: pl.name
+
+    if inaccessible != [] do
+      Logger.error(
+        "[mishka_installer.event] #{inspect(event)} cannot run: #{inspect(inaccessible)} " <>
+          "not loaded; every Hook.call/3 on it answers {:error, _} until they are loaded or unregistered"
+      )
+    end
 
     module = ModuleStateCompiler.module_event_name(event)
     recompile(compiled?(module), module, sorted_plugins, inaccessible, event)

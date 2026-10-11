@@ -1,3 +1,24 @@
+# Changelog for MishkaInstaller 0.1.13
+
+### Fixed:
+
+- A plugin removed or renamed in a newer version of its extension no longer takes its event down.
+  Its registration outlived its module in Mnesia, so the event compiled to the error stub and every
+  `Hook.call/3` on it answered `{:error, [%{message: "This event has plugins that are not loaded; it
+  cannot run."}]}` instead of running the plugins that were still there, until the record was
+  unregistered by hand. On boot, once the run-time extensions are loaded and before the events
+  start, every plugin whose extension's application is loaded and no longer has its module is now
+  unregistered, with a warning, so whatever depended on it is held as `unregister/3` holds it
+- A plugin whose application is not loaded is left as it was: its event stays an error stub, since
+  that extension may still be on its way in — and compiling an event to that stub now logs an error
+  naming the plugins it is waiting for, once per compile, where before it was silent
+
+### Features:
+
+- `MishkaInstaller.Event.Event.unregister_gone/1` and `MishkaInstaller.Event.Event.gone?/1`
+- `[:mishka_installer, :event, :unregistered_gone]` telemetry for each plugin unregistered this way,
+  with `:plugin`, `:event` and `:extension`
+
 # Changelog for MishkaInstaller 0.1.12
 
 ### Fixed:

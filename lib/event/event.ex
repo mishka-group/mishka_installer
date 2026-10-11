@@ -641,6 +641,53 @@ defmodule MishkaInstaller.Event.Event do
     end
   end
 
+  @doc """
+  Unregisters every plugin whose code is gone (`gone?/1`) through `unregister/3`, so whatever
+  depended on it is held, and returns the records it removed.
+
+  `MishkaInstaller.Event.EventHandler` runs this once on boot, after the run-time extensions are
+  loaded and before `start/1`. Without it, a plugin removed or renamed in a newer version of its
+  extension stays registered, and its event compiles to the error stub `Hook.call/3` answers with
+  instead of running any of its plugins.
+
+  ## Example:
+
+  ```elixir
+  unregister_gone()
+  ```
+  """
+  @spec unregister_gone(boolean()) :: list(struct())
+  def unregister_gone(queue \\ true) do
+    for plugin <- get(),
+        gone?(plugin),
+        {:ok, db_plg} <- [unregister(:name, plugin.name, queue)],
+        do: db_plg
+  end
+
+  @doc """
+  Whether a plugin's code is gone: the application that registered it (its `:extension`) is
+  loaded and holds no such module, and the module cannot be loaded.
+
+  A plugin whose application is not loaded is not gone, since an extension may still be on its
+  way in; its event stays an error stub until the application is loaded or the plugin is
+  unregistered.
+
+  ## Example:
+
+  ```elixir
+  gone?(%{name: TestApp.User.Auth, extension: :test_app})
+  ```
+  """
+  @spec gone?(map()) :: boolean()
+  def gone?(%{name: name, extension: app}) when is_atom(name) and is_atom(app) do
+    case Application.spec(app, :modules) do
+      modules when is_list(modules) -> name not in modules and not Code.ensure_loaded?(name)
+      nil -> false
+    end
+  end
+
+  def gone?(_plugin), do: false
+
   ###################################################################################
   ############################ (▰˘◡˘▰) Query (▰˘◡˘▰) ##########################
   ###################################################################################
