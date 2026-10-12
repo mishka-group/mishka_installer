@@ -642,13 +642,29 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
-  Unregisters every plugin whose code is gone (`gone?/1`) through `unregister/3`, so whatever
-  depended on it is held, and returns the records it removed.
+  Unregisters every plugin whose code is gone — the application that registered it (its
+  `:extension`) is loaded and holds no such module — through `unregister/3`, so whatever depended
+  on it is held, and returns the records it removed. A plugin whose application is not loaded is
+  left as it is: that extension may still be on its way in, and its event stays an error stub
+  until the application is loaded or the plugin is unregistered.
 
   `MishkaInstaller.Event.EventHandler` runs this once on boot, after the run-time extensions are
   loaded and before `start/1`. Without it, a plugin removed or renamed in a newer version of its
   extension stays registered, and its event compiles to the error stub `Hook.call/3` answers with
-  instead of running any of its plugins.
+  instead of running any of its plugins. Run it by hand after loading a new version of an extension
+  without a restart. **This is a heavy write activity**
+
+  > #### Security considerations {: .warning}
+  >
+  > It is important to remember that all of the functionalities contained within this
+  > section must be implemented at the **high access level**, and they should not directly take
+  > any input from the user. Ensure that you include the required safety measures.
+  >
+  > This module is a read-only in-memory storage optimized for the fastest possible read times
+  > not for write strategies.
+  >
+  > It is not appropriate for the user to have any direct influence on this function because
+  > it is intended for the use of the programmer.
 
   ## Example:
 
@@ -664,20 +680,7 @@ defmodule MishkaInstaller.Event.Event do
         do: db_plg
   end
 
-  @doc """
-  Whether a plugin's code is gone: the application that registered it (its `:extension`) is
-  loaded and holds no such module, and the module cannot be loaded.
-
-  A plugin whose application is not loaded is not gone, since an extension may still be on its
-  way in; its event stays an error stub until the application is loaded or the plugin is
-  unregistered.
-
-  ## Example:
-
-  ```elixir
-  gone?(%{name: TestApp.User.Auth, extension: :test_app})
-  ```
-  """
+  @doc false
   @spec gone?(map()) :: boolean()
   def gone?(%{name: name, extension: app}) when is_atom(name) and is_atom(app) do
     case Application.spec(app, :modules) do

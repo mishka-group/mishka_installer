@@ -20,7 +20,7 @@
 
 ### Features:
 
-- `MishkaInstaller.Event.Event.unregister_gone/1` and `MishkaInstaller.Event.Event.gone?/1`
+- `MishkaInstaller.Event.Event.unregister_gone/1`
 - `[:mishka_installer, :event, :unregistered_gone]` telemetry for each plugin unregistered this way,
   with `:plugin`, `:event` and `:extension`
 
