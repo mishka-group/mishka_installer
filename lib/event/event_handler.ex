@@ -249,7 +249,8 @@ defmodule MishkaInstaller.Event.EventHandler do
     if inaccessible != [] do
       Logger.error(
         "[mishka_installer.event] #{inspect(event)} cannot run: #{inspect(inaccessible)} " <>
-          "not loaded; every Hook.call/3 on it answers {:error, _} until they are loaded or unregistered"
+          "not loaded; every Hook.call/3 on it answers its cannot_run option, or the state it is " <>
+          "given, until they are loaded or unregistered"
       )
     end
 

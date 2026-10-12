@@ -645,14 +645,14 @@ defmodule MishkaInstaller.Event.Event do
   Unregisters every plugin whose code is gone — the application that registered it (its
   `:extension`) is loaded and holds no such module — through `unregister/3`, so whatever depended
   on it is held, and returns the records it removed. A plugin whose application is not loaded is
-  left as it is: that extension may still be on its way in, and its event stays an error stub
+  left as it is: that extension may still be on its way in, and its event runs none of its plugins
   until the application is loaded or the plugin is unregistered.
 
   `MishkaInstaller.Event.EventHandler` runs this once on boot, after the run-time extensions are
   loaded and before `start/1`. Without it, a plugin removed or renamed in a newer version of its
-  extension stays registered, and its event compiles to the error stub `Hook.call/3` answers with
-  instead of running any of its plugins. Run it by hand after loading a new version of an extension
-  without a restart. **This is a heavy write activity**
+  extension stays registered, and its event compiles to a stub that runs none of its plugins:
+  `Hook.call/3` on it answers its `cannot_run` option, or the state it is given. Run it by hand
+  after loading a new version of an extension without a restart. **This is a heavy write activity**
 
   > #### Security considerations {: .warning}
   >

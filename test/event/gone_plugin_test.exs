@@ -96,7 +96,7 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
     test "unregisters a gone plugin, holds what depended on it, and its event runs the rest" do
       left_behind()
 
-      assert {:error, [%{action: :call, plugins: [@removed]}]} = Hook.call(@event, %{})
+      assert Hook.call(@event, %{}, cannot_run: :cannot_run) == :cannot_run
 
       assert [%{name: @removed}] = Event.unregister_gone(false)
 
@@ -106,7 +106,7 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
       assert Hook.call(@event, %{}) == %{ran: [Kept]}
     end
 
-    test "leaves a plugin whose extension is not loaded, and its event stays an error stub" do
+    test "leaves a plugin whose extension is not loaded, and its event still cannot run" do
       {:ok, _} =
         Event.write(%{
           name: @removed,
@@ -120,7 +120,8 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
 
       assert Event.unregister_gone(false) == []
       refute is_nil(Event.get(:name, @removed))
-      assert {:error, [%{action: :call, plugins: [@removed]}]} = Hook.call(@event, %{})
+      assert Hook.call(@event, %{}) == %{}
+      assert Hook.call(@event, %{}, cannot_run: :cannot_run) == :cannot_run
     end
   end
 

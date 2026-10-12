@@ -51,7 +51,7 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     assert length(plugins) > 0
   end
 
-  test "create/3 with inaccessible plugins compiles an error stub" do
+  test "create/3 with inaccessible plugins compiles a stub that runs none of them" do
     {:ok, plugin} =
       Event.builder(%{
         name: MishkaTmp.NotLoaded,
@@ -63,7 +63,8 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
 
     module = ModuleStateCompiler.module_event_name("ms_err_evt")
     assert module.mode() == :error
-    assert {:error, [%{action: :call, plugins: [MishkaTmp.NotLoaded]}]} = module.call(%{})
+    assert module.call(%{a: 1}) == %{a: 1}
+    assert module.call(%{a: 1}, cannot_run: :refused) == :refused
   end
 
   test "initialize? / safe_initialize? / compile_initialize? / rescue_initialize? track compile state" do

@@ -43,6 +43,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   - `plugins` (list): A list of plugin(`ishkaInstaller.Event.Event`) structs to be included in the
   new module.
   - `event` (String.t()): The name of the event for which the module is created.
+  - `inaccessible` (list): The plugins of the chain that are started but not loaded. When it is not
+  empty, the module's `call/2` runs none of the plugins: it answers the `:cannot_run` option, or the
+  state it was given when there is none, and `mode/0` is `:error`.
 
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
@@ -69,7 +72,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     ast =
       quote do
         defmodule unquote(module) do
-          unquote(call_ast(mode, event, plugins, inaccessible))
+          unquote(call_ast(mode, event, plugins))
 
           def mode(), do: unquote(mode)
 
@@ -102,24 +105,15 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
   end
 
-  # Started-but-not-loaded plugins compile to an error stub: calling it returns `{:error, ...}`.
-  defp call_ast(:error, _event, _plugins, inaccessible) do
+  # Started-but-not-loaded plugins compile to a stub that runs none of them: it hands back the state,
+  # or the caller's `:cannot_run` answer.
+  defp call_ast(:error, _event, _plugins) do
     quote do
-      def call(_state, _args \\ []) do
-        {:error,
-         [
-           %{
-             message: "This event has plugins that are not loaded; it cannot run.",
-             field: :event,
-             action: :call,
-             plugins: unquote(Macro.escape(inaccessible))
-           }
-         ]}
-      end
+      def call(state, args \\ []), do: Keyword.get(args, :cannot_run, state)
     end
   end
 
-  defp call_ast(:ok, event, plugins, _inaccessible) do
+  defp call_ast(:ok, event, plugins) do
     # One shared `state` var for the param and the unrolled chain.
     state = Macro.var(:state, __MODULE__)
 
