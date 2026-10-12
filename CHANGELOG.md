@@ -12,6 +12,11 @@
 - A plugin whose application is not loaded is left as it was: its event stays an error stub, since
   that extension may still be on its way in — and compiling an event to that stub now logs an error
   naming the plugins it is waiting for, once per compile, where before it was silent
+- An event whose state is not a list, a map, `{:ok, _}` or `{:error, _}` — a LiveView callback's
+  `{:noreply, socket}` or `{:ok, socket, layout: ...}`, a binary — now comes back as its plugins left
+  it. The compiled chain had no clause for it: every call raised inside it, logged
+  `plugin pipeline raised`, and answered the state it was handed, so what the plugins returned was
+  thrown away — and an event left with no plugins logged that error on every call
 
 ### Features:
 

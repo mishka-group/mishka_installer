@@ -161,6 +161,11 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
               data when is_map(data) ->
                 if !is_nil(private), do: Map.merge(data, private), else: data
+
+              # Any other state — a LiveView callback's `{:noreply, socket}`, a binary — comes back as
+              # the plugins left it; `:private` merges only into a list or a map.
+              other ->
+                other
             end
           end
 

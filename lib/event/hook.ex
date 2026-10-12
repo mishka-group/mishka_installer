@@ -228,6 +228,7 @@ defmodule MishkaInstaller.Event.Hook do
   {:error, _errors} # It does not need to be merged
   data when is_list(data) # It can be merged with the `:private` key
   data when is_map(data) # It can be merged with the `:private` key
+  data # Any other state, such as `{:noreply, socket}`: it comes back as the plugins left it
   ```
 
   ### For example:
