@@ -48,6 +48,10 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
     start_supervised!(MishkaInstaller.MnesiaRepo)
     assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
 
+    # The handler's own boot sync — `unregister_gone/1`, then the events — is over before a test
+    # writes anything it could take.
+    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}, 2000
+
     :ok
   end
 
