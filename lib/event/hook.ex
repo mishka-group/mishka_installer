@@ -171,6 +171,9 @@ defmodule MishkaInstaller.Event.Hook do
 
   # If you want the initial entry to be displayed at the end
   Hook.call("after_success_login", params, [return: true])
+
+  # If you want another answer than `params` when a plugin of the event is not loaded
+  Hook.call("after_success_login", params, [cannot_run: {:error, :refused}])
   ```
 
   > #### Use cases information {: .tip}
@@ -228,6 +231,7 @@ defmodule MishkaInstaller.Event.Hook do
   {:error, _errors} # It does not need to be merged
   data when is_list(data) # It can be merged with the `:private` key
   data when is_map(data) # It can be merged with the `:private` key
+  data # Any other state, such as `{:noreply, socket}`: it comes back as the plugins left it
   ```
 
   ### For example:
@@ -433,16 +437,25 @@ defmodule MishkaInstaller.Event.Hook do
   ## Parameters
   - `event` (String.t()): The name of the event.
   - `data` (any()): The data to be passed to the event module.
-  - `args` (keyword()): Additional arguments for the call (`private`, `return`, `meta`). `meta` is
-    read-only side context handed to plugins that opt in with `call/2`; unlike `private` it is never
-    merged into the result.
+  - `args` (keyword()): Additional arguments for the call:
+    - `private` — merged into a list or map result, untouched by the plugins.
+    - `return` — when set, the plugins run and `data` is returned as it was given.
+    - `meta` — read-only side context handed to plugins that opt in with `call/2`; unlike `private`
+      it is never merged into the result.
+    - `cannot_run` — the answer when the event cannot run: one of its plugins is started but not
+      loaded, so none of them runs. Without it that event answers `data`. An event whose plugins
+      all run ignores it.
 
   ## Returns
-  - `any()`: The result of the event module's `call/2` function.
+  - `any()`: The result of the event module's `call/2` function; `data` when the event is not
+    compiled (it has no plugins); the `cannot_run` answer, or `data`, when it cannot run.
 
   ## Examples
   ```elixir
   MishkaInstaller.Event.Hook.call("my_event", %{}, [])
+
+  # A decision the plugins take part in refuses when they cannot run
+  MishkaInstaller.Event.Hook.call("auth:gate:check", gate, cannot_run: %{gate | allowed?: false})
   ```
   """
   @spec call(String.t(), any(), keyword()) :: any()
@@ -456,6 +469,8 @@ defmodule MishkaInstaller.Event.Hook do
   does not check in a single step whether the required event has been compiled or not.
   When you are 100% certain that the event you want is present in the system,
   using it is the best option.
+
+  It takes the same `args`, `cannot_run` included: an event that cannot run answers it, or `data`.
   """
   @spec call!(String.t(), any(), keyword()) :: any()
   def call!(event, data, args \\ []) do

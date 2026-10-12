@@ -1,3 +1,40 @@
+# Changelog for MishkaInstaller 0.1.13
+
+### Fixed:
+
+- A plugin removed or renamed in a newer version of its extension no longer takes its event down.
+  Its registration outlived its module in Mnesia, so the event compiled to a stub that ran none of
+  the plugins that were still there, until the record was unregistered by hand. On boot, once the
+  run-time extensions are loaded and before the events start, every plugin whose extension's
+  application is loaded and no longer has its module is now unregistered, with a warning, so
+  whatever depended on it is held as `unregister/3` holds it
+- A plugin whose application is not loaded is left as it was: its event still runs none of its
+  plugins, since that extension may still be on its way in — and compiling an event to that stub now
+  logs an error naming the plugins it is waiting for, once per compile, where before it was silent
+- An event whose state is not a list, a map, `{:ok, _}` or `{:error, _}` — a LiveView callback's
+  `{:noreply, socket}` or `{:ok, socket, layout: ...}`, a binary — now comes back as its plugins left
+  it. The compiled chain had no clause for it: every call raised inside it, logged
+  `plugin pipeline raised`, and answered the state it was handed, so what the plugins returned was
+  thrown away — and an event left with no plugins logged that error on every call
+
+### Changed:
+
+- **(BREAKING CHANGE)** An event that cannot run — one of its plugins is started but not loaded —
+  now answers `Hook.call/3` and `Hook.call!/3` with the state they were given, or with the answer
+  named in their new `cannot_run:` option, instead of
+  `{:error, [%{action: :call, field: :event, plugins: [...]}]}`. Every caller had to tell that error
+  apart from its plugins' answer before it could go on without them; a caller whose decision must
+  refuse when its plugins cannot run, such as a security gate, now names its refusal:
+  `Hook.call("auth:gate:check", gate, cannot_run: %{gate | allowed?: false})`. An event whose
+  plugins all run ignores the option
+
+### Features:
+
+- `cannot_run:` option on `MishkaInstaller.Event.Hook.call/3` and `MishkaInstaller.Event.Hook.call!/3`
+- `MishkaInstaller.Event.Event.unregister_gone/1`
+- `[:mishka_installer, :event, :unregistered_gone]` telemetry for each plugin unregistered this way,
+  with `:plugin`, `:event` and `:extension`
+
 # Changelog for MishkaInstaller 0.1.12
 
 ### Fixed:

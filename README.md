@@ -64,6 +64,7 @@ alias MishkaInstaller.Event.Hook
 Hook.call("after_success_login", params)
 Hook.call("after_success_login", params, private: keep_this)  # extra data, untouched by plugins
 Hook.call("after_success_login", params, return: true)        # return the original input
+Hook.call("after_success_login", params, cannot_run: :refused) # the answer while a plugin is not loaded
 ```
 
 To start a plugin automatically, add its module to your supervision tree:
@@ -132,7 +133,7 @@ config :mishka_installer, MishkaInstaller.MnesiaRepo,
 
 ```elixir
 def deps do
-  [{:mishka_installer, "~> 0.1.12"}]
+  [{:mishka_installer, "~> 0.1.13"}]
 end
 ```
 

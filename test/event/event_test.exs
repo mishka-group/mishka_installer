@@ -914,7 +914,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
   #################### (▰˘◡˘▰) Inaccessible plugins (▰˘◡˘▰) ###################
   ###################################################################################
   describe "inaccessible plugins ===>" do
-    test "an event with a started but unloaded plugin compiles to an error stub" do
+    test "an event with a started but unloaded plugin compiles to a stub that runs none of them" do
       {:ok, _} =
         assert Event.write(%{
                  name: MishkaTest.NotLoadedPlugin,
@@ -928,8 +928,8 @@ defmodule MishkaInstallerTest.Event.EventTest do
       module = ModuleStateCompiler.module_event_name("ghost_event")
       assert module.mode() == :error
 
-      assert {:error, [%{action: :call, field: :event, plugins: [MishkaTest.NotLoadedPlugin]}]} =
-               Hook.call("ghost_event", %{})
+      assert Hook.call("ghost_event", %{a: 1}) == %{a: 1}
+      assert Hook.call("ghost_event", %{a: 1}, cannot_run: :refused) == :refused
     end
 
     test "an event whose plugins are all loaded compiles to a runnable module" do
