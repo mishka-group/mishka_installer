@@ -74,7 +74,7 @@ defmodule MishkaInstaller.Installer.Installer do
     # This type can be used when you want to introduce a runtime library (OTP app) name.
     field(:app, String.t(), enforce: true, derives: "validate(not_empty_string)")
     # This type can be used when you want to introduce a runtime library version.
-    field(:version, String.t(), enforce: true, derives: "validate(not_empty_string)")
+    field(:version, String.t(), enforce: true, derives: "validate(not_empty_string, semver)")
     # `:path` (a local package dir) or download a `tar.gz` artifact (`:url`/`:github_*`).
     field(:type, download_type(),
       default: :path,
@@ -127,6 +127,9 @@ defmodule MishkaInstaller.Installer.Installer do
   `MishkaInstaller.Installer.LibraryHandler.extensions_path/0`); `:url`/`:github_tag`/
   `:github_latest_release` **download** a pre-built `tar.gz` artifact and extract it there. Nothing
   is ever compiled here (see `MishkaInstaller.Installer.Downloader`).
+
+  The `version` must be a semantic version (for example `"0.1.7"` or `"1.0.0-rc.1"`); anything else
+  is refused with an `{:error, [...]}` before anything is installed.
 
   The steps are: validate the app name, resolve the package (local move or download + extract),
   confirm the `ebin`/`.app` exist, reject a same/older version that is already running, add the
@@ -754,7 +757,7 @@ defmodule MishkaInstaller.Installer.Installer do
   end
 
   defp update_or_write(data, merged_app) do
-    db_data = get(data.app)
+    db_data = get(:app, data.app)
     if is_nil(db_data), do: write(merged_app), else: write(:id, db_data.id, merged_app)
   end
 

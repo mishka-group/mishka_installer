@@ -318,21 +318,62 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   @doc false
   @spec compare_version_with_installed_app(atom(), String.t()) :: :ok | error_return()
   def compare_version_with_installed_app(app, version) do
-    ver = Application.spec(app, :vsn)
+    with {:ok, new_version} <- parse_version(version, :version),
+         {:ok, installed_version} <- installed_version(app) do
+      newer_than_installed(new_version, installed_version)
+    end
+  end
 
-    cond do
-      is_nil(ver) ->
+  defp installed_version(app) do
+    case Application.spec(app, :vsn) do
+      nil -> {:ok, nil}
+      installed -> parse_version(installed, :app)
+    end
+  end
+
+  defp newer_than_installed(_new_version, nil), do: :ok
+
+  defp newer_than_installed(new_version, installed_version) do
+    case Version.compare(new_version, installed_version) do
+      :gt ->
         :ok
 
-      Version.compare("#{version}", "#{ver}") == :gt ->
-        :ok
-
-      true ->
+      _ ->
         message =
           "In the path of installed apps, there is an app of the same name with the same or higher version."
 
         {:error, [%{message: message, field: :app, action: :compare_version_with_installed_app}]}
     end
+  end
+
+  # `field` is `:version` for the version being installed and `:app` for the one already loaded.
+  defp parse_version(version, field) do
+    with string when is_binary(string) <- version_string(version),
+         {:ok, parsed} <- Version.parse(string) do
+      {:ok, parsed}
+    else
+      _ -> {:error, [invalid_version_error(field)]}
+    end
+  end
+
+  defp version_string(version) when is_binary(version), do: version
+
+  defp version_string(version) when is_list(version) do
+    if List.ascii_printable?(version), do: List.to_string(version), else: :error
+  end
+
+  defp version_string(_version), do: :error
+
+  defp invalid_version_error(:version) do
+    message = "The version you sent is not a semantic version (expected MAJOR.MINOR.PATCH)."
+    %{message: message, field: :version, action: :compare_version_with_installed_app}
+  end
+
+  defp invalid_version_error(:app) do
+    message =
+      "The version of the installed app of the same name is not a semantic version, so it cannot be compared."
+
+    %{message: message, field: :app, action: :compare_version_with_installed_app}
   end
 
   defp finalize_extract(temp_path, dest) do

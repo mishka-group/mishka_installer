@@ -72,9 +72,42 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     {:error, [%{action: :compare_version_with_installed_app}]} =
       assert LibraryHandler.compare_version_with_installed_app(:req, "0.0.1")
 
+    # A pre-release of a newer version is still newer than the installed one.
+    :ok = assert LibraryHandler.compare_version_with_installed_app(:req, "99.0.0-rc.1")
+
     # An app that is not installed is always allowed.
     :ok =
       assert LibraryHandler.compare_version_with_installed_app(:not_installed_app_xyz, "1.0.0")
+  end
+
+  test "Compare version with installed app returns an error for a version that is not semver" do
+    for version <- ["1.0", "latest", "", "1.0.0/../x", nil, 1] do
+      # `:req` is loaded, which used to raise `Version.InvalidVersionError`.
+      {:error, [%{field: :version, action: :compare_version_with_installed_app}]} =
+        assert LibraryHandler.compare_version_with_installed_app(:req, version)
+
+      # No such app is loaded, which used to accept it silently.
+      {:error, [%{field: :version, action: :compare_version_with_installed_app}]} =
+        assert LibraryHandler.compare_version_with_installed_app(:not_installed_app_xyz, version)
+    end
+  end
+
+  test "Compare version with installed app returns an error when the installed version is not semver" do
+    app = :"lib_handler_compare_#{System.unique_integer([:positive])}"
+    dir = Path.join(System.tmp_dir!(), "#{app}")
+    {^app, _module, ebin} = EbinFixture.build_fake_app(dir, app, "1.0")
+
+    on_exit(fn ->
+      Application.unload(app)
+      Code.delete_path(ebin)
+      File.rm_rf!(dir)
+    end)
+
+    :ok = assert LibraryHandler.prepend_compiled_apps([{app, ebin}])
+    :ok = assert Application.load(app)
+
+    {:error, [%{field: :app, action: :compare_version_with_installed_app}]} =
+      assert LibraryHandler.compare_version_with_installed_app(app, "2.0.0")
   end
 
   test "Extract a pre-built ebin tarball into the extensions directory" do
