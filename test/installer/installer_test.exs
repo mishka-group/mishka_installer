@@ -130,6 +130,54 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert module.hello() == :world
     end
 
+    test "install does not change the working folder of the node" do
+      cwd = File.cwd!()
+
+      project =
+        Path.join(System.tmp_dir!(), "mishka_project_#{System.unique_integer([:positive])}")
+
+      File.mkdir_p!(project)
+
+      on_exit(fn ->
+        File.cd!(cwd)
+        System.put_env("PROJECT_PATH", cwd)
+        File.rm_rf!(project)
+      end)
+
+      System.put_env("PROJECT_PATH", project)
+      {app, app_atom, version, pkg, module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+
+      assert File.cwd!() == cwd
+      assert module.hello() == :world
+    end
+
+    test "install works without a project path when the extensions path is configured" do
+      cwd = File.cwd!()
+
+      extensions =
+        Path.join(System.tmp_dir!(), "mishka_ext_#{System.unique_integer([:positive])}")
+
+      on_exit(fn ->
+        System.put_env("PROJECT_PATH", cwd)
+        Application.delete_env(:mishka_installer, :extensions_path)
+        File.rm_rf!(extensions)
+      end)
+
+      System.delete_env("PROJECT_PATH")
+      Application.put_env(:mishka_installer, :extensions_path, extensions)
+      {app, app_atom, version, pkg, module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, %{extension: %{app: ^app}}} =
+        assert Installer.install(%{app: app, version: version, path: pkg})
+
+      assert File.cwd!() == cwd
+      assert module.hello() == :world
+    end
+
     test "install a downloaded pre-built ebin (:url) via Req.Test" do
       Application.put_env(:mishka_installer, :downloader_req_options,
         plug: {Req.Test, Downloader}

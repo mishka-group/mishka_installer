@@ -189,8 +189,6 @@ defmodule MishkaInstaller.Installer.Installer do
       MishkaInstaller.broadcast("installer", :install, install_output(output))
       {:ok, install_output(output)}
     end
-  after
-    File.cd!(MishkaInstaller.__information__().path)
   end
 
   @doc """
