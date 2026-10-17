@@ -158,6 +158,23 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   """
   @spec extract(:tar, binary(), String.t()) :: :ok | error_return()
   def extract(:tar, archived, name) do
+    with :ok <- valid_extract_name(name) do
+      extract_archive(archived, name)
+    end
+  end
+
+  # `name` becomes a folder of the extensions directory, so it must be one plain path segment.
+  defp valid_extract_name(name) do
+    if is_binary(name) and name not in ["", ".", ".."] and name == Path.basename(name) and
+         not String.contains?(name, <<0>>) do
+      :ok
+    else
+      message = "The name of the extracted package must be a single folder name."
+      {:error, [%{message: message, field: :path, action: :extract}]}
+    end
+  end
+
+  defp extract_archive(archived, name) do
     base = extensions_path()
     temp_path = "#{base}/temp-#{name}"
     File.rm_rf!(temp_path)

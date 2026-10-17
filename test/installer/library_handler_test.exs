@@ -147,6 +147,32 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     {:error, [%{action: :extract}]} = assert LibraryHandler.extract(:tar, tarball, name)
   end
 
+  test "Extract refuses a name that is not a single folder name, before touching the disk" do
+    app = :"lib_handler_name_#{System.unique_integer([:positive])}"
+    {tarball, ^app, _module} = EbinFixture.tar_fake_app(app, "0.1.0")
+    base = LibraryHandler.extensions_path()
+    outside = "#{base}-outside-#{System.unique_integer([:positive])}"
+    on_exit(fn -> File.rm_rf!(outside) end)
+
+    for name <- [
+          "",
+          ".",
+          "..",
+          "../#{Path.basename(outside)}",
+          "a/b",
+          "/abs",
+          "x/../../#{Path.basename(outside)}",
+          "nul\0byte",
+          nil,
+          :atom
+        ] do
+      {:error, [%{action: :extract, field: :path}]} =
+        assert LibraryHandler.extract(:tar, tarball, name)
+    end
+
+    refute File.exists?(outside)
+  end
+
   test "Extract rejects an archive with a traversal member (tar-slip)" do
     uniq = System.unique_integer([:positive])
     src = Path.join(System.tmp_dir!(), "slip-#{uniq}")
