@@ -1,6 +1,7 @@
 defmodule MishkaInstallerTest.Installer.InstallerTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Installer.{Installer, LibraryHandler, Downloader}
+  alias MishkaInstaller.Installer.{Installer, LibraryHandler, Downloader, CompileHandler}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query}
   alias MishkaInstallerTest.Support.EbinFixture
   import ExUnit.CaptureLog, only: [capture_log: 1]
 
@@ -921,9 +922,111 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
                Installer.uninstall(%{app: "demo", version: "0.1.0/../../etc", path: "p"})
     end
 
+    test "uninstall refuses a version that points at another package of the extensions directory" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      {other, other_atom, other_version, other_pkg, _other_module} = fake_local_app()
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        cleanup(other_atom, other_pkg)
+      end)
+
+      {:error, [%{action: :package_dir}]} =
+        assert Installer.uninstall(%{
+                 app: app,
+                 version: "#{version}/../#{other}-#{other_version}",
+                 path: pkg
+               })
+
+      assert File.dir?(other_pkg)
+      assert File.dir?(pkg)
+    end
+
     test "uninstall rejects an invalid app name (path traversal in app)" do
       assert {:error, [%{action: :valid_name}]} =
                Installer.uninstall(%{app: "../../etc", version: "0.1.0", path: "p"})
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Boot replay (▰˘◡˘▰) ##########################
+  ###################################################################################
+  describe "boot replay ===>" do
+    @describetag :capture_log
+
+    test "the ebin is loaded from the extensions directory, not from the path a record names" do
+      {app, app_atom, version, pkg, module} = fake_local_app()
+
+      evil =
+        Path.join(System.tmp_dir!(), "mishka_evil_ebin_#{System.unique_integer([:positive])}")
+
+      build_variant(evil, app_atom, version, :evil)
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        File.rm_rf!(evil)
+        :code.purge(module)
+        :code.delete(module)
+      end)
+
+      {:ok, _} =
+        assert Installer.write(%{
+                 app: app,
+                 version: version,
+                 path: pkg,
+                 prepend_paths: [{app_atom, "#{evil}/ebin"}]
+               })
+
+      :code.purge(module)
+      :code.delete(module)
+      :code.purge(module)
+
+      replay_all()
+
+      assert_receive {:telemetry, %{app: ^app, result: :ok}}
+      assert String.to_charlist("#{pkg}/ebin") in :code.get_path()
+      refute String.to_charlist("#{evil}/ebin") in :code.get_path()
+      assert app_atom in started_apps()
+      assert module.hello() == :world
+    end
+
+    test "a record that holds an invalid name, a protected app or an escaping version is skipped" do
+      unique = System.unique_integer([:positive])
+      evil = Path.join(System.tmp_dir!(), "mishka_evil_ebin_#{unique}")
+      File.mkdir_p!("#{evil}/ebin")
+      on_exit(fn -> File.rm_rf!(evil) end)
+
+      records = [
+        %{app: "evil_newline_#{unique}\n", version: "0.1.0"},
+        %{app: "mishka_installer", version: "9.9.9"},
+        %{app: "evil_version_#{unique}", version: "0.1.0/../../mishka_evil_ebin_#{unique}"},
+        %{app: "Evil_Upper_#{unique}", version: "0.1.0"}
+      ]
+
+      for record <- records do
+        put_raw_record(
+          Map.merge(record, %{
+            id: MishkaInstaller.Helper.UUID.generate(),
+            path: "p",
+            type: :path,
+            depends: [],
+            prepend_paths: [{:evil, "#{evil}/ebin"}],
+            inserted_at: 1,
+            updated_at: 1
+          })
+        )
+      end
+
+      replay_all()
+
+      for %{app: app} <- records do
+        assert_receive {:telemetry, %{app: ^app, result: :error}}
+      end
+
+      refute_received {:telemetry, %{result: :ok}}
+      refute String.to_charlist("#{evil}/ebin") in :code.get_path()
+      assert_raise ArgumentError, fn -> String.to_existing_atom("evil_newline_#{unique}\n") end
+      assert :mishka_installer in started_apps()
     end
   end
 
@@ -954,6 +1057,39 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   end
 
   defp started_apps, do: Enum.map(Application.started_applications(), &elem(&1, 0))
+
+  defp build_variant(pkg, app_atom, version, result) do
+    previous = Code.get_compiler_option(:ignore_module_conflict)
+    Code.put_compiler_option(:ignore_module_conflict, true)
+    {^app_atom, _module, _ebin} = EbinFixture.build_fake_app(pkg, app_atom, version, result)
+    Code.put_compiler_option(:ignore_module_conflict, previous)
+    pkg
+  end
+
+  # A record written straight into the table, as a peer node or a restored backup could.
+  defp put_raw_record(record) do
+    values = ([Installer] ++ Enum.map(Installer.keys(), &Map.get(record, &1))) |> List.to_tuple()
+    {:atomic, _} = Transaction.durable_transaction(fn -> Query.write(values) end)
+  end
+
+  # Boots the CompileHandler on the table as it is; every replay result arrives as `{:telemetry, meta}`.
+  defp replay_all do
+    test_pid = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      [:mishka_installer, :installer, :replay],
+      fn _event, _meas, meta, _ -> send(test_pid, {:telemetry, meta}) end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    pid = start_supervised!(CompileHandler)
+    send(pid, %{status: :synchronized, channel: "mnesia"})
+    assert_receive %{status: :compile_synchronized, channel: "mnesia"}, 2000
+  end
 
   defp stub_download(tarball) do
     Req.Test.stub(Downloader, fn conn ->

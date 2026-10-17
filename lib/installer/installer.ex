@@ -691,6 +691,16 @@ defmodule MishkaInstaller.Installer.Installer do
   end
 
   @doc false
+  @spec replay_paths(map()) :: {:ok, atom(), [{atom(), String.t()}]} | error_return()
+  def replay_paths(item) do
+    with {:ok, app} <- app_atom(item.app),
+         :ok <- protected_app(item.app),
+         {:ok, dir} <- package_dir(item.app, item.version) do
+      {:ok, app, [{app, "#{dir}/ebin"}]}
+    end
+  end
+
+  @doc false
   @spec app_atom(term()) :: {:ok, atom()} | error_return()
   def app_atom(app) do
     with :ok <- valid_name(app), do: {:ok, String.to_atom(app)}
@@ -742,12 +752,13 @@ defmodule MishkaInstaller.Installer.Installer do
   end
 
   # `app`/`version` can arrive from an admin web form, so never trust them straight into a path:
-  # build the canonical "<app>-<version>" dir and refuse anything that escapes the extensions dir.
+  # build the canonical "<app>-<version>" dir and refuse a name that is more than one path segment.
   defp package_dir(app, version) do
     base = LibraryHandler.extensions_path()
-    dir = Path.expand("#{app}-#{version}", base)
+    name = "#{app}-#{version}"
+    dir = Path.expand(name, base)
 
-    if inside_extensions?(dir, base) do
+    if name == Path.basename(name) and Path.dirname(dir) == Path.expand(base) do
       {:ok, dir}
     else
       message = "Invalid app/version: the package path escapes the extensions directory."
