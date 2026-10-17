@@ -41,6 +41,8 @@ defmodule MishkaInstaller.Installer.Downloader do
   > A downloaded artifact is loaded as code with full node privileges; only download from trusted
   > sources and verify its provenance/integrity before activation.
   """
+  require Logger
+
   @github_api_path "https://api.github.com/repos"
   @github_hosts ["github.com", "api.github.com"]
   @github_release_hosts ["release-assets.githubusercontent.com", "objects.githubusercontent.com"]
@@ -193,12 +195,20 @@ defmodule MishkaInstaller.Installer.Downloader do
 
   # Redirects are never followed by Req: each `Location` is checked against `hosts` and followed here.
   defp fetch(url, hosts, hops_left, args) do
-    response = build_url(url, Keyword.put(args, :redirect, false))
+    case build_url(url, Keyword.put(args, :redirect, false)) do
+      {:ok, %Req.Response{status: status} = response} when status in @redirect_statuses ->
+        follow(response, url, hosts, hops_left, args)
 
-    if response.status in @redirect_statuses do
-      follow(response, url, hosts, hops_left, args)
-    else
-      {:ok, response}
+      {:ok, response} ->
+        {:ok, response}
+
+      {:error, exception} ->
+        Logger.warning(
+          "[mishka_installer.downloader] request to #{inspect(URI.parse(url).host)} failed: " <>
+            Exception.message(exception)
+        )
+
+        download_err()
     end
   end
 
@@ -240,6 +250,6 @@ defmodule MishkaInstaller.Installer.Downloader do
     |> Keyword.merge(args)
     |> Keyword.merge(Application.get_env(:mishka_installer, :downloader_req_options, []))
     |> Keyword.merge(Application.get_env(:mishka_installer, :proxy, []))
-    |> Req.request!()
+    |> Req.request()
   end
 end

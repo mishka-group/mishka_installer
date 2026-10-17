@@ -645,6 +645,49 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       refute_received {:requested, _scheme}
     end
 
+    test "a network failure is an error tuple, and the queue's CompileHandler survives it" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader},
+        retry: false
+      )
+
+      Req.Test.stub(Downloader, fn conn -> Req.Test.transport_error(conn, :econnrefused) end)
+
+      app = uniq_app("offline")
+
+      source = %{
+        app: app,
+        version: "0.1.0",
+        type: :url,
+        path: "https://cdn.example.com/#{app}.tar.gz"
+      }
+
+      {:error, [%{action: :download}]} = assert Installer.install(source)
+
+      test_pid = self()
+      handler = {__MODULE__, make_ref()}
+
+      :telemetry.attach(
+        handler,
+        [:mishka_installer, :installer, :install],
+        fn _event, _meas, meta, _ -> send(test_pid, {:telemetry, meta}) end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      pid = start_supervised!(CompileHandler)
+      Req.Test.allow(Downloader, self(), pid)
+      :ok = Installer.async_install(source)
+
+      assert_receive {:telemetry, %{result: :error}}
+      assert Process.whereis(CompileHandler) == pid
+      assert Keyword.get(CompileHandler.get(), :running) == []
+      assert is_nil(Installer.get(:app, app))
+    end
+
     test "a download that redirects off the allowlisted host installs nothing" do
       Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
 

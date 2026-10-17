@@ -3,7 +3,11 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
   alias MishkaInstaller.Installer.Downloader
 
   setup do
-    Application.put_env(:mishka_installer, :downloader_req_options, plug: {Req.Test, Downloader})
+    Application.put_env(:mishka_installer, :downloader_req_options,
+      plug: {Req.Test, Downloader},
+      retry: false
+    )
+
     on_exit(fn -> Application.delete_env(:mishka_installer, :allowlist) end)
     :ok
   end
@@ -57,6 +61,56 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
 
     test "An unknown download type is an error" do
       {:error, [%{action: :download}]} = assert Downloader.download(:hex, %{app: "whatever"})
+    end
+  end
+
+  describe "A network failure ===>" do
+    @describetag :capture_log
+
+    test "is an error tuple, not a raise" do
+      Req.Test.stub(Downloader, fn conn -> Req.Test.transport_error(conn, :econnrefused) end)
+
+      {:error, [%{action: :download, field: :path}]} =
+        assert Downloader.download(:url, %{path: "https://cdn.example.com/app.tar.gz"})
+
+      {:error, [%{action: :download}]} =
+        assert Downloader.download(:github_latest_release, %{path: "owner/repo"})
+
+      {:error, [%{action: :download}]} =
+        assert Downloader.download(:github_tag, %{path: "owner/repo", tag: "1.0.0"})
+    end
+
+    test "on a redirect hop is an error tuple too" do
+      Req.Test.stub(Downloader, fn conn ->
+        case conn.request_path do
+          "/app.tar.gz" -> redirect(conn, "/second.tar.gz")
+          "/second.tar.gz" -> Req.Test.transport_error(conn, :timeout)
+        end
+      end)
+
+      {:error, [%{action: :download}]} =
+        assert Downloader.download(:url, %{path: "https://cdn.example.com/app.tar.gz"})
+    end
+
+    test "on the asset after the release was resolved is an error tuple too" do
+      Req.Test.stub(Downloader, fn conn ->
+        if conn.host == "api.github.com" do
+          Req.Test.json(conn, %{
+            "assets" => [
+              %{
+                "name" => "app.tar.gz",
+                "browser_download_url" =>
+                  "https://github.com/owner/repo/releases/download/1/app.tar.gz"
+              }
+            ]
+          })
+        else
+          Req.Test.transport_error(conn, :closed)
+        end
+      end)
+
+      {:error, [%{action: :download}]} =
+        assert Downloader.download(:github_latest_release, %{path: "owner/repo"})
     end
   end
 
