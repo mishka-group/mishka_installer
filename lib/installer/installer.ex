@@ -135,6 +135,9 @@ defmodule MishkaInstaller.Installer.Installer do
   > sandbox. Only install artifacts from a trusted source, built for the **same** Erlang/OTP and
   > Elixir as the host.
 
+  A `:url` must be an `https` URL. A redirect of a download is followed only to `https` hosts the
+  install may use (see `MishkaInstaller.Installer.Downloader`).
+
   A remote install (`:url`/`:github_*`) should carry the artifact's sha256 as `checksum`. Without one
   a warning is logged; with `config :mishka_installer, :allowlist, require_checksum: true` it is
   refused with `{:error, [%{action: :allowlist}]}` before anything is downloaded. A `:path` install
