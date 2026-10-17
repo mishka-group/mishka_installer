@@ -514,21 +514,18 @@ defmodule MishkaInstaller.Event.Hook do
 
   # Cold path: each plugin runs in its own process, so one failing plugin cannot abort the profile run.
   defp time_plugin(name, state) do
-    timed =
-      Extra.isolate(fn ->
-        :timer.tc(fn ->
-          args = if function_exported?(name, :call, 2), do: [state, nil], else: [state]
-
-          case apply(name, :call, args) do
-            {:reply, new_state} -> new_state
-            other -> other
-          end
-        end)
-      end)
-
-    case timed do
+    case Extra.isolate(fn -> :timer.tc(fn -> call_plugin(name, state) end) end) do
       {:ok, {micros, next}} -> {micros, next}
       {:exit, _reason} -> {0, state}
+    end
+  end
+
+  defp call_plugin(name, state) do
+    args = if function_exported?(name, :call, 2), do: [state, nil], else: [state]
+
+    case apply(name, :call, args) do
+      {:reply, new_state} -> new_state
+      other -> other
     end
   end
 

@@ -217,19 +217,7 @@ defmodule MishkaInstaller.Helper.Record do
           :mnesia.abort(:record_not_found)
 
         data ->
-          merged =
-            data
-            |> Map.merge(Map.drop(updated_to, [:id]))
-            |> Map.merge(%{updated_at: Extra.get_unix_time()})
-
-          case build.({:root, merged, :edit}) do
-            {:ok, struct} ->
-              module |> to_tuple(struct) |> Query.write()
-              struct
-
-            {:error, _} = error ->
-              :mnesia.abort(error)
-          end
+          write_merged(module, data, updated_to, build)
       end
     end)
     |> case do
@@ -247,6 +235,23 @@ defmodule MishkaInstaller.Helper.Record do
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, module, "storing", :global, :database)
+    end
+  end
+
+  # Writes `data` with `updated_to` merged onto it, or aborts the transaction with the error of `build`.
+  defp write_merged(module, data, updated_to, build) do
+    merged =
+      data
+      |> Map.merge(Map.drop(updated_to, [:id]))
+      |> Map.merge(%{updated_at: Extra.get_unix_time()})
+
+    case build.({:root, merged, :edit}) do
+      {:ok, struct} ->
+        module |> to_tuple(struct) |> Query.write()
+        struct
+
+      {:error, _} = error ->
+        :mnesia.abort(error)
     end
   end
 

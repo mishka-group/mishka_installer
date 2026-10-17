@@ -259,14 +259,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :start_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            case bulk_start(pl_item) do
-              {:ok, db_plg} -> acc ++ [db_plg]
-              :skip -> acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &bulk_start/1)
 
         EventHandler.do_compile(event, :start, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -289,6 +282,40 @@ defmodule MishkaInstaller.Event.Event do
     else
       if pl_item.status != :held, do: write(:id, pl_item.id, %{status: :held})
       :skip
+    end
+  end
+
+  # Applies `transition` to every plugin of an event; the plugins that moved, ordered by priority.
+  defp transition_all(plugins, transition) do
+    plugins
+    |> Enum.flat_map(fn pl_item ->
+      case transition.(pl_item) do
+        {:ok, db_plg} -> [db_plg]
+        _skipped -> []
+      end
+    end)
+    |> Enum.sort_by(&{&1.priority, &1.name})
+  end
+
+  defp restart_one(pl_item) do
+    with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
+         :ok <- startable?(data.status),
+         :ok <- allowed_events?(data.depends) do
+      write(:id, data.id, %{status: :restarted})
+    end
+  end
+
+  defp stop_one(pl_item) do
+    with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
+         :ok <- stoppable?(data.status) do
+      write(:id, data.id, %{status: :stopped})
+    end
+  end
+
+  defp unregister_one(pl_item) do
+    with {:ok, db_plg} <- delete(:name, pl_item.name) do
+      stop_if_alive(pl_item.name)
+      {:ok, db_plg}
     end
   end
 
@@ -377,18 +404,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :restart_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
-                 :ok <- startable?(data.status),
-                 :ok <- allowed_events?(data.depends),
-                 {:ok, db_plg} <- write(:id, data.id, %{status: :restarted}) do
-              acc ++ [db_plg]
-            else
-              _ -> acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &restart_one/1)
 
         EventHandler.do_compile(event, :restart, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -502,17 +518,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :stop_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
-                 :ok <- stoppable?(data.status),
-                 {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}) do
-              acc ++ [db_plg]
-            else
-              _ -> acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &stop_one/1)
 
         EventHandler.do_compile(event, :stop, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -590,18 +596,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :unregister_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            case delete(:name, pl_item.name) do
-              {:ok, db_plg} ->
-                stop_if_alive(pl_item.name)
-                acc ++ [db_plg]
-
-              _ ->
-                acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &unregister_one/1)
 
         EventHandler.do_compile(event, :unregister, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -1103,28 +1098,29 @@ defmodule MishkaInstaller.Event.Event do
   # A single pass cannot settle a diamond (a plugin reached before one of its other dependencies was
   # updated), so passes repeat while anything changes, bounded by the size of the affected set.
   defp settle(names, index, changed, rounds) when rounds > 0 do
-    {index, changed, dirty?} =
-      Enum.reduce(names, {index, changed, false}, fn name, {index, changed, dirty?} ->
-        record = Map.get(index, name)
-        desired = if is_nil(record), do: nil, else: desired_status(record, index)
-
-        if is_nil(record) or desired == record.status do
-          {index, changed, dirty?}
-        else
-          case write(:id, record.id, %{status: desired}) do
-            {:ok, updated} ->
-              {Map.put(index, name, updated), Map.put(changed, name, updated), true}
-
-            _error ->
-              {index, changed, dirty?}
-          end
-        end
-      end)
+    {index, changed, dirty?} = Enum.reduce(names, {index, changed, false}, &settle_one/2)
 
     if dirty?, do: settle(names, index, changed, rounds - 1), else: {index, changed}
   end
 
   defp settle(_names, index, changed, _rounds), do: {index, changed}
+
+  defp settle_one(name, {index, changed, dirty?}) do
+    record = Map.get(index, name)
+    desired = if is_nil(record), do: nil, else: desired_status(record, index)
+
+    if is_nil(record) or desired == record.status do
+      {index, changed, dirty?}
+    else
+      case write(:id, record.id, %{status: desired}) do
+        {:ok, updated} ->
+          {Map.put(index, name, updated), Map.put(changed, name, updated), true}
+
+        _error ->
+          {index, changed, dirty?}
+      end
+    end
+  end
 
   # The status a plugin should hold given its dependencies, looked up either in a cascade's snapshot
   # or, with `:db`, in the database.
