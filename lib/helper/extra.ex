@@ -43,12 +43,15 @@ defmodule MishkaInstaller.Helper.Extra do
   end
 
   @doc """
-  Runs `fun` in its own monitored process and waits for it.
+  Runs `fun` in its own process and waits for it.
 
   Returns `{:ok, result}` when `fun` returns, and `{:exit, reason}` when the process dies first
   (an exception, a throw, an exit or a kill): `reason` is the exit reason of the process, so a
   raised exception arrives as `{exception, stacktrace}`. Nothing `fun` does reaches the caller as
   an exception, and `fun` runs without the caller's process dictionary.
+
+  The process lives and dies with the caller: when the caller is killed or stopped while `fun` is
+  running, `fun` is stopped too.
 
   ## Examples
 
@@ -59,11 +62,25 @@ defmodule MishkaInstaller.Helper.Extra do
   """
   @spec isolate((-> result)) :: {:ok, result} | {:exit, term()} when result: term()
   def isolate(fun) when is_function(fun, 0) do
-    {pid, ref} = spawn_monitor(fn -> exit({:isolated, fun.()}) end)
+    caller = self()
+    {guard, ref} = spawn_monitor(fn -> guard(caller, fun) end)
 
     receive do
-      {:DOWN, ^ref, :process, ^pid, {:isolated, result}} -> {:ok, result}
-      {:DOWN, ^ref, :process, ^pid, reason} -> {:exit, reason}
+      {:DOWN, ^ref, :process, ^guard, {:isolated, outcome}} -> outcome
+    end
+  end
+
+  # Runs `fun` in a process linked to this one and reports how it ended; ends, and so ends `fun`,
+  # as soon as the caller is gone.
+  defp guard(caller, fun) do
+    Process.flag(:trap_exit, true)
+    caller_ref = Process.monitor(caller)
+    worker = spawn_link(fn -> exit({:isolated, fun.()}) end)
+
+    receive do
+      {:EXIT, ^worker, {:isolated, result}} -> exit({:isolated, {:ok, result}})
+      {:EXIT, ^worker, reason} -> exit({:isolated, {:exit, reason}})
+      {:DOWN, ^caller_ref, :process, ^caller, _reason} -> exit(:caller_down)
     end
   end
 

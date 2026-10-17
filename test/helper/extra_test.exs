@@ -78,6 +78,24 @@ defmodule MishkaInstaller.Helper.ExtraTest do
       assert Extra.isolate(fn -> Process.exit(self(), :kill) end) == {:exit, :killed}
     end
 
+    test "stops the function when the caller is killed while it runs" do
+      test_pid = self()
+
+      caller =
+        spawn(fn ->
+          Extra.isolate(fn ->
+            send(test_pid, {:running, self()})
+            Process.sleep(:infinity)
+          end)
+        end)
+
+      assert_receive {:running, worker}
+      worker_ref = Process.monitor(worker)
+      Process.exit(caller, :kill)
+
+      assert_receive {:DOWN, ^worker_ref, :process, ^worker, _reason}
+    end
+
     test "leaves nothing in the caller's mailbox" do
       {:ok, _} = Extra.isolate(fn -> :ok end)
       {:exit, :gone} = Extra.isolate(fn -> exit(:gone) end)
