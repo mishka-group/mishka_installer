@@ -31,7 +31,8 @@
           "apps/*/test/",
           "apps/*/web/"
         ],
-        excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/"]
+        # test/integration holds the app a release test builds, not code of this library.
+        excluded: [~r"/_build/", ~r"/deps/", ~r"/node_modules/", ~r"/test/integration/"]
       },
       #
       # Load and configure plugins here:
@@ -100,10 +101,18 @@
             {Credo.Check.Readability.LargeNumbers, []},
             {Credo.Check.Readability.MaxLineLength, [priority: :low, max_length: 120]},
             {Credo.Check.Readability.ModuleAttributeNames, []},
-            {Credo.Check.Readability.ModuleDoc, []},
+            # The plugin modules of test/support are helpers of the tests; the first regex is credo's default.
+            {Credo.Check.Readability.ModuleDoc,
+             [
+               ignore_names: [
+                 ~r/(\.\w+Controller|\.Endpoint|\.\w+Live(\.\w+)?|\.Repo|\.Router|\.\w+Socket|\.\w+View|\.\w+HTML|\.\w+JSON|\.Telemetry|\.Layouts|\.Mailer)$/,
+                 ~r/\AMishkaInstallerTest\.Support\./
+               ]
+             ]},
             {Credo.Check.Readability.ModuleNames, []},
             {Credo.Check.Readability.ParenthesesInCondition, []},
-            {Credo.Check.Readability.ParenthesesOnZeroArityDefs, []},
+            # Every def of the codebase writes its zero arguments as `def foo()`.
+            {Credo.Check.Readability.ParenthesesOnZeroArityDefs, false},
             {Credo.Check.Readability.PipeIntoAnonymousFunctions, []},
             {Credo.Check.Readability.PredicateFunctionNames, []},
             {Credo.Check.Readability.PreferImplicitTry, []},
@@ -146,7 +155,8 @@
             {Credo.Check.Warning.ExpensiveEmptyEnumCheck, []},
             {Credo.Check.Warning.IExPry, []},
             {Credo.Check.Warning.IoInspect, []},
-            {Credo.Check.Warning.MissedMetadataKeyInLoggerConfig, []},
+            # `domain` is a standard Logger metadata key and a library cannot set the host's Logger config.
+            {Credo.Check.Warning.MissedMetadataKeyInLoggerConfig, false},
             {Credo.Check.Warning.OperationOnSameValues, []},
             {Credo.Check.Warning.OperationWithConstantResult, []},
             {Credo.Check.Warning.RaiseInsideRescue, []},
