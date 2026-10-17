@@ -60,6 +60,131 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
     end
   end
 
+  describe "GitHub inputs ===>" do
+    test "a tag, asset or repository that is not a plain name is refused before any request" do
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host, conn.request_path})
+        Req.Test.json(conn, %{"assets" => []})
+      end)
+
+      for tag <- [
+            "v1/../../../evil/other/releases/latest",
+            "v1?per_page=1#frag",
+            "..",
+            ".",
+            "v 1",
+            "v1\n",
+            "v1%2F..",
+            "a/b",
+            ""
+          ] do
+        {:error, [%{action: :download}]} =
+          assert Downloader.download(:github_tag, %{path: "owner/repo", tag: tag})
+      end
+
+      for asset <- ["../x", "a/b", "a b", "x?y", "..", ""] do
+        {:error, [%{action: :download}]} =
+          assert Downloader.download(:github_tag, %{
+                   path: "owner/repo",
+                   tag: "1.0.0",
+                   asset: asset
+                 })
+
+        {:error, [%{action: :download}]} =
+          assert Downloader.download(:github_latest_release, %{path: "owner/repo", asset: asset})
+      end
+
+      for path <- [
+            "owner",
+            "owner/repo/extra",
+            "../evil",
+            "owner/..",
+            "./repo",
+            "owner/repo?x=1",
+            "owner/repo#frag",
+            "ow ner/repo",
+            "owner//repo",
+            "",
+            nil,
+            %{}
+          ] do
+        {:error, [%{action: :download}]} =
+          assert Downloader.download(:github_latest_release, %{path: path})
+
+        {:error, [%{action: :download}]} =
+          assert Downloader.download(:github_tag, %{path: path, tag: "1.0.0"})
+      end
+
+      refute_received {:requested, _host, _path}
+    end
+
+    test "a plain tag, asset and repository reach the API URL unchanged" do
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host, conn.request_path})
+
+        if conn.host == "api.github.com" do
+          Req.Test.json(conn, %{
+            "assets" => [
+              %{
+                "name" => "app-ebin_0.1.tar.gz",
+                "browser_download_url" =>
+                  "https://github.com/my-org/my_repo.x/releases/download/v1/app-ebin_0.1.tar.gz"
+              }
+            ]
+          })
+        else
+          binary_response(conn, "tarball")
+        end
+      end)
+
+      {:ok, "tarball"} =
+        assert Downloader.download(:github_tag, %{
+                 path: " my-org/my_repo.x ",
+                 tag: "1.0.0-rc.1+build.5",
+                 asset: "app-ebin_0.1.tar.gz"
+               })
+
+      assert_received {:requested, "api.github.com",
+                       "/repos/my-org/my_repo.x/releases/tags/1.0.0-rc.1+build.5"}
+
+      assert_received {:requested, "github.com",
+                       "/my-org/my_repo.x/releases/download/v1/app-ebin_0.1.tar.gz"}
+    end
+
+    test "a release asset that is not an https URL on github.com is never requested" do
+      test_pid = self()
+
+      for url <- [
+            "https://evil.example/x.tar.gz",
+            "http://github.com/owner/repo/releases/download/1/x.tar.gz",
+            "https://github.com.evil.example/x.tar.gz",
+            "https://api.github.com/x.tar.gz"
+          ] do
+        Req.Test.stub(Downloader, fn conn ->
+          send(test_pid, {:requested, conn.host})
+
+          if conn.host == "api.github.com" and conn.request_path =~ "/releases/latest" do
+            Req.Test.json(conn, %{"assets" => [%{"name" => "x", "browser_download_url" => url}]})
+          else
+            binary_response(conn, "tarball")
+          end
+        end)
+
+        {:error, [%{action: :download}]} =
+          assert Downloader.download(:github_latest_release, %{path: "owner/repo"})
+      end
+
+      assert_received {:requested, "api.github.com"}
+      refute_received {:requested, "evil.example"}
+      refute_received {:requested, "github.com"}
+      refute_received {:requested, "github.com.evil.example"}
+    end
+  end
+
   describe "Scheme ===>" do
     test "only an https URL is requested" do
       test_pid = self()
@@ -279,15 +404,16 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
     end)
   end
 
-  # First request (GitHub API) -> JSON with assets; any other request -> the raw tarball bytes.
+  # The GitHub API request -> JSON with assets; any other request -> the raw tarball bytes.
   defp stub_release_then_binary(tarball, asset_name \\ "app.tar.gz") do
     Req.Test.stub(Downloader, fn conn ->
-      if String.contains?(conn.request_path, "/releases") do
+      if conn.host == "api.github.com" do
         Req.Test.json(conn, %{
           "assets" => [
             %{
               "name" => asset_name,
-              "browser_download_url" => "https://cdn.example.com/#{asset_name}"
+              "browser_download_url" =>
+                "https://github.com/owner/repo/releases/download/0.1.0/#{asset_name}"
             }
           ]
         })

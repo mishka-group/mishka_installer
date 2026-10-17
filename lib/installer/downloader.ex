@@ -13,6 +13,12 @@ defmodule MishkaInstaller.Installer.Downloader do
   - `:github_tag` — resolve the asset of a specific release **tag** via the GitHub API.
   - `:github_latest_release` — resolve the asset of the **latest** release via the GitHub API.
 
+  ## GitHub
+
+  For `:github_tag` and `:github_latest_release`, `path` must be `"owner/repo"` and `tag` and `asset`
+  may only contain letters, digits and `. _ + -`; anything else is an `{:error, ...}` before a request
+  is made. The asset must be an `https` URL on `github.com`.
+
   ## Scheme
 
   Only `https` URLs are downloaded. Any other scheme (`http`, `file`, none) is an `{:error, ...}`
@@ -40,6 +46,8 @@ defmodule MishkaInstaller.Installer.Downloader do
   @github_release_hosts ["release-assets.githubusercontent.com", "objects.githubusercontent.com"]
   @max_redirects 3
   @redirect_statuses [301, 302, 303, 307, 308]
+  @github_name ~r/\A[A-Za-z0-9._+-]+\z/
+  @github_repo ~r/\A[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+\z/
 
   @type download_type :: :url | :github_tag | :github_latest_release
 
@@ -91,11 +99,18 @@ defmodule MishkaInstaller.Installer.Downloader do
   end
 
   def download(:github_tag, %{path: path, tag: tag} = pkg) when not is_nil(tag) do
-    release_asset("#{@github_api_path}/#{String.trim(path)}/releases/tags/#{tag}", pkg)
+    with {:ok, repo} <- github_repo(path),
+         :ok <- github_name(tag),
+         :ok <- github_name(Map.get(pkg, :asset)) do
+      release_asset("#{@github_api_path}/#{repo}/releases/tags/#{tag}", pkg)
+    end
   end
 
   def download(:github_latest_release, %{path: path} = pkg) do
-    release_asset("#{@github_api_path}/#{String.trim(path)}/releases/latest", pkg)
+    with {:ok, repo} <- github_repo(path),
+         :ok <- github_name(Map.get(pkg, :asset)) do
+      release_asset("#{@github_api_path}/#{repo}/releases/latest", pkg)
+    end
   end
 
   def download(_, _) do
@@ -105,13 +120,43 @@ defmodule MishkaInstaller.Installer.Downloader do
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
+  # `path` must be "owner/repo" and `tag`/`asset` a plain name: they are put into the API URL as they are.
+  defp github_repo(path) when is_binary(path) do
+    repo = String.trim(path)
+
+    if Regex.match?(@github_repo, repo) and not Enum.any?(String.split(repo, "/"), &dots_only?/1),
+      do: {:ok, repo},
+      else: github_input_err()
+  end
+
+  defp github_repo(_path), do: github_input_err()
+
+  defp github_name(nil), do: :ok
+
+  defp github_name(name) when is_binary(name) do
+    if Regex.match?(@github_name, name) and not dots_only?(name),
+      do: :ok,
+      else: github_input_err()
+  end
+
+  defp github_name(_name), do: github_input_err()
+
+  defp dots_only?(segment), do: segment in [".", ".."]
+
+  defp github_input_err do
+    download_err(
+      "The GitHub repository must be \"owner/repo\", and the tag and asset names may only " <>
+        "contain letters, digits and . _ + -"
+    )
+  end
+
   # Resolve the asset's download URL from a GitHub release payload, then download it.
   defp release_asset(api_url, pkg) do
     case fetch(api_url, redirect_hosts(api_url), @max_redirects, []) do
       {:ok, %Req.Response{status: 200, body: %{"assets" => assets}}} when is_list(assets) ->
         case pick_asset(assets, Map.get(pkg, :asset)) do
           nil -> download_err("No matching release asset was found.")
-          asset_url -> download(:url, %{path: asset_url})
+          asset_url -> download_github_asset(asset_url)
         end
 
       {:error, _reason} = error ->
@@ -121,6 +166,15 @@ defmodule MishkaInstaller.Installer.Downloader do
         download_err()
     end
   end
+
+  defp download_github_asset(asset_url) when is_binary(asset_url) do
+    case URI.parse(asset_url) do
+      %URI{scheme: "https", host: "github.com"} -> download(:url, %{path: asset_url})
+      _ -> download_err("The release asset is not an https URL on github.com.")
+    end
+  end
+
+  defp download_github_asset(_asset_url), do: download_err("No matching release asset was found.")
 
   defp pick_asset([], _name), do: nil
   defp pick_asset([asset | _], nil), do: asset["browser_download_url"]

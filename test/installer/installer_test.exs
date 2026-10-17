@@ -177,14 +177,15 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
       Application.put_env(:mishka_installer, :allowlist, github_repos: ["owner/#{app}"])
 
-      # GitHub API call -> release JSON; the asset (served from a CDN) -> the tarball.
+      # GitHub API call -> release JSON; the asset on github.com -> the tarball.
       Req.Test.stub(Downloader, fn conn ->
-        if String.contains?(conn.request_path, "/releases") do
+        if conn.host == "api.github.com" do
           Req.Test.json(conn, %{
             "assets" => [
               %{
                 "name" => "#{app}.tar.gz",
-                "browser_download_url" => "https://cdn.example.com/#{app}.tar.gz"
+                "browser_download_url" =>
+                  "https://github.com/owner/#{app}/releases/download/0.1.0/#{app}.tar.gz"
               }
             ]
           })
