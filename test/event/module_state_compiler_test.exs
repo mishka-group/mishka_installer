@@ -108,6 +108,41 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     refute ModuleStateCompiler.compile_initialize?("ms_purge_evt")
   end
 
+  describe "finish_call/3 ===>" do
+    test "return hands back the state the call was given" do
+      assert ModuleStateCompiler.finish_call({:ok, %{a: 2}}, %{a: 1}, return: true) == %{a: 1}
+      assert ModuleStateCompiler.finish_call(:anything, :given, return: false) == :given
+    end
+
+    test "private is merged into a keyword list or a map, and into nothing else" do
+      private = [private: [p: 1]]
+      map_private = [private: %{p: 1}]
+
+      assert ModuleStateCompiler.finish_call([a: 1], :s, private) == [a: 1, p: 1]
+      assert ModuleStateCompiler.finish_call({:ok, [a: 1]}, :s, private) == {:ok, [a: 1, p: 1]}
+      assert ModuleStateCompiler.finish_call(%{a: 1}, :s, map_private) == %{a: 1, p: 1}
+
+      assert ModuleStateCompiler.finish_call({:ok, %{a: 1}}, :s, map_private) ==
+               {:ok, %{a: 1, p: 1}}
+
+      assert ModuleStateCompiler.finish_call([1, 2], :s, private) == [1, 2]
+      assert ModuleStateCompiler.finish_call({:ok, [1, 2]}, :s, private) == {:ok, [1, 2]}
+      assert ModuleStateCompiler.finish_call("binary", :s, private) == "binary"
+      assert ModuleStateCompiler.finish_call({:ok, "binary"}, :s, private) == {:ok, "binary"}
+
+      assert ModuleStateCompiler.finish_call({:noreply, :socket}, :s, private) ==
+               {:noreply, :socket}
+
+      assert ModuleStateCompiler.finish_call({:error, [:e]}, :s, private) == {:error, [:e]}
+    end
+
+    test "without private every shape comes back as the plugins left it" do
+      for performed <- [[a: 1], {:ok, [a: 1]}, %{a: 1}, {:ok, %{a: 1}}, {:error, [:e]}, :other] do
+        assert ModuleStateCompiler.finish_call(performed, :s, []) == performed
+      end
+    end
+  end
+
   describe "create/3 when the module cannot be built ===>" do
     @describetag :capture_log
 

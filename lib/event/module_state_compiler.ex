@@ -143,54 +143,47 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
     quote do
       def call(unquote(state), args \\ []) do
-        private = Keyword.get(args, :private)
-        return_status = Keyword.get(args, :return)
         unquote(meta) = Keyword.get(args, :meta)
 
         performed = unquote(build_chain(plugins, state, meta))
 
-        new_state =
-          if !is_nil(return_status) do
-            unquote(state)
-          else
-            case performed do
-              {:ok, data} when is_list(data) ->
-                if Keyword.keyword?(data) and !is_nil(private),
-                  do: {:ok, Keyword.merge(data, private)},
-                  else: {:ok, data}
-
-              {:ok, data} when is_map(data) ->
-                {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
-
-              {:ok, data} ->
-                {:ok, data}
-
-              {:error, _errors} = errors ->
-                errors
-
-              data when is_list(data) ->
-                if Keyword.keyword?(data) and !is_nil(private),
-                  do: Keyword.merge(data, private),
-                  else: data
-
-              data when is_map(data) ->
-                if !is_nil(private), do: Map.merge(data, private), else: data
-
-              # Any other state — a LiveView callback's `{:noreply, socket}`, a binary — comes back as
-              # the plugins left it; `:private` merges only into a list or a map.
-              other ->
-                other
-            end
-          end
-
-        new_state
+        unquote(__MODULE__).finish_call(performed, unquote(state), args)
       rescue
         e ->
-          MishkaInstaller.Event.ModuleStateCompiler.log_call_error(unquote(event), e)
+          unquote(__MODULE__).log_call_error(unquote(event), e)
           unquote(state)
       end
     end
   end
+
+  @doc false
+  @spec finish_call(any(), any(), keyword()) :: any()
+  def finish_call(performed, state, args) do
+    case Keyword.get(args, :return) do
+      nil -> merge_private(performed, Keyword.get(args, :private))
+      _return -> state
+    end
+  end
+
+  defp merge_private({:ok, data}, private) when is_list(data),
+    do: {:ok, merge_list(data, private)}
+
+  defp merge_private({:ok, data}, private) when is_map(data), do: {:ok, merge_map(data, private)}
+  defp merge_private({:ok, _data} = ok, _private), do: ok
+  defp merge_private({:error, _errors} = errors, _private), do: errors
+  defp merge_private(data, private) when is_list(data), do: merge_list(data, private)
+  defp merge_private(data, private) when is_map(data), do: merge_map(data, private)
+  # Any other state — a LiveView callback's `{:noreply, socket}`, a binary — comes back as the
+  # plugins left it; `:private` merges only into a list or a map.
+  defp merge_private(other, _private), do: other
+
+  defp merge_list(data, nil), do: data
+
+  defp merge_list(data, private),
+    do: if(Keyword.keyword?(data), do: Keyword.merge(data, private), else: data)
+
+  defp merge_map(data, nil), do: data
+  defp merge_map(data, private), do: Map.merge(data, private)
 
   # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
   # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
