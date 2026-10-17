@@ -94,10 +94,10 @@ defmodule MishkaInstallerTest.Event.DependencyTest do
     MishkaInstaller.subscribe("event")
     start_supervised!(EventHandler)
     start_supervised!(MishkaInstaller.MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
 
     # The handler's own boot sync is over before a test writes anything it could hold or start.
-    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}, 2000
+    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}
 
     :ok
   end
@@ -343,7 +343,7 @@ defmodule MishkaInstallerTest.Event.DependencyTest do
 
       {:ok, second} = Event.register(Root, @root_evt, %{priority: 50, extra: [%{feature: :new}]})
 
-      assert length(Event.get()) == 1
+      assert [_one] = Event.get()
       assert second.id == first.id
       assert second.inserted_at == first.inserted_at
       assert second.priority == 50

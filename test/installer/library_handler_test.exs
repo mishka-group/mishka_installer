@@ -51,7 +51,7 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
   test "Application unload" do
     Application.stop(:req)
     assert is_nil(Enum.find(Application.started_applications(), &(elem(&1, 0) == :req)))
-    assert !is_nil(Enum.find(Application.loaded_applications(), &(elem(&1, 0) == :req)))
+    assert List.keymember?(Application.loaded_applications(), :req, 0)
     :ok = assert LibraryHandler.unload(:req)
     assert is_nil(Enum.find(Application.loaded_applications(), &(elem(&1, 0) == :req)))
     :ok = assert LibraryHandler.unload(:req1)

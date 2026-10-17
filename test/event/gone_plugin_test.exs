@@ -46,11 +46,11 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
     MishkaInstaller.subscribe("mnesia")
     start_supervised!(EventHandler)
     start_supervised!(MishkaInstaller.MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
 
     # The handler's own boot sync — `unregister_gone/1`, then the events — is over before a test
     # writes anything it could take.
-    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}, 2000
+    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}
 
     :ok
   end
@@ -119,7 +119,7 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
       assert log =~ "#{inspect(@event)} cannot run: [#{inspect(@removed)}] not loaded"
 
       assert Event.unregister_gone(false) == []
-      refute is_nil(Event.get(:name, @removed))
+      assert %Event{name: @removed} = Event.get(:name, @removed)
       assert Hook.call(@event, %{}) == %{}
       assert Hook.call(@event, %{}, cannot_run: :cannot_run) == :cannot_run
     end
@@ -145,10 +145,9 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
           send(Process.whereis(EventHandler), %{status: :compile_synchronized, channel: "mnesia"})
 
           assert_receive {:unregistered_gone,
-                          %{plugin: @removed, event: @event, extension: :mishka_installer}},
-                         2000
+                          %{plugin: @removed, event: @event, extension: :mishka_installer}}
 
-          assert_receive {:compile, %{event: @event, result: :ok}}, 2000
+          assert_receive {:compile, %{event: @event, result: :ok}}
         end)
 
       assert log =~ "unregistered #{inspect(@removed)}"

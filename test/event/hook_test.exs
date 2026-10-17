@@ -53,7 +53,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -75,7 +75,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -92,7 +92,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :restart, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -105,13 +105,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       {:ok, _db_plg} = assert Bulk.EventCSocial.stop()
 
       assert_receive %{status: :stop, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -125,13 +125,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       {:ok, _db_plg} = assert Bulk.EventCSocial.unregister()
 
       assert_receive %{status: :unregister, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)

@@ -2,6 +2,8 @@ defmodule MishkaInstaller.Helper.UUIDTest do
   use ExUnit.Case, async: true
   alias MishkaInstaller.Helper.UUID
 
+  doctest MishkaInstaller.Helper.UUID
+
   @uuid_v4 ~r/\A[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\z/
 
   test "generate/0 returns a 36-char lowercase version 4 UUID" do
@@ -13,7 +15,7 @@ defmodule MishkaInstaller.Helper.UUIDTest do
 
   test "generate/0 is (practically) unique" do
     uuids = for _ <- 1..1000, do: UUID.generate()
-    assert length(Enum.uniq(uuids)) == 1000
+    assert MapSet.size(MapSet.new(uuids)) == 1000
   end
 
   test "bingenerate/0 returns 16 raw bytes with the v4 version/variant bits set" do

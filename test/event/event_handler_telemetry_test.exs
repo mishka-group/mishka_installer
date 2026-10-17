@@ -40,6 +40,7 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
     :ok
   end
 
+  # credo:disable-for-next-line Jump.CredoChecks.VacuousTest
   test "emits [:event, :synchronized] once plugins start after the store is ready" do
     assert_receive {:telemetry, [:mishka_installer, :event, :synchronized], _meas, %{node: _}}
   end
@@ -77,6 +78,7 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
     refute MishkaInstaller.Event.ModuleStateCompiler.compile_initialize?(event)
   end
 
+  # credo:disable-for-next-line Jump.CredoChecks.VacuousTest
   test "a :cluster_recompile from another node rebuilds the event module locally" do
     event = "remote_evt_#{System.unique_integer([:positive])}"
 
@@ -109,10 +111,10 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
     assert Keyword.get(state, :running) == []
   end
 
+  # credo:disable-for-next-line Jump.CredoChecks.VacuousTest
   test "a :compile_synchronized broadcast forces synchronized_start" do
     send(Process.whereis(EventHandler), %{status: :compile_synchronized, channel: "mnesia"})
 
-    assert_receive {:telemetry, [:mishka_installer, :event, :synchronized], _meas, %{node: _}},
-                   1000
+    assert_receive {:telemetry, [:mishka_installer, :event, :synchronized], _meas, %{node: _}}
   end
 end

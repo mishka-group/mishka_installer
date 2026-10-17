@@ -60,7 +60,9 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
 
       assert Installer.get() != []
-      assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
+
+      assert %Installer{app: "mishka_developer_tools"} =
+               Installer.get(:app, "mishka_developer_tools")
     end
 
     test "Update a Library record" do
@@ -108,14 +110,16 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       {:ok, _data} =
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
 
-      assert length(Installer.ids()) == 1
+      assert [_one] = Installer.ids()
     end
 
     test "Unique? Library Record by app" do
       {:ok, _data} =
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
 
-      assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
+      assert %Installer{app: "mishka_developer_tools"} =
+               Installer.get(:app, "mishka_developer_tools")
+
       assert is_nil(Installer.get(:app, "mishka_developer_tools1"))
     end
 
@@ -332,7 +336,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
       :ok = Installer.async_install(%{app: app, version: version, path: pkg})
 
-      assert_receive %{status: :install, channel: "installer"}, 2000
+      assert_receive %{status: :install, channel: "installer"}
       assert app_atom in started_apps()
       assert module.hello() == :world
     end
@@ -373,11 +377,10 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       pid = start_supervised!(MishkaInstaller.Installer.CompileHandler)
       send(pid, %{status: :synchronized, channel: "mnesia"})
 
-      assert_receive %{status: :compile_synchronized, channel: "mnesia"}, 2000
+      assert_receive %{status: :compile_synchronized, channel: "mnesia"}
 
       assert_receive {:telemetry, [:mishka_installer, :installer, :replay],
-                      %{app: ^app, result: :ok}},
-                     2000
+                      %{app: ^app, result: :ok}}
 
       # The app is back purely from the persisted record + the on-disk ebin (no reinstall, no mix).
       assert app_atom in started_apps()
@@ -1244,7 +1247,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
     pid = start_supervised!(CompileHandler)
     send(pid, %{status: :synchronized, channel: "mnesia"})
-    assert_receive %{status: :compile_synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :compile_synchronized, channel: "mnesia"}
   end
 
   defp stub_download(tarball) do

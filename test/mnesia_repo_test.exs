@@ -49,37 +49,35 @@ defmodule MishkaInstaller.MnesiaRepoTest do
   test "boots, creates the essential tables and broadcasts :synchronized" do
     start_supervised!(MnesiaRepo)
 
-    assert_receive %{status: :synchronized, channel: "mnesia", data: data}, 2000
-    assert is_list(data.local_tables)
+    assert_receive %{status: :synchronized, channel: "mnesia", data: data}
+    assert Installer in data.local_tables
     assert Installer in :mnesia.system_info(:local_tables)
   end
 
   test "emits the init span (start + stop), a table event and synchronized" do
     start_supervised!(MnesiaRepo)
 
-    assert_receive {:telemetry, [:mishka_installer, :mnesia, :init, :start], _meas, _meta}, 2000
+    assert_receive {:telemetry, [:mishka_installer, :mnesia, :init, :start], _meas, _meta}
 
-    assert_receive {:telemetry, [:mishka_installer, :mnesia, :init, :stop], meas, meta}, 2000
+    assert_receive {:telemetry, [:mishka_installer, :mnesia, :init, :stop], meas, meta}
     assert is_integer(meas.duration)
     assert meta.result == :ok
 
     assert_receive {:telemetry, [:mishka_installer, :mnesia, :table], _meas,
-                    %{table: Installer, status: status}},
-                   2000
+                    %{table: Installer, status: status}}
 
     assert status in [:created, :already_exists, :already_loaded]
 
-    assert_receive {:telemetry, [:mishka_installer, :mnesia, :synchronized], _meas, %{node: _}},
-                   2000
+    assert_receive {:telemetry, [:mishka_installer, :mnesia, :synchronized], _meas, %{node: _}}
   end
 
   test "health_check emits a telemetry health event" do
     pid = start_supervised!(MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
 
     send(pid, :health_check)
 
-    assert_receive {:telemetry, [:mishka_installer, :mnesia, :health_check], meas, meta}, 2000
+    assert_receive {:telemetry, [:mishka_installer, :mnesia, :health_check], meas, meta}
     assert is_integer(meas.table_count)
     assert meta.healthy? == true
     assert meta.missing == []
@@ -87,7 +85,7 @@ defmodule MishkaInstaller.MnesiaRepoTest do
 
   test "state/0 returns the repo state including essential tables" do
     start_supervised!(MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
 
     state = MnesiaRepo.state()
     assert state.essential == [Installer]
@@ -96,7 +94,7 @@ defmodule MishkaInstaller.MnesiaRepoTest do
 
   test "schemas/0 reports local tables with storage info" do
     start_supervised!(MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
 
     assert {Installer, info} = Enum.find(MnesiaRepo.schemas(), fn {t, _} -> t == Installer end)
     assert Keyword.has_key?(info, :storage_type)
@@ -104,14 +102,14 @@ defmodule MishkaInstaller.MnesiaRepoTest do
 
   test "a restart on the same dir re-announces without wiping the running DB" do
     start_supervised!(MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
 
     {:ok, _} = Installer.write(%{app: "keep_me", version: "1.0.0", path: "p"})
     assert Installer.get(:app, "keep_me")
 
     :ok = stop_supervised(MnesiaRepo)
     start_supervised!(MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
 
     assert Installer.get(:app, "keep_me")
   end
@@ -122,7 +120,7 @@ defmodule MishkaInstaller.MnesiaRepoTest do
     test "a node with no configured peers stays passive (dynamic membership off)" do
       # The default / single-node case: no `cluster_nodes` => no monitoring, node events are no-ops.
       pid = start_supervised!(MnesiaRepo)
-      assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+      assert_receive %{status: :synchronized, channel: "mnesia"}
 
       assert MnesiaRepo.state().dynamic == false
 
