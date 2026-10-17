@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.MixProject do
   use Mix.Project
 
-  @version "0.1.13"
+  @version "0.1.14"
   @source_url "https://github.com/mishka-group/mishka_installer"
 
   def project do

@@ -1,3 +1,24 @@
+# Changelog for MishkaInstaller 0.1.14
+
+### Fixed:
+
+- A `version:` that is not a semantic version no longer crashes `Installer.install/1`. With an app
+  of that name already loaded, a version such as `"1.0"` raised `Version.InvalidVersionError` from
+  the comparison with the running app; with none loaded, it was installed as it was. Both versions
+  are now parsed with `Version.parse/1`, and a bad one is answered with
+  `{:error, [%{field: :version, action: :compare_version_with_installed_app, ...}]}`, or
+  `field: :app` when the loaded app's own `vsn` is not one
+- Upgrading an installed app updates its record instead of writing a second one. `update_or_write/2`
+  looked the record up by id with the app's name, found nothing, and wrote a new record with the
+  same app every time, so `get(:app, ...)` could answer either one and `uninstall/1` removed only one
+
+### Changed:
+
+- **(BREAKING CHANGE)** The installer's `version` field is validated as a semantic version
+  (`MAJOR.MINOR.PATCH`, with optional pre-release and build). `builder/1`, `write/1`, `install/1`
+  and `async_install/1` refuse anything else with
+  `{:error, [%{field: :version, action: :semver, ...}]}` before anything is installed
+
 # Changelog for MishkaInstaller 0.1.13
 
 ### Fixed:
