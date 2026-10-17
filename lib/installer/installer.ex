@@ -351,17 +351,7 @@ defmodule MishkaInstaller.Installer.Installer do
   def write(data) do
     with {:ok, struct} <- builder(data),
          :ok <- valid_name(struct.app) do
-      values_tuple =
-        ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
-
-      Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
-      |> case do
-        {:atomic, _res} ->
-          {:ok, struct}
-
-        {:aborted, reason} ->
-          Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
-      end
+      Record.store(__MODULE__, struct)
     end
   end
 

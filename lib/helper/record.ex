@@ -69,4 +69,34 @@ defmodule MishkaInstaller.Helper.Record do
         nil
     end
   end
+
+  ####################################################################################
+  ########################## (▰˘◡˘▰) Write (▰˘◡˘▰) #############################
+  ####################################################################################
+  @doc """
+  Writes `struct` (a struct of `module`, as `module.builder/1` returns it) in a durable transaction
+  and returns `{:ok, struct}`, or the error of the aborted transaction.
+
+  ## Example:
+
+  ```elixir
+  {:ok, struct} = Installer.builder(%{app: "demo", version: "0.1.0", path: "demo"})
+  store(MishkaInstaller.Installer.Installer, struct)
+  ```
+  """
+  @spec store(module(), struct()) :: {:ok, struct()} | error_return()
+  def store(module, struct) do
+    Transaction.durable_transaction(fn -> Query.write(to_tuple(module, struct)) end)
+    |> case do
+      {:atomic, _res} ->
+        {:ok, struct}
+
+      {:aborted, reason} ->
+        Transaction.transaction_error(reason, module, "storing", :global, :database)
+    end
+  end
+
+  defp to_tuple(module, struct) do
+    ([module] ++ Enum.map(module.keys(), &Map.get(struct, &1))) |> List.to_tuple()
+  end
 end

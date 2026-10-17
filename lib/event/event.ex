@@ -797,23 +797,7 @@ defmodule MishkaInstaller.Event.Event do
   """
   @spec write(builder_entry) :: error_return | okey_return
   def write(data) do
-    case builder(data) do
-      {:ok, struct} ->
-        values_tuple =
-          ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
-
-        Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
-        |> case do
-          {:atomic, _res} ->
-            {:ok, struct}
-
-          {:aborted, reason} ->
-            Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
-        end
-
-      error ->
-        error
-    end
+    with {:ok, struct} <- builder(data), do: Record.store(__MODULE__, struct)
   end
 
   @doc """
