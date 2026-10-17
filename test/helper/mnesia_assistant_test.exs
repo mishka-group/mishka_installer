@@ -4,7 +4,7 @@ defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
   @moduletag :capture_log
   import ExUnit.CaptureLog
   alias MishkaInstaller.Helper.MnesiaAssistant
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table, Error, Information}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Error, Information, Query, Table, Transaction}
 
   doctest MishkaInstaller.Helper.MnesiaAssistant
 

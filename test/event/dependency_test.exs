@@ -54,14 +54,14 @@ defmodule MishkaInstallerTest.Event.DependencyTest do
   alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
 
   alias MishkaInstallerTest.Event.DependencyTest.{
+    CycleA,
+    CycleB,
+    Diamond,
+    Leaf,
+    Mid,
     Root,
     RootTwo,
-    Mid,
-    Sibling,
-    Leaf,
-    Diamond,
-    CycleA,
-    CycleB
+    Sibling
   }
 
   @root_evt "dep_root_evt"

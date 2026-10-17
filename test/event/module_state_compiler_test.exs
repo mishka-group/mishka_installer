@@ -1,6 +1,6 @@
 defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{ModuleStateCompiler, Event, Hook}
+  alias MishkaInstaller.Event.{Event, Hook, ModuleStateCompiler}
 
   setup_all do
     pid = Process.whereis(MishkaInstaller.MnesiaRepo)
@@ -31,7 +31,7 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     assert Code.ensure_loaded?(module)
     assert module.initialize?()
     %{module: _, plugins: plugins} = assert module.initialize()
-    assert length(plugins) > 0
+    assert [_ | _] = plugins
   end
 
   test "Purge and Create a compile time module" do
@@ -48,7 +48,7 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     assert Code.ensure_loaded?(module)
     assert module.initialize?()
     %{module: _, plugins: plugins} = assert module.initialize()
-    assert length(plugins) > 0
+    assert [_ | _] = plugins
   end
 
   test "create/3 with inaccessible plugins compiles a stub that runs none of them" do

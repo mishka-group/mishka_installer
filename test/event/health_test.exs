@@ -76,22 +76,20 @@ end
 
 defmodule MishkaInstaller.Event.HealthTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, EventHandler, Hook}
-
-  alias MishkaInstaller.Event.ModuleStateCompiler
+  alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
 
   alias MishkaInstallerTest.Event.HealthTest.{
-    HealthyProbe,
+    AuditPlugin,
+    CrashProbe,
     DegradedProbe,
     ErrorProbe,
-    CrashProbe,
-    SlowProbe,
-    WeirdProbe,
+    HealthyProbe,
     NoProbe,
+    NotifyPlugin,
     OkPlugin,
     SickPlugin,
-    AuditPlugin,
-    NotifyPlugin
+    SlowProbe,
+    WeirdProbe
   }
 
   setup do

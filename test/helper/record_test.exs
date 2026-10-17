@@ -1,8 +1,8 @@
 defmodule MishkaInstallerTest.Helper.RecordTest do
   use ExUnit.Case, async: true
+  alias MishkaInstaller.Event.Event
   alias MishkaInstaller.Helper.Record
   alias MishkaInstaller.Installer.Installer
-  alias MishkaInstaller.Event.Event
 
   describe "database_config/2 ===>" do
     test "describes a :set of the module's keys, kept in ram_copies when compiled for test" do

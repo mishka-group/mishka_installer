@@ -103,18 +103,18 @@ defmodule MishkaInstaller.Event.HookTest do
   alias MishkaInstaller.Event.{Event, EventHandler, Hook}
 
   alias MishkaInstallerTest.Event.HookTest.{
-    IndependentPlugin,
+    CallBangPlugin,
+    CyclicA,
+    CyclicB,
     DependentPlugin,
+    IndependentPlugin,
+    LimboPlugin,
+    OverCapPlugin,
     ProfileNormal,
     ProfileRaiser,
     ReEventPlugin,
-    CallBangPlugin,
     RetryPlugin,
-    CyclicA,
-    CyclicB,
-    LimboPlugin,
-    StoppedPlugin,
-    OverCapPlugin
+    StoppedPlugin
   }
 
   setup do

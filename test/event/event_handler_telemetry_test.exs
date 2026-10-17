@@ -1,6 +1,6 @@
 defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, EventHandler}
+  alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
 
   @events [
     [:mishka_installer, :event, :compile],
@@ -75,7 +75,7 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
                      %{event: ^event, result: :ok}}
 
     assert Process.whereis(EventHandler) == pid
-    refute MishkaInstaller.Event.ModuleStateCompiler.compile_initialize?(event)
+    refute ModuleStateCompiler.compile_initialize?(event)
   end
 
   # credo:disable-for-next-line Jump.CredoChecks.VacuousTest

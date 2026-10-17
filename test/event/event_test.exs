@@ -41,12 +41,16 @@ end
 
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
-  alias MishkaInstaller.Event.Hook
-  alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
-  alias MishkaInstallerTest.Support.MishkaPlugin.RegisterOTPSender
-  alias MishkaInstallerTest.Support.MishkaPlugin.MetaAuditLog
+  alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
+  alias MishkaInstaller.Helper.UUID
+  alias MishkaInstaller.MnesiaRepo
   alias MishkaInstallerTest.Event.EventTest.{AddOne, MetaReader, MetaStamp}
+
+  alias MishkaInstallerTest.Support.MishkaPlugin.{
+    MetaAuditLog,
+    RegisterEmailSender,
+    RegisterOTPSender
+  }
 
   setup do
     :persistent_term.put(:compile_status, "ready")
@@ -54,32 +58,32 @@ defmodule MishkaInstallerTest.Event.EventTest do
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{UUID.generate()}")}"
 
     on_exit(fn ->
-      pid = Process.whereis(MishkaInstaller.MnesiaRepo)
-      pid1 = Process.whereis(MishkaInstaller.Event.EventHandler)
+      pid = Process.whereis(MnesiaRepo)
+      pid1 = Process.whereis(EventHandler)
 
       if !is_nil(pid) and Process.alive?(pid) do
-        GenServer.stop(MishkaInstaller.MnesiaRepo)
+        GenServer.stop(MnesiaRepo)
       end
 
       if !is_nil(pid1) and Process.alive?(pid1) do
-        GenServer.stop(MishkaInstaller.Event.EventHandler)
+        GenServer.stop(EventHandler)
       end
     end)
 
     Process.register(self(), :__mishka_installer_event_test__)
 
-    Application.put_env(:mishka_installer, MishkaInstaller.MnesiaRepo,
+    Application.put_env(:mishka_installer, MnesiaRepo,
       mnesia_dir: mnesia_dir,
       essential: [Event]
     )
 
     MishkaInstaller.subscribe("mnesia")
     MishkaInstaller.subscribe("event")
-    start_supervised!(MishkaInstaller.Event.EventHandler)
-    start_supervised!(MishkaInstaller.MnesiaRepo)
+    start_supervised!(EventHandler)
+    start_supervised!(MnesiaRepo)
 
     assert_receive %{status: :event_status, channel: "mnesia", data: _data}
 

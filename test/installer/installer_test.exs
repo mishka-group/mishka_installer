@@ -1,7 +1,8 @@
 defmodule MishkaInstallerTest.Installer.InstallerTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Installer.{Installer, LibraryHandler, Downloader, CompileHandler}
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Transaction}
+  alias MishkaInstaller.Helper.UUID
+  alias MishkaInstaller.Installer.{CompileHandler, Downloader, Installer, LibraryHandler}
   alias MishkaInstallerTest.Support.EbinFixture
   import ExUnit.CaptureLog, only: [capture_log: 1]
 
@@ -10,7 +11,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{UUID.generate()}")}"
 
     on_exit(fn ->
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
@@ -1165,7 +1166,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       for record <- records do
         put_raw_record(
           Map.merge(record, %{
-            id: MishkaInstaller.Helper.UUID.generate(),
+            id: UUID.generate(),
             path: "p",
             type: :path,
             depends: [],

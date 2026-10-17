@@ -1,7 +1,7 @@
 defmodule MishkaInstaller.MnesiaRepoTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.MnesiaRepo
   alias MishkaInstaller.Installer.Installer
+  alias MishkaInstaller.MnesiaRepo
 
   @events [
     [:mishka_installer, :mnesia, :init, :start],
