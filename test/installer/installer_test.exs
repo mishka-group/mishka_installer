@@ -352,6 +352,19 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       refute String.to_atom(app) in Enum.map(Application.loaded_applications(), &elem(&1, 0))
     end
 
+    test "an .app file that is not valid UTF-8 aborts install with an error, not a crash" do
+      app = uniq_app("bad_utf8")
+      pkg = "#{LibraryHandler.extensions_path()}/#{app}-0.1.0"
+      File.mkdir_p!("#{pkg}/ebin")
+      File.write!("#{pkg}/ebin/#{app}.app", <<0xFF, 0xFE, 0xFA>>)
+      on_exit(fn -> File.rm_rf!(pkg) end)
+
+      {:error, [%{action: :read_app}]} =
+        assert Installer.install(%{app: app, version: "0.1.0", path: pkg})
+
+      assert is_nil(Installer.get(:app, app))
+    end
+
     test "verifies a matching checksum on a downloaded artifact" do
       Application.put_env(:mishka_installer, :downloader_req_options,
         plug: {Req.Test, Downloader}

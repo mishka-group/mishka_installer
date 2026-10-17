@@ -23,6 +23,24 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     {:error, _error} = assert LibraryHandler.read_app(:req1, "_build/test/lib/req/ebin/req.app")
   end
 
+  test "Read app file returns an error for a file that is not valid UTF-8" do
+    dir = Path.join(System.tmp_dir!(), "bad-utf8-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    for {name, bytes} <- [
+          invalid: <<0xFF, 0xFE, 0xFA>>,
+          truncated: "{application, demo, []}." <> <<0xE2, 0x82>>,
+          inside_term: "{application, demo, [{description, \"" <> <<0xC3, 0x28>> <> "\"}]}."
+        ] do
+      path = Path.join(dir, "#{name}.app")
+      File.write!(path, bytes)
+
+      {:error, [%{action: :read_app, field: :erl_scan}]} =
+        assert LibraryHandler.read_app(:demo, path)
+    end
+  end
+
   test "Application ensure/load is idempotent" do
     :ok = assert LibraryHandler.application_ensure(:req)
     # Calling it again on an already-loaded/started app must still succeed (boot-replay safety).

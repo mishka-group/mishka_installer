@@ -116,7 +116,8 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   def read_app(app, app_path) do
     case File.read(app_path) do
       {:ok, bin} ->
-        with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)),
+        with chars when is_list(chars) <- :unicode.characters_to_list(bin),
+             {:ok, tokens, _} <- :erl_scan.string(chars),
              {:ok, {:application, ^app, properties}} <- :erl_parse.parse_term(tokens) do
           {:ok, properties}
         else
