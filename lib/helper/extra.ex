@@ -2,9 +2,9 @@ defmodule MishkaInstaller.Helper.Extra do
   @moduledoc """
   Small, dependency-free helpers used across `MishkaInstaller`.
 
-  It covers unix timestamps, random strings, and two helpers that build Erlang
-  [match specifications](https://www.erlang.org/doc/apps/erts/match_spec) used by the
-  Mnesia query layer (`MishkaInstaller.Helper.MnesiaAssistant`).
+  It covers unix timestamps, random strings, running a function in an isolated process, and two
+  helpers that build Erlang [match specifications](https://www.erlang.org/doc/apps/erts/match_spec)
+  used by the Mnesia query layer (`MishkaInstaller.Helper.MnesiaAssistant`).
   """
 
   @alphabet Enum.concat([?0..?9, ?A..?Z, ?a..?z])
@@ -40,6 +40,31 @@ defmodule MishkaInstaller.Helper.Extra do
     |> Enum.take(count)
     |> List.to_string()
     |> String.upcase()
+  end
+
+  @doc """
+  Runs `fun` in its own monitored process and waits for it.
+
+  Returns `{:ok, result}` when `fun` returns, and `{:exit, reason}` when the process dies first
+  (an exception, a throw, an exit or a kill): `reason` is the exit reason of the process, so a
+  raised exception arrives as `{exception, stacktrace}`. Nothing `fun` does reaches the caller as
+  an exception, and `fun` runs without the caller's process dictionary.
+
+  ## Examples
+
+  ```elixir
+  iex> MishkaInstaller.Helper.Extra.isolate(fn -> 1 + 1 end)
+  {:ok, 2}
+  ```
+  """
+  @spec isolate((-> result)) :: {:ok, result} | {:exit, term()} when result: term()
+  def isolate(fun) when is_function(fun, 0) do
+    {pid, ref} = spawn_monitor(fn -> exit({:isolated, fun.()}) end)
+
+    receive do
+      {:DOWN, ^ref, :process, ^pid, {:isolated, result}} -> {:ok, result}
+      {:DOWN, ^ref, :process, ^pid, reason} -> {:exit, reason}
+    end
   end
 
   @doc """

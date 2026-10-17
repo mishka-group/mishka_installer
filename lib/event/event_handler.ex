@@ -255,18 +255,20 @@ defmodule MishkaInstaller.Event.EventHandler do
     end
 
     module = ModuleStateCompiler.module_event_name(event)
-    recompile(compiled?(module), module, sorted_plugins, inaccessible, event)
 
-    telemetry(:compile, %{event: event, result: :ok})
-    true
-  rescue
-    error ->
-      Logger.error(
-        "[mishka_installer.event] compile failed for event #{inspect(event)}: #{inspect(error)}"
-      )
+    case recompile(compiled?(module), module, sorted_plugins, inaccessible, event) do
+      :ok ->
+        telemetry(:compile, %{event: event, result: :ok})
+        true
 
-      telemetry(:compile, %{event: event, result: :error})
-      false
+      {:error, errors} ->
+        Logger.error(
+          "[mishka_installer.event] compile failed for event #{inspect(event)}: #{inspect(errors)}"
+        )
+
+        telemetry(:compile, %{event: event, result: :error})
+        false
+    end
   end
 
   # Not compiled yet: build it.
@@ -294,8 +296,9 @@ defmodule MishkaInstaller.Event.EventHandler do
     do: if(function_exported?(module, :mode, 0), do: module.mode(), else: :ok)
 
   defp purge_create(sorted_plugins, inaccessible, event) do
-    :ok = ModuleStateCompiler.purge_create(sorted_plugins, event, inaccessible)
-    :ok = MishkaInstaller.broadcast("event", :purge_create, event)
+    with :ok <- ModuleStateCompiler.purge_create(sorted_plugins, event, inaccessible) do
+      MishkaInstaller.broadcast("event", :purge_create, event)
+    end
   end
 
   defp broadcast_recompile(event) do

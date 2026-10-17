@@ -108,6 +108,57 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     refute ModuleStateCompiler.compile_initialize?("ms_purge_evt")
   end
 
+  describe "create/3 when the module cannot be built ===>" do
+    @describetag :capture_log
+
+    test "a plugin that cannot be compiled into a module is an error tuple, not a raise" do
+      event = "ms_unbuildable_#{System.unique_integer([:positive])}"
+
+      {:ok, plugin} =
+        Event.builder(%{
+          name: MishkaInstallerTest.Support.MishkaPlugin.EventCDeps,
+          event: event,
+          extension: :mishka_installer,
+          extra: [%{callback: fn -> :not_a_literal end}]
+        })
+
+      assert {:error, [%{field: :event, action: :compile, message: message}]} =
+               ModuleStateCompiler.create([plugin], event)
+
+      assert message == "The module of the event could not be compiled."
+
+      assert {:error, [%{action: :compile}]} = ModuleStateCompiler.purge_create([plugin], event)
+      refute ModuleStateCompiler.compile_initialize?(event)
+      assert Hook.call(event, %{a: 1}) == %{a: 1}
+    end
+
+    test "a module that was built before keeps answering after a failed rebuild" do
+      event = "ms_rebuild_#{System.unique_integer([:positive])}"
+
+      {:ok, good} =
+        Event.builder(%{
+          name: MishkaInstallerTest.Support.MishkaPlugin.EventCDeps,
+          event: event,
+          extension: :mishka_installer
+        })
+
+      {:ok, bad} =
+        Event.builder(%{
+          name: MishkaInstallerTest.Support.MishkaPlugin.EventCDeps,
+          event: event,
+          extension: :mishka_installer,
+          extra: [%{callback: fn -> :not_a_literal end}]
+        })
+
+      :ok = ModuleStateCompiler.create([good], event)
+      module = ModuleStateCompiler.event_module(event)
+      assert module.initialize().plugins == [good]
+
+      assert {:error, [%{action: :compile}]} = ModuleStateCompiler.create([bad], event)
+      assert module.initialize().plugins == [good]
+    end
+  end
+
   describe "an event that was never compiled ===>" do
     test "every read path answers without creating an atom or a cache key" do
       event = "never_compiled_#{System.unique_integer([:positive])}"

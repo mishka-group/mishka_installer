@@ -47,6 +47,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   empty, the module's `call/2` runs none of the plugins: it answers the `:cannot_run` option, or the
   state it was given when there is none, and `mode/0` is `:error`.
 
+  Returns `:ok`, or `{:error, [%{action: :compile, field: :event, message: _}]}` when the module
+  cannot be built (a plugin entry that is not a plugin, for example). The module is built in its own
+  process, so a failure never raises in the caller.
+
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
   like a plugin joining it, and `MishkaInstaller.Event.EventHandler` rebuilds the module.
@@ -65,6 +69,28 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec create(list(struct()), String.t(), list(module())) :: :ok | error_return
   def create(plugins, event, inaccessible \\ []) do
+    case Extra.isolate(fn -> compile_event(plugins, event, inaccessible) end) do
+      {:ok, result} ->
+        result
+
+      {:exit, reason} ->
+        Logger.error(
+          "[mishka_installer.event] the module of event #{inspect(event)} was not compiled: " <>
+            inspect(reason)
+        )
+
+        {:error,
+         [
+           %{
+             message: "The module of the event could not be compiled.",
+             field: :event,
+             action: :compile
+           }
+         ]}
+    end
+  end
+
+  defp compile_event(plugins, event, inaccessible) do
     module = module_event_name(event)
     escaped_plugins = Macro.escape(plugins)
     mode = if inaccessible == [], do: :ok, else: :error
@@ -97,12 +123,6 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     [{^module, _}] = Code.compile_quoted(ast, "#{Extra.randstring(8)}")
     {:module, ^module} = Code.ensure_loaded(module)
     :ok
-  rescue
-    e in CompileError ->
-      {:error, [%{message: e.description, field: :event, action: :compile}]}
-
-    _ ->
-      {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
   end
 
   # Started-but-not-loaded plugins compile to a stub that runs none of them: it hands back the state,

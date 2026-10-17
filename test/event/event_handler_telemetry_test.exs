@@ -51,6 +51,32 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
                     %{event: "after_login_test", result: :ok}}
   end
 
+  @tag :capture_log
+  test "an event whose module cannot be built is an error and the handler keeps running" do
+    event = "unbuildable_evt_#{System.unique_integer([:positive])}"
+    pid = Process.whereis(EventHandler)
+
+    {:ok, _} =
+      Event.write(%{
+        name: MishkaTest.Unbuildable,
+        event: event,
+        extension: :mishka_installer,
+        extra: [%{callback: fn -> :not_a_literal end}]
+      })
+
+    assert {:error, [%{action: :start, field: :global}]} =
+             EventHandler.do_compile(event, :start, false)
+
+    assert_receive {:telemetry, [:mishka_installer, :event, :compile], _meas,
+                    %{event: ^event, result: :error}}
+
+    refute_received {:telemetry, [:mishka_installer, :event, :compile], _meas,
+                     %{event: ^event, result: :ok}}
+
+    assert Process.whereis(EventHandler) == pid
+    refute MishkaInstaller.Event.ModuleStateCompiler.compile_initialize?(event)
+  end
+
   test "a :cluster_recompile from another node rebuilds the event module locally" do
     event = "remote_evt_#{System.unique_integer([:positive])}"
 
