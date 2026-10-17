@@ -15,7 +15,8 @@ defmodule MishkaInstaller.Helper.Record do
   > any input from the user. Ensure that you include the required safety measures.
   """
   alias MishkaInstaller.Helper.{Extra, MnesiaAssistant}
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Transaction}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
+  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
 
@@ -94,6 +95,42 @@ defmodule MishkaInstaller.Helper.Record do
       {:aborted, reason} ->
         Transaction.transaction_error(reason, module, "storing", :global, :database)
     end
+  end
+
+  @doc """
+  Removes every row of `module`'s table.
+
+  Returns `{:ok, :atomic}`, or `{:error, reason, description}` when Mnesia refuses.
+
+  ## Example:
+
+  ```elixir
+  drop(MishkaInstaller.Installer.Installer)
+  ```
+  """
+  @spec drop(module()) :: {:ok, :atomic} | {:error, any(), charlist()}
+  def drop(module) do
+    Table.clear_table(module)
+    |> MError.error_description(module)
+  end
+
+  @doc """
+  Answers `:ok` when `selected` (the struct a read returned, or `nil`) is `nil`, meaning the record
+  does not exist yet, and the error with the action `:unique` otherwise. `noun` names the record in
+  the message.
+
+  ## Example:
+
+  ```elixir
+  unique(Installer.get(:app, "demo"), "library")
+  ```
+  """
+  @spec unique(struct() | nil, String.t()) :: :ok | error_return()
+  def unique(nil, _noun), do: :ok
+
+  def unique(_selected, noun) do
+    message = "This #{noun} already exists in the database."
+    {:error, [%{message: message, field: :global, action: :unique}]}
   end
 
   @doc """

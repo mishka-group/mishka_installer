@@ -47,7 +47,6 @@ defmodule MishkaInstaller.Installer.Installer do
   alias MishkaInstaller.Helper.{Extra, Record, UUID}
   alias MishkaInstaller.Installer.{Downloader, LibraryHandler, CompileHandler}
   alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
-  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
 
   @type download_type :: :path | :url | :github_tag | :github_latest_release
 
@@ -435,10 +434,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec drop() :: {:ok, :atomic} | {:error, any(), charlist()}
-  def drop() do
-    Table.clear_table(__MODULE__)
-    |> MError.error_description(__MODULE__)
-  end
+  def drop(), do: Record.drop(__MODULE__)
 
   @doc """
   To check is a runtime library unique or not in Mnesia database.
@@ -459,16 +455,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec unique(:app, String.t()) :: :ok | error_return()
-  def unique(field, value) do
-    case get(field, value) do
-      nil ->
-        :ok
-
-      _data ->
-        message = "This event already exists in the database."
-        {:error, [%{message: message, field: :global, action: :unique}]}
-    end
-  end
+  def unique(field, value), do: Record.unique(get(field, value), "library")
 
   @doc """
   This function is exactly like `unique/2` function, except that its output is a Boolean.

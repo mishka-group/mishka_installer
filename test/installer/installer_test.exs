@@ -146,9 +146,11 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       {:ok, _data} =
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
 
-      {:error, [%{field: :global, action: :unique}]} =
+      {:error, [%{field: :global, action: :unique, message: message}]} =
         assert Installer.unique(:app, "mishka_developer_tools")
 
+      assert message =~ "library"
+      refute message =~ "event"
       refute Installer.unique?(:app, "mishka_developer_tools")
     end
 

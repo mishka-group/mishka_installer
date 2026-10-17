@@ -63,7 +63,6 @@ defmodule MishkaInstaller.Event.Event do
   alias MishkaInstaller.Helper.{Extra, Record, UUID}
   import MishkaInstaller.Helper.MnesiaAssistant, only: [er: 1, erl_fields: 4]
   alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
-  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
   alias MishkaInstaller.Event.EventHandler
 
   @mnesia_info [
@@ -917,10 +916,7 @@ defmodule MishkaInstaller.Event.Event do
   ```
   """
   @spec drop() :: {:ok, :atomic} | {:error, any(), charlist()}
-  def drop() do
-    Table.clear_table(__MODULE__)
-    |> MError.error_description(__MODULE__)
-  end
+  def drop(), do: Record.drop(__MODULE__)
 
   @doc """
   To check is a plugin unique or not in Mnesia database.
@@ -940,16 +936,7 @@ defmodule MishkaInstaller.Event.Event do
   unique(:name, TestApp.User.Auth)
   ```
   """
-  def unique(field, value) do
-    case get(field, value) do
-      nil ->
-        :ok
-
-      _data ->
-        message = "This event already exists in the database."
-        {:error, [%{message: message, field: :global, action: :unique}]}
-    end
-  end
+  def unique(field, value), do: Record.unique(get(field, value), "event")
 
   @doc """
   This function is exactly like `unique/2` function, except that its output is a Boolean.
