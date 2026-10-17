@@ -128,6 +128,30 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert Installer.get() == []
     end
 
+    test "Delete, update and unique answer for a record that is not there" do
+      {:error, [%{field: :global, action: :delete}]} =
+        assert Installer.delete(:app, "mishka_developer_tools")
+
+      {:error, [%{field: :global, action: :delete}]} = assert Installer.delete(:id, "missing")
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Installer.write(:app, "mishka_developer_tools", %{tag: "1.0.0"})
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Installer.write(:id, "missing", %{tag: "1.0.0"})
+
+      :ok = assert Installer.unique(:app, "mishka_developer_tools")
+      assert Installer.unique?(:app, "mishka_developer_tools")
+
+      {:ok, _data} =
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
+
+      {:error, [%{field: :global, action: :unique}]} =
+        assert Installer.unique(:app, "mishka_developer_tools")
+
+      refute Installer.unique?(:app, "mishka_developer_tools")
+    end
+
     test "Drop all Library records" do
       {:ok, _data} =
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})

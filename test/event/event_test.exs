@@ -157,6 +157,31 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert Event.get() == []
     end
 
+    test "Delete, update and unique answer for a record that is not there" do
+      {:error, [%{field: :global, action: :delete}]} =
+        assert Event.delete(:name, MishkaTest.Email)
+
+      {:error, [%{field: :global, action: :delete}]} = assert Event.delete(:id, "missing")
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Event.write(:name, MishkaTest.Email, %{priority: 1})
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Event.write(:id, "missing", %{priority: 1})
+
+      :ok = assert Event.unique(:name, MishkaTest.Email)
+      assert Event.unique?(:name, MishkaTest.Email)
+
+      %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}
+      |> Event.write()
+
+      {:error, [%{field: :global, action: :unique, message: message}]} =
+        assert Event.unique(:name, MishkaTest.Email)
+
+      assert message =~ "event"
+      refute Event.unique?(:name, MishkaTest.Email)
+    end
+
     test "Drop all plugins records" do
       %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}
       |> Event.write()

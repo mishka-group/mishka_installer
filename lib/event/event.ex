@@ -898,26 +898,7 @@ defmodule MishkaInstaller.Event.Event do
   @spec delete(atom(), String.t() | module()) :: error_return | okey_return
   def delete(field, value) when field in [:id, :name] do
     selected = if field == :id, do: get(value), else: get(:name, value)
-
-    case selected do
-      nil ->
-        message =
-          "The ID of the record you want to delete is incorrect or has already been deleted."
-
-        {:error, [%{message: message, field: :global, action: :delete}]}
-
-      data ->
-        Transaction.durable_transaction(fn ->
-          Query.delete(__MODULE__, Map.get(data, :id), :write)
-        end)
-        |> case do
-          {:atomic, _res} ->
-            {:ok, data}
-
-          {:aborted, reason} ->
-            Transaction.transaction_error(reason, __MODULE__, "deleting", :global, :database)
-        end
-    end
+    Record.delete(__MODULE__, selected)
   end
 
   @doc """

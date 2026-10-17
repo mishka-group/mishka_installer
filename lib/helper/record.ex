@@ -97,6 +97,36 @@ defmodule MishkaInstaller.Helper.Record do
   end
 
   @doc """
+  Deletes the row of `module` that `selected` (the struct a read returned, or `nil`) came from, in a
+  durable transaction, and returns `{:ok, selected}`.
+
+  A `nil` selection is the error of a record that is incorrect or already deleted, with the action
+  `:delete`.
+
+  ## Example:
+
+  ```elixir
+  delete(MishkaInstaller.Installer.Installer, Installer.get(:app, "demo"))
+  ```
+  """
+  @spec delete(module(), struct() | nil) :: {:ok, struct()} | error_return()
+  def delete(_module, nil) do
+    message = "The ID of the record you want to delete is incorrect or has already been deleted."
+    {:error, [%{message: message, field: :global, action: :delete}]}
+  end
+
+  def delete(module, data) do
+    Transaction.durable_transaction(fn -> Query.delete(module, Map.get(data, :id), :write) end)
+    |> case do
+      {:atomic, _res} ->
+        {:ok, data}
+
+      {:aborted, reason} ->
+        Transaction.transaction_error(reason, module, "deleting", :global, :database)
+    end
+  end
+
+  @doc """
   Merges `updated_to` onto the stored row of `module` found by `field` (`:id`, or an indexed field
   such as `:name` or `:app`) and `value`, and returns `{:ok, struct}`.
 
