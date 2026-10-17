@@ -476,6 +476,139 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   end
 
   ###################################################################################
+  ###################### (▰˘◡˘▰) Version (▰˘◡˘▰) #############################
+  ###################################################################################
+  describe "version ===>" do
+    test "the struct refuses a version that is not a semantic version" do
+      for version <- ["1.0", "1", "latest", "v1.0.0", "1.0.0.0", "", " 1.0.0", "1.0.0/../x"] do
+        {:error, errors} =
+          assert Installer.builder(%{app: "demo", version: version, path: "p"})
+
+        assert Enum.any?(errors, &(&1.field == :version))
+      end
+
+      {:error, [%{field: :version, action: :semver}]} =
+        assert Installer.write(%{app: "demo", version: "1.0", path: "p"})
+
+      assert Installer.get() == []
+    end
+
+    test "the struct accepts a semantic version with a pre-release and build" do
+      for version <- ["0.1.0", "10.20.30", "1.0.0-rc.1", "1.0.0+build.5", "1.0.0-beta+exp.sha"] do
+        {:ok, %Installer{version: ^version}} =
+          assert Installer.builder(%{app: "demo", version: version, path: "p"})
+      end
+    end
+
+    test "install refuses a version that is not semver while the app is already running" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+      assert app_atom in started_apps()
+
+      # `Version.compare/2` used to raise `Version.InvalidVersionError` out of `install/1` here.
+      {:error, [%{field: :version, action: :semver}]} =
+        assert Installer.install(%{app: app, version: "1.0", path: pkg})
+
+      assert Installer.get(:app, app).version == version
+      assert app_atom in started_apps()
+    end
+
+    test "install refuses a version that is not semver when the app is not running" do
+      app = uniq_app("ebin_demo")
+      pkg = "#{LibraryHandler.extensions_path()}/#{app}-1.0"
+      on_exit(fn -> File.rm_rf!(pkg) end)
+
+      {:error, [%{field: :version, action: :semver}]} =
+        assert Installer.install(%{app: app, version: "1.0", path: pkg})
+
+      assert is_nil(Installer.get(:app, app))
+      refute File.dir?(pkg)
+    end
+
+    test "install still upgrades a running app to a newer semantic version" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      newer = "0.2.0-rc.1"
+      newer_pkg = build_other_version(app, app_atom, newer)
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        cleanup(app_atom, newer_pkg)
+      end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+
+      {:ok, %{extension: %{version: ^newer}}} =
+        assert Installer.install(%{app: app, version: newer, path: newer_pkg})
+
+      assert Application.spec(app_atom, :vsn) == String.to_charlist(newer)
+      assert app_atom in started_apps()
+      assert Installer.get(:app, app).version == newer
+    end
+
+    test "an upgrade updates the one record of the app instead of writing a second one" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      newer = "0.2.0"
+      newer_pkg = build_other_version(app, app_atom, newer)
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        cleanup(app_atom, newer_pkg)
+      end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+      [%{id: id, inserted_at: inserted_at}] = Enum.filter(Installer.get(), &(&1.app == app))
+
+      {:ok, _} = assert Installer.install(%{app: app, version: newer, path: newer_pkg})
+
+      assert [record] = Enum.filter(Installer.get(), &(&1.app == app))
+      assert record.id == id
+      assert record.inserted_at == inserted_at
+      assert record.version == newer
+      assert record.path == newer_pkg
+      assert record.prepend_paths == [{app_atom, "#{newer_pkg}/ebin"}]
+    end
+
+    test "a refused downgrade leaves the one record of the app as it was" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      older = "0.0.9"
+      older_pkg = build_other_version(app, app_atom, older)
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        cleanup(app_atom, older_pkg)
+      end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+
+      {:error, [%{action: :compare_version_with_installed_app}]} =
+        assert Installer.install(%{app: app, version: older, path: older_pkg})
+
+      assert [%{version: ^version}] = Enum.filter(Installer.get(), &(&1.app == app))
+    end
+
+    test "uninstall after an upgrade leaves no record of the app" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      newer = "0.2.0"
+      newer_pkg = build_other_version(app, app_atom, newer)
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        cleanup(app_atom, newer_pkg)
+      end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+      {:ok, _} = assert Installer.install(%{app: app, version: newer, path: newer_pkg})
+
+      :ok = assert Installer.uninstall(%{app: app, version: newer, path: newer_pkg})
+
+      assert Enum.filter(Installer.get(), &(&1.app == app)) == []
+      assert is_nil(Installer.get(:app, app))
+    end
+  end
+
+  ###################################################################################
   ###################### (▰˘◡˘▰) Path safety (▰˘◡˘▰) ##########################
   ###################################################################################
   describe "path safety ===>" do
@@ -484,14 +617,16 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       File.mkdir_p!(outside)
       on_exit(fn -> File.rm_rf!(outside) end)
 
-      assert {:error, [%{action: :package_dir}]} =
+      assert {:error, errors} =
                Installer.install(%{
                  app: "demo",
                  version: "0.1.0/../../../../#{outside}",
                  path: "x"
                })
 
-      # the guard fires before any filesystem op, so the outside dir is untouched
+      assert Enum.any?(errors, &(&1.field == :version and &1.action == :semver))
+
+      # the version is refused before any filesystem op, so the outside dir is untouched
       assert File.dir?(outside)
     end
 
@@ -519,6 +654,17 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
     File.rm_rf!(pkg)
     {^app_atom, module, _ebin} = EbinFixture.build_fake_app(pkg, app_atom, version)
     {app, app_atom, version, pkg, module}
+  end
+
+  # Builds a second version of an app that is already compiled in this VM, without the
+  # "redefining module" warning.
+  defp build_other_version(app, app_atom, version) do
+    pkg = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+    previous = Code.get_compiler_option(:ignore_module_conflict)
+    Code.put_compiler_option(:ignore_module_conflict, true)
+    {^app_atom, _module, _ebin} = EbinFixture.build_fake_app(pkg, app_atom, version)
+    Code.put_compiler_option(:ignore_module_conflict, previous)
+    pkg
   end
 
   defp started_apps, do: Enum.map(Application.started_applications(), &elem(&1, 0))
