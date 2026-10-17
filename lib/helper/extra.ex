@@ -63,25 +63,34 @@ defmodule MishkaInstaller.Helper.Extra do
   @spec isolate((-> result)) :: {:ok, result} | {:exit, term()} when result: term()
   def isolate(fun) when is_function(fun, 0) do
     caller = self()
-    {guard, ref} = spawn_monitor(fn -> guard(caller, fun) end)
+    ref = make_ref()
+    {guard, guard_ref} = spawn_monitor(fn -> guard(caller, ref, fun) end)
 
     receive do
-      {:DOWN, ^ref, :process, ^guard, {:isolated, outcome}} -> outcome
+      {^ref, outcome} ->
+        Process.demonitor(guard_ref, [:flush])
+        outcome
+
+      {:DOWN, ^guard_ref, :process, ^guard, reason} ->
+        {:exit, reason}
     end
   end
 
-  # Runs `fun` in a process linked to this one and reports how it ended; ends, and so ends `fun`,
-  # as soon as the caller is gone.
-  defp guard(caller, fun) do
+  # Runs `fun` in a process linked to this one and sends the caller how it ended; stops `fun` as soon
+  # as the caller is gone.
+  defp guard(caller, ref, fun) do
     Process.flag(:trap_exit, true)
     caller_ref = Process.monitor(caller)
-    worker = spawn_link(fn -> exit({:isolated, fun.()}) end)
+    guard = self()
+    worker = spawn_link(fn -> send(guard, {:worker_done, self(), fun.()}) end)
 
     receive do
-      {:EXIT, ^worker, {:isolated, result}} -> exit({:isolated, {:ok, result}})
-      {:EXIT, ^worker, reason} -> exit({:isolated, {:exit, reason}})
-      {:DOWN, ^caller_ref, :process, ^caller, _reason} -> exit(:caller_down)
+      {:worker_done, ^worker, result} -> send(caller, {ref, {:ok, result}})
+      {:EXIT, ^worker, reason} -> send(caller, {ref, {:exit, reason}})
+      {:DOWN, ^caller_ref, :process, ^caller, _reason} -> Process.exit(worker, :kill)
     end
+
+    :ok
   end
 
   @doc """
