@@ -57,7 +57,7 @@ defmodule MishkaInstaller.Installer.Installer do
 
   @type builder_entry :: {:root, struct() | map(), :edit} | struct() | map()
 
-  @name_pattern ~r/^[a-z][a-z0-9_]*$/
+  @name_pattern ~r/\A[a-z][a-z0-9_]*\z/
 
   @mnesia_info [
     type: :set,
@@ -170,16 +170,14 @@ defmodule MishkaInstaller.Installer.Installer do
   @spec install(t()) :: error_return() | okey_return()
   def install(app) do
     with {:ok, data} <- __MODULE__.builder(app),
-         :ok <- valid_name(data.app),
+         {:ok, app_atom} <- app_atom(data.app),
          :ok <- protected_app(data.app),
          {:ok, dest} <- fetch_package(data),
          :ok <- ebin_exist(dest),
          _ <- warn_on_native(dest, data.app),
-         {:ok, _props} <-
-           LibraryHandler.read_app(safe_atom(data.app), app_resource(dest, data.app)),
-         :ok <-
-           LibraryHandler.compare_version_with_installed_app(safe_atom(data.app), data.version),
-         {:ok, prepend_paths} <- install_steps(data, dest),
+         {:ok, _props} <- LibraryHandler.read_app(app_atom, app_resource(dest, data.app)),
+         :ok <- LibraryHandler.compare_version_with_installed_app(app_atom, data.version),
+         {:ok, prepend_paths} <- install_steps(app_atom, dest),
          merged_app <- Map.merge(data, %{prepend_paths: prepend_paths}),
          {:ok, output} <- update_or_write(data, merged_app) do
       MishkaInstaller.broadcast("installer", :install, install_output(output))
@@ -216,10 +214,9 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   @spec uninstall(t() | map()) :: :ok | error_return()
   def uninstall(app) do
-    with :ok <- valid_name(app.app),
+    with {:ok, app_atom} <- app_atom(app.app),
          :ok <- protected_app(app.app),
          {:ok, dir} <- package_dir(app.app, app.version) do
-      app_atom = safe_atom(app.app)
       Application.stop(app_atom)
       Application.unload(app_atom)
       Code.delete_path("#{dir}/ebin")
@@ -371,22 +368,19 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   @spec write(builder_entry) :: error_return | okey_return
   def write(data) do
-    case builder(data) do
-      {:ok, struct} ->
-        values_tuple =
-          ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
+    with {:ok, struct} <- builder(data),
+         :ok <- valid_name(struct.app) do
+      values_tuple =
+        ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
 
-        Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
-        |> case do
-          {:atomic, _res} ->
-            {:ok, struct}
+      Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
+      |> case do
+        {:atomic, _res} ->
+          {:ok, struct}
 
-          {:aborted, reason} ->
-            Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
-        end
-
-      error ->
-        error
+        {:aborted, reason} ->
+          Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
+      end
     end
   end
 
@@ -671,8 +665,14 @@ defmodule MishkaInstaller.Installer.Installer do
     :ok
   end
 
+  @doc false
+  @spec app_atom(term()) :: {:ok, atom()} | error_return()
+  def app_atom(app) do
+    with :ok <- valid_name(app), do: {:ok, String.to_atom(app)}
+  end
+
   defp valid_name(app) do
-    if Regex.match?(@name_pattern, "#{app}") and String.length("#{app}") <= 255 do
+    if is_binary(app) and Regex.match?(@name_pattern, app) and String.length(app) <= 255 do
       :ok
     else
       message =
@@ -681,8 +681,6 @@ defmodule MishkaInstaller.Installer.Installer do
       {:error, [%{message: message, field: :app, action: :valid_name}]}
     end
   end
-
-  defp safe_atom(app), do: String.to_atom(app)
 
   defp app_resource(path, app), do: "#{path}/ebin/#{app}.app"
 
@@ -749,8 +747,7 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  defp install_steps(data, dest) do
-    app = safe_atom(data.app)
+  defp install_steps(app, dest) do
     ebin = "#{dest}/ebin"
     prepend_paths = [{app, ebin}]
 

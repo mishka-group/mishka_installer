@@ -299,6 +299,34 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         assert Installer.install(%{app: "../../etc", version: "1.0.0", path: "whatever"})
     end
 
+    test "rejects an app name that only matches because of a trailing newline" do
+      unique = System.unique_integer([:positive])
+
+      for app <- ["newline_#{unique}\n", "newline_#{unique}\n\n", "Newline_#{unique}", "1new_app"] do
+        {:error, [%{action: :valid_name, field: :app}]} =
+          assert Installer.install(%{app: app, version: "1.0.0", path: "whatever"})
+
+        {:error, [%{action: :valid_name}]} =
+          assert Installer.uninstall(%{app: app, version: "1.0.0", path: "whatever"})
+      end
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom("newline_#{unique}\n") end
+    end
+
+    test "a record with an invalid app name is never stored" do
+      for app <- ["foo\n", "Foo", "foo-bar", "foo bar", "../etc", String.duplicate("a", 256)] do
+        {:error, [%{action: :valid_name, field: :app}]} =
+          assert Installer.write(%{app: app, version: "0.1.0", path: "p"})
+      end
+
+      {:ok, %{id: id}} = assert Installer.write(%{app: "valid_name", version: "0.1.0", path: "p"})
+
+      {:error, [%{action: :valid_name}]} =
+        assert Installer.write(:id, id, %{app: "valid_name\n"})
+
+      assert [%{app: "valid_name"}] = Installer.get()
+    end
+
     test "rejects re-installing the same version of an already running app" do
       {app, app_atom, version, pkg, _module} = fake_local_app()
       on_exit(fn -> cleanup(app_atom, pkg) end)
