@@ -129,7 +129,7 @@ defmodule MishkaInstaller.Event.EventHandler do
     queues = Keyword.get(state, :queues, QueueAssistant.new())
 
     new_state =
-      if length(running) == 0 and !QueueAssistant.empty?(queues) do
+      if running == [] and !QueueAssistant.empty?(queues) do
         case QueueAssistant.out(queues) do
           {:empty, _} ->
             state
@@ -150,7 +150,7 @@ defmodule MishkaInstaller.Event.EventHandler do
     running = Keyword.get(state, :running, [])
 
     new_state =
-      if length(running) != 0 do
+      if running != [] do
         event = List.first(running)
 
         if perform(event),

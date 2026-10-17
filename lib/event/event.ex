@@ -1024,7 +1024,7 @@ defmodule MishkaInstaller.Event.Event do
       |> Enum.sort_by(&{&1.priority, &1.name})
 
     case ready do
-      [] -> Enum.reverse(acc) ++ Enum.sort_by(plugins, &{&1.priority, &1.name})
+      [] -> Enum.reverse(acc, Enum.sort_by(plugins, &{&1.priority, &1.name}))
       [next | _] -> order_loop(plugins -- [next], MapSet.delete(pending, next.name), [next | acc])
     end
   end
