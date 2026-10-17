@@ -16,6 +16,7 @@ defmodule MishkaInstaller.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      dialyzer: [ignore_warnings: ".dialyzer_ignore.exs"],
       description: description(),
       package: package(),
       homepage_url: "https://github.com/mishka-group",
@@ -73,12 +74,12 @@ defmodule MishkaInstaller.MixProject do
   defp aliases do
     [
       ci: [
+        "hex.audit",
+        "deps.audit",
         "compile --warnings-as-errors",
         "format --check-formatted",
         "credo --strict",
-        "sobelow --skip --exit",
-        "deps.audit",
-        "hex.audit",
+        "sobelow --config",
         "dialyzer",
         "ex_dna --max-clones 0",
         "test"
