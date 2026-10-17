@@ -20,6 +20,33 @@ defmodule MishkaInstaller.Helper.Record do
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
 
+  @copies if MishkaInstaller.__information__().env != :test, do: :disc_copies, else: :ram_copies
+
+  ####################################################################################
+  ########################## (▰˘◡˘▰) Table (▰˘◡˘▰) ############################
+  ####################################################################################
+  @doc """
+  The options `MishkaInstaller.Helper.MnesiaAssistant.Table.create_table/2` needs to create the table
+  of `module`: a `:set` of `module`'s `keys/0`, indexed by `index`, kept in `ram_copies` when the
+  library is compiled for `:test` and in `disc_copies` otherwise.
+
+  ## Example:
+
+  ```elixir
+  database_config(MishkaInstaller.Installer.Installer, [:app])
+  ```
+  """
+  @spec database_config(module(), [atom()]) :: keyword()
+  def database_config(module, index) do
+    [
+      type: :set,
+      index: index,
+      record_name: module,
+      storage_properties: [ets: [{:read_concurrency, true}, {:write_concurrency, true}]],
+      attributes: module.keys()
+    ] ++ [{@copies, [node()]}]
+  end
+
   ####################################################################################
   ########################## (▰˘◡˘▰) Query (▰˘◡˘▰) ############################
   ####################################################################################

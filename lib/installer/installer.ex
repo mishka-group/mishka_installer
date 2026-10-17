@@ -58,12 +58,6 @@ defmodule MishkaInstaller.Installer.Installer do
 
   @name_pattern ~r/\A[a-z][a-z0-9_]*\z/
 
-  @mnesia_info [
-    type: :set,
-    index: [:app],
-    record_name: __MODULE__,
-    storage_properties: [ets: [{:read_concurrency, true}, {:write_concurrency, true}]]
-  ]
   ####################################################################################
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
   ####################################################################################
@@ -106,13 +100,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ################################################################################
   @doc false
   @spec database_config() :: keyword()
-  if MishkaInstaller.__information__().env != :test do
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), disc_copies: [node()])
-  else
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), ram_copies: [node()])
-  end
+  def database_config(), do: Record.database_config(__MODULE__, [:app])
 
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################

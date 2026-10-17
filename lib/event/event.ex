@@ -65,12 +65,6 @@ defmodule MishkaInstaller.Event.Event do
   alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
   alias MishkaInstaller.Event.EventHandler
 
-  @mnesia_info [
-    type: :set,
-    index: [:name, :event, :extension],
-    record_name: __MODULE__,
-    storage_properties: [ets: [{:read_concurrency, true}, {:write_concurrency, true}]]
-  ]
   ####################################################################################
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
   ####################################################################################
@@ -116,13 +110,7 @@ defmodule MishkaInstaller.Event.Event do
   ################################################################################
   @doc false
   @spec database_config() :: keyword()
-  if MishkaInstaller.__information__().env != :test do
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), disc_copies: [node()])
-  else
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), ram_copies: [node()])
-  end
+  def database_config(), do: Record.database_config(__MODULE__, [:name, :event, :extension])
 
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
