@@ -1,9 +1,7 @@
 defmodule MishkaInstaller.Installer.LibraryHandler do
   @moduledoc """
-  This module provides programmers with a public APIs and helpers that allow them to
-  load a **pre-built** Elixir/Erlang library (its compiled `ebin`) into a running system.
-
-  > It also includes aids and tools that allow them to work with the library while it is running.
+  Loads a **pre-built** Elixir/Erlang library (its compiled `ebin`) into a running system, and gives
+  the helpers to work with it while it is running.
 
   `MishkaInstaller.Installer.Installer` is also referred to as action and aggregator functions,
   which is something that should be taken into consideration.

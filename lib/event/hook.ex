@@ -1,10 +1,10 @@
 defmodule MishkaInstaller.Event.Hook do
   @moduledoc """
-  The `MishkaInstaller.Event.Hook` module provides a set of functionalities to manage event hooks
-  within the Mishka Installer system.
+  Registers, starts, stops and calls the plugins of an event: `use MishkaInstaller.Event.Hook` turns a
+  module into a plugin `GenServer` of one event, and `call/3` runs the plugins of an event in order.
 
-  It leverages `GenServer` to handle asynchronous event-driven operations and offers a set of
-  macros and functions for registering, starting, stopping, and managing hooks dynamically.
+  A plugin is registered, started, stopped and removed at runtime, so the functions of this module
+  are the way to manage hooks dynamically.
 
   In addition to being one of the most significant modules of the MishkaInstaller library,
   the Hook module gives you the ability to make the library as a whole,
