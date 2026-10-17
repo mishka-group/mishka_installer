@@ -2,6 +2,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Installer.{Installer, LibraryHandler, Downloader}
   alias MishkaInstallerTest.Support.EbinFixture
+  import ExUnit.CaptureLog, only: [capture_log: 1]
 
   setup do
     System.put_env("PROJECT_PATH", File.cwd!())
@@ -375,6 +376,143 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
                })
 
       assert module.hello() == :world
+    end
+
+    test "a remote install without a checksum is logged, and installs when the policy is not strict" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      app = uniq_app("sum_none")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      log =
+        capture_log(fn ->
+          {:ok, _} =
+            assert Installer.install(%{
+                     app: app,
+                     version: version,
+                     type: :url,
+                     path: "https://cdn.example.com/#{app}.tar.gz"
+                   })
+        end)
+
+      assert log =~ "without a checksum"
+      assert module.hello() == :world
+    end
+
+    test "a remote install with a checksum is not warned about" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      app = uniq_app("sum_quiet")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, _module} = EbinFixture.tar_fake_app(app_atom, version)
+      checksum = :crypto.hash(:sha256, tarball) |> Base.encode16(case: :lower)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      log =
+        capture_log(fn ->
+          {:ok, _} =
+            assert Installer.install(%{
+                     app: app,
+                     version: version,
+                     type: :url,
+                     path: "https://cdn.example.com/#{app}.tar.gz",
+                     checksum: checksum
+                   })
+        end)
+
+      refute log =~ "without a checksum"
+    end
+
+    test "require_checksum refuses a remote install without a checksum before downloading" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist,
+        url_hosts: ["cdn.example.com"],
+        github_repos: ["owner/repo"],
+        require_checksum: true
+      )
+
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host})
+        Plug.Conn.send_resp(conn, 200, "tarball")
+      end)
+
+      app = uniq_app("sum_required")
+
+      capture_log(fn ->
+        for source <- [
+              %{type: :url, path: "https://cdn.example.com/#{app}.tar.gz"},
+              %{type: :github_latest_release, path: "owner/repo"},
+              %{type: :github_tag, path: "owner/repo", tag: "0.1.0"}
+            ] do
+          {:error, [%{action: :allowlist, message: message}]} =
+            assert Installer.install(Map.merge(%{app: app, version: "0.1.0"}, source))
+
+          assert message =~ "require_checksum"
+        end
+      end)
+
+      refute_received {:requested, _host}
+      assert is_nil(Installer.get(:app, app))
+    end
+
+    test "require_checksum installs a remote artifact that carries one, and never asks a :path install" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist,
+        url_hosts: ["cdn.example.com"],
+        require_checksum: true
+      )
+
+      app = uniq_app("sum_strict")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      checksum = :crypto.hash(:sha256, tarball) |> Base.encode16(case: :lower)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      {:ok, _} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz",
+                 checksum: checksum
+               })
+
+      assert module.hello() == :world
+
+      {local_app, local_atom, local_version, pkg, local_module} = fake_local_app()
+      on_exit(fn -> cleanup(local_atom, pkg) end)
+
+      {:ok, _} =
+        assert Installer.install(%{app: local_app, version: local_version, path: pkg})
+
+      assert local_module.hello() == :world
     end
 
     test "rejects a mismatched checksum and installs nothing" do

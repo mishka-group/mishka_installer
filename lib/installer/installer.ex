@@ -89,6 +89,7 @@ defmodule MishkaInstaller.Installer.Installer do
     # The optional release asset name to pick for `:github_*` downloads (defaults to the first asset).
     field(:asset, String.t(), derives: "validate(not_empty_string)")
     # Optional sha256 (hex) of the downloaded artifact; verified before extraction when present.
+    # A remote install without one logs a warning, or is refused with `require_checksum: true`.
     field(:checksum, String.t(), derives: "validate(not_empty_string)")
 
     # This type can be used when you want to introduce a list of apps that a library depend on them.
@@ -146,6 +147,11 @@ defmodule MishkaInstaller.Installer.Installer do
   > Loading a `.beam` is **running arbitrary code with full node privileges**; the BEAM has no
   > sandbox. Only install artifacts from a trusted source, built for the **same** Erlang/OTP and
   > Elixir as the host.
+
+  A remote install (`:url`/`:github_*`) should carry the artifact's sha256 as `checksum`. Without one
+  a warning is logged; with `config :mishka_installer, :allowlist, require_checksum: true` it is
+  refused with `{:error, [%{action: :allowlist}]}` before anything is downloaded. A `:path` install
+  is never asked for one.
 
   In reality, the structure of this module `__MODULE__.builder/1`, which likewise possesses
   a high access level validation, is what this function takes as its input.
@@ -568,6 +574,7 @@ defmodule MishkaInstaller.Installer.Installer do
   defp fetch_package(data) do
     with {:ok, dest} <- package_dir(data.app, data.version),
          :ok <- allowed_source(data),
+         :ok <- checksum_policy(data),
          {:ok, body} <- Downloader.download(data.type, download_pkg(data)),
          :ok <- verify_checksum(body, Map.get(data, :checksum)),
          :ok <- LibraryHandler.extract(:tar, body, Path.basename(dest)) do
@@ -639,6 +646,24 @@ defmodule MishkaInstaller.Installer.Installer do
 
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
+
+  # A remote artifact is loaded as code, so a missing `checksum` is logged; `require_checksum: true` in
+  # the allowlist config refuses it.
+  defp checksum_policy(%{checksum: checksum}) when is_binary(checksum), do: :ok
+
+  defp checksum_policy(data) do
+    if allowlist(:require_checksum, false) == true do
+      policy_blocked(:require_checksum, data.path)
+    else
+      Logger.warning(
+        "[mishka_installer.installer] #{data.app} is installed from #{data.type} #{inspect(data.path)} " <>
+          "without a checksum, so the artifact is not verified; pass `checksum:` (sha256) " <>
+          "or set `require_checksum: true` in the :allowlist config"
+      )
+
+      :ok
+    end
+  end
 
   defp verify_checksum(_body, nil), do: :ok
 
