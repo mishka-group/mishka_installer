@@ -96,6 +96,9 @@ defmodule MishkaInstallerTest.Event.DependencyTest do
     start_supervised!(MishkaInstaller.MnesiaRepo)
     assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
 
+    # The handler's own boot sync is over before a test writes anything it could hold or start.
+    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}, 2000
+
     :ok
   end
 
