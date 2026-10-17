@@ -460,8 +460,10 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec call(String.t(), any(), keyword()) :: any()
   def call(event, data, args \\ []) do
-    module = ModuleStateCompiler.module_event_name(event)
-    if function_exported?(module, :call, 2), do: module.call(data, args), else: data
+    case ModuleStateCompiler.event_module(event) do
+      nil -> data
+      module -> if function_exported?(module, :call, 2), do: module.call(data, args), else: data
+    end
   end
 
   @doc """
@@ -474,8 +476,10 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec call!(String.t(), any(), keyword()) :: any()
   def call!(event, data, args \\ []) do
-    module = ModuleStateCompiler.module_event_name(event)
-    module.call(data, args)
+    case ModuleStateCompiler.event_module(event) do
+      nil -> raise UndefinedFunctionError, message: "the event #{inspect(event)} is not compiled"
+      module -> module.call(data, args)
+    end
   end
 
   @doc """
@@ -491,9 +495,9 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec profile(String.t(), any()) :: {:ok, [map()]} | {:error, :not_compiled}
   def profile(event, state) do
-    module = ModuleStateCompiler.module_event_name(event)
+    module = ModuleStateCompiler.event_module(event)
 
-    if function_exported?(module, :initialize, 0) do
+    if !is_nil(module) and function_exported?(module, :initialize, 0) do
       {_final, timings} =
         Enum.reduce(module.initialize().plugins, {state, []}, fn plugin, {acc_state, acc} ->
           {micros, next} = time_plugin(plugin.name, acc_state)
@@ -563,9 +567,12 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec event_health(String.t(), timeout()) :: map()
   def event_health(event, timeout \\ @health_timeout) do
-    module = ModuleStateCompiler.module_event_name(event)
-    compiled? = function_exported?(module, :initialize, 0)
-    mode = if function_exported?(module, :mode, 0), do: module.mode(), else: :unknown
+    module = ModuleStateCompiler.event_module(event)
+    compiled? = !is_nil(module) and function_exported?(module, :initialize, 0)
+
+    mode =
+      if compiled? and function_exported?(module, :mode, 0), do: module.mode(), else: :unknown
+
     plugins = if compiled?, do: module.initialize().plugins, else: []
 
     reports =
@@ -729,7 +736,7 @@ defmodule MishkaInstaller.Event.Hook do
   def plugin_start_again(module, state) do
     event = Keyword.get(state, :event)
     db_plg = Event.get(:name, Keyword.get(state, :name))
-    state_module = ModuleStateCompiler.module_event_name(event)
+    state_module = ModuleStateCompiler.event_module(event)
 
     new_state =
       if ModuleStateCompiler.safe_initialize?(event) and state_module.is_initialized?(db_plg) do
@@ -761,8 +768,9 @@ defmodule MishkaInstaller.Event.Hook do
     new_state =
       with "ready" <- :persistent_term.get(:event_status, nil),
            "ready" <- :persistent_term.get(:compile_status, nil),
-           {:module, state_module} <-
-             Code.ensure_loaded(ModuleStateCompiler.module_event_name(module.config(:__event__))),
+           state_module when not is_nil(state_module) <-
+             ModuleStateCompiler.event_module(module.config(:__event__)),
+           {:module, ^state_module} <- Code.ensure_loaded(state_module),
            data when not is_nil(data) <-
              Enum.find(state_module.initialize().plugins, &(&1.name == module)),
            plugin <- Event.dirty_get(:name, module) do

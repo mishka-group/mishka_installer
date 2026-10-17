@@ -248,17 +248,40 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   def purge(event) do
-    module = module_event_name(event)
-    :code.purge(module)
-    :code.delete(module)
-    :ok
+    case event_module(event) do
+      nil ->
+        :ok
+
+      module ->
+        :code.purge(module)
+        :code.delete(module)
+        :ok
+    end
   end
 
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   @doc """
+  Returns the module compiled for `event` on this node, or `nil` when `create/3` never built one.
+
+  It only reads the cache that `module_event_name/1` fills, so it never creates an atom or a cache
+  key: this is the function to call with an event name that is not known to exist.
+
+  ## Examples
+  ```elixir
+  event_module("event_name")
+  ```
+  """
+  @spec event_module(String.t()) :: module() | nil
+  def event_module(event), do: :persistent_term.get({__MODULE__, :name_cache, event}, nil)
+
+  @doc """
   Generates a module name based on the event name.
+
+  It **creates** the module atom and a `:persistent_term` cache key for a name it has not seen, so
+  pass it only the name of an event that is being compiled. `create/3` and `purge_create/3` call it;
+  to find the module of an event that may not exist use `event_module/1`.
 
   > #### Security considerations {: .warning}
   >
@@ -307,7 +330,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   def initialize?(event), do: module_event_name(event).initialize?()
 
   @doc """
-  Safely checks if the event module is initialized, rescuing any errors.
+  Checks if the event module is initialized, answering `false` for an event that is not compiled
+  instead of raising.
 
   ## Examples
   ```elixir
@@ -316,10 +340,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec rescue_initialize?(String.t()) :: boolean()
   def rescue_initialize?(event) do
-    module = module_event_name(event)
-    module.initialize?()
-  rescue
-    _ -> false
+    safe_initialize?(event) and event_module(event).initialize?()
   end
 
   @doc """
@@ -334,8 +355,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec compile_initialize?(String.t()) :: boolean()
   def compile_initialize?(event) do
-    module = module_event_name(event)
-    Code.ensure_loaded?(module)
+    case event_module(event) do
+      nil -> false
+      module -> Code.ensure_loaded?(module)
+    end
   end
 
   @doc """
@@ -348,7 +371,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec safe_initialize?(String.t()) :: boolean()
   def safe_initialize?(event) do
-    module = module_event_name(event)
-    function_exported?(module, :initialize?, 0)
+    case event_module(event) do
+      nil -> false
+      module -> Code.ensure_loaded?(module) and function_exported?(module, :initialize?, 0)
+    end
   end
 end

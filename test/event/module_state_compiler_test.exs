@@ -1,6 +1,6 @@
 defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{ModuleStateCompiler, Event}
+  alias MishkaInstaller.Event.{ModuleStateCompiler, Event, Hook}
 
   setup_all do
     pid = Process.whereis(MishkaInstaller.MnesiaRepo)
@@ -106,5 +106,57 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     :ok = ModuleStateCompiler.create([plugin], "ms_purge_evt")
     :ok = ModuleStateCompiler.purge(["ms_purge_evt"])
     refute ModuleStateCompiler.compile_initialize?("ms_purge_evt")
+  end
+
+  describe "an event that was never compiled ===>" do
+    test "every read path answers without creating an atom or a cache key" do
+      event = "never_compiled_#{System.unique_integer([:positive])}"
+      module_name = "MishkaInstaller.Event.ModuleStateCompiler.State." <> Macro.camelize(event)
+
+      assert Hook.call(event, %{a: 1}) == %{a: 1}
+      assert Hook.call(event, %{a: 1}, cannot_run: :refused) == %{a: 1}
+      assert_raise UndefinedFunctionError, fn -> Hook.call!(event, %{a: 1}) end
+      assert Hook.profile(event, %{a: 1}) == {:error, :not_compiled}
+      assert %{compiled?: false, mode: :unknown, plugins: []} = Hook.event_health(event)
+
+      assert ModuleStateCompiler.event_module(event) == nil
+      refute ModuleStateCompiler.compile_initialize?(event)
+      refute ModuleStateCompiler.safe_initialize?(event)
+      refute ModuleStateCompiler.rescue_initialize?(event)
+      :ok = ModuleStateCompiler.purge(event)
+      :ok = ModuleStateCompiler.purge([event])
+
+      assert :persistent_term.get({ModuleStateCompiler, :name_cache, event}, :none) == :none
+
+      for name <- [module_name, "Elixir." <> module_name] do
+        assert_raise ArgumentError, fn -> String.to_existing_atom(name) end
+      end
+    end
+
+    test "an event that was created is found by the lookup, and is gone from it after purge" do
+      event = "found_evt_#{System.unique_integer([:positive])}"
+
+      {:ok, plugin} =
+        Event.builder(%{
+          name: MishkaInstallerTest.Support.MishkaPlugin.EventCDeps,
+          event: event,
+          extension: :mishka_installer
+        })
+
+      :ok = ModuleStateCompiler.create([plugin], event)
+
+      module = ModuleStateCompiler.event_module(event)
+      assert module == ModuleStateCompiler.module_event_name(event)
+      assert module.initialize?()
+      assert %{compiled?: true, mode: :ok} = Hook.event_health(event)
+
+      assert {:ok, [%{plugin: MishkaInstallerTest.Support.MishkaPlugin.EventCDeps}]} =
+               Hook.profile(event, %{})
+
+      :ok = ModuleStateCompiler.purge(event)
+      refute ModuleStateCompiler.compile_initialize?(event)
+      assert Hook.call(event, %{a: 1}) == %{a: 1}
+      assert_raise UndefinedFunctionError, fn -> Hook.call!(event, %{a: 1}) end
+    end
   end
 end
