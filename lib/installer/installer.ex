@@ -44,9 +44,9 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   use GuardedStruct
   require Logger
-  alias MishkaInstaller.Helper.{Extra, Record, UUID}
-  alias MishkaInstaller.Installer.{Downloader, LibraryHandler, CompileHandler}
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
+  alias MishkaInstaller.Helper.{Extra, MnesiaAssistant, Record, UUID}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
+  alias MishkaInstaller.Installer.{CompileHandler, Downloader, LibraryHandler}
 
   @type download_type :: :path | :url | :github_tag | :github_latest_release
 
@@ -309,7 +309,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         |> List.first()
 
       {:aborted, reason} ->

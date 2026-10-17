@@ -60,10 +60,10 @@ defmodule MishkaInstaller.Event.Event do
   module is being created and destroyed during the compilation process.
   """
   use GuardedStruct
-  alias MishkaInstaller.Helper.{Extra, Record, UUID}
+  alias MishkaInstaller.Helper.{Extra, MnesiaAssistant, Record, UUID}
   import MishkaInstaller.Helper.MnesiaAssistant, only: [er: 1, erl_fields: 4]
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
   alias MishkaInstaller.Event.EventHandler
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
 
   ####################################################################################
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
@@ -728,7 +728,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        data = MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        data = MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         if field in [:event, :extension], do: data, else: List.first(data)
 
       {:aborted, reason} ->
@@ -745,7 +745,7 @@ defmodule MishkaInstaller.Event.Event do
   @spec dirty_get(:name, module()) :: map() | struct() | nil
   def dirty_get(:name, value) do
     :mnesia.dirty_index_read(__MODULE__, value, :name)
-    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
     |> List.first()
   end
 

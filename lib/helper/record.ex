@@ -15,8 +15,8 @@ defmodule MishkaInstaller.Helper.Record do
   > any input from the user. Ensure that you include the required safety measures.
   """
   alias MishkaInstaller.Helper.{Extra, MnesiaAssistant}
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
   alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
 

@@ -287,6 +287,7 @@ defmodule MishkaInstaller.Event.Hook do
 
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
   alias MishkaInstaller.Helper.Extra
+  alias MishkaInstaller.Helper.MnesiaAssistant.Table
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   @type okey_return :: {:ok, struct() | map() | module() | list(any())}
@@ -319,7 +320,7 @@ defmodule MishkaInstaller.Event.Hook do
     quote bind_quoted: [opts: opts] do
       use GenServer, restart: :transient
       @behaviour MishkaInstaller.Event.Hook
-      alias MishkaInstaller.Event.{Event, Hook, EventHandler}
+      alias MishkaInstaller.Event.{Event, EventHandler, Hook}
       alias MishkaInstaller.Event.ModuleStateCompiler, as: MSE
 
       @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
@@ -717,7 +718,7 @@ defmodule MishkaInstaller.Event.Hook do
 
   @doc false
   def plugin_continue(module, state) do
-    MishkaInstaller.Helper.MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
+    Table.wait_for_tables([Event], @wait_for_tables)
 
     new_state =
       if ready?() do

@@ -78,10 +78,10 @@ defmodule MishkaInstaller.MnesiaRepo do
   use GenServer
   require Logger
   alias MishkaInstaller.Event.Event
-  alias MishkaInstaller.Installer.Installer
   alias MishkaInstaller.Helper.MnesiaAssistant
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Schema, Table}
   alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Schema, Table}
+  alias MishkaInstaller.Installer.Installer
 
   # I got the basic idea from https://github.com/processone/ejabberd
   @identifier :mishka_mnesia_repo
