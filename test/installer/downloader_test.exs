@@ -295,6 +295,31 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
       refute_received {:requested, "other-host.example"}
     end
 
+    test "the Req options of the host cannot turn Req's own redirects back on" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader},
+        retry: false,
+        redirect: true,
+        max_redirects: 10
+      )
+
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host})
+
+        case conn.host do
+          "cdn.example.com" -> redirect(conn, "https://other-host.example/evil.tar.gz")
+          _ -> binary_response(conn, "evil")
+        end
+      end)
+
+      {:error, [%{action: :download}]} =
+        assert Downloader.download(:url, %{path: "https://cdn.example.com/app.tar.gz"})
+
+      refute_received {:requested, "other-host.example"}
+    end
+
     test "a redirect to http is refused even on the same host" do
       test_pid = self()
 

@@ -195,7 +195,7 @@ defmodule MishkaInstaller.Installer.Downloader do
 
   # Redirects are never followed by Req: each `Location` is checked against `hosts` and followed here.
   defp fetch(url, hosts, hops_left, args) do
-    case build_url(url, Keyword.put(args, :redirect, false)) do
+    case build_url(url, args) do
       {:ok, %Req.Response{status: status} = response} when status in @redirect_statuses ->
         follow(response, url, hosts, hops_left, args)
 
@@ -250,6 +250,7 @@ defmodule MishkaInstaller.Installer.Downloader do
     |> Keyword.merge(args)
     |> Keyword.merge(Application.get_env(:mishka_installer, :downloader_req_options, []))
     |> Keyword.merge(Application.get_env(:mishka_installer, :proxy, []))
+    |> Keyword.put(:redirect, false)
     |> Req.request()
   end
 end
