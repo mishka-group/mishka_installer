@@ -1,3 +1,11 @@
+# Changelog for MishkaInstaller Unreleased
+
+### Fixed:
+
+- Upgrading an installed app keeps the `inserted_at` of its record. The update of 0.1.14 wrote the
+  new install's `inserted_at` over it; only `updated_at` moves now, and the record keeps the time
+  it was first installed
+
 # Changelog for MishkaInstaller 0.1.14
 
 ### Fixed:
@@ -5,7 +13,9 @@
 - A `version:` that is not a semantic version no longer crashes `Installer.install/1`. With an app
   of that name already loaded, a version such as `"1.0"` raised `Version.InvalidVersionError` from
   the comparison with the running app; with none loaded, it was installed as it was. Both versions
-  are now parsed with `Version.parse/1`, and a bad one is answered with
+  are now parsed with `Version.parse/1`. Through `install/1` a bad `version:` is refused first,
+  by the builder, with `{:error, [%{field: :version, action: :semver, ...}]}`; a direct call to
+  `LibraryHandler.compare_version_with_installed_app/2` answers
   `{:error, [%{field: :version, action: :compare_version_with_installed_app, ...}]}`, or
   `field: :app` when the loaded app's own `vsn` is not one
 - Upgrading an installed app updates its record instead of writing a second one. `update_or_write/2`

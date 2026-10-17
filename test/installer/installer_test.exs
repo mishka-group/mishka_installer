@@ -557,14 +557,18 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         cleanup(app_atom, newer_pkg)
       end)
 
+      past = 1_000_000_000
+
       {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
-      [%{id: id, inserted_at: inserted_at}] = Enum.filter(Installer.get(), &(&1.app == app))
+      [%{id: id}] = Enum.filter(Installer.get(), &(&1.app == app))
+      {:ok, %{inserted_at: ^past}} = assert Installer.write(:id, id, %{inserted_at: past})
 
       {:ok, _} = assert Installer.install(%{app: app, version: newer, path: newer_pkg})
 
       assert [record] = Enum.filter(Installer.get(), &(&1.app == app))
       assert record.id == id
-      assert record.inserted_at == inserted_at
+      assert record.inserted_at == past
+      assert record.updated_at > past
       assert record.version == newer
       assert record.path == newer_pkg
       assert record.prepend_paths == [{app_atom, "#{newer_pkg}/ebin"}]

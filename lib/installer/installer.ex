@@ -756,9 +756,13 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
+  # An upgrade keeps the stored `inserted_at`; `write/3` moves `updated_at`.
   defp update_or_write(data, merged_app) do
     db_data = get(:app, data.app)
-    if is_nil(db_data), do: write(merged_app), else: write(:id, db_data.id, merged_app)
+
+    if is_nil(db_data),
+      do: write(merged_app),
+      else: write(:id, db_data.id, Map.drop(merged_app, [:inserted_at]))
   end
 
   defp install_output(data) do
