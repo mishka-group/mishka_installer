@@ -286,6 +286,7 @@ defmodule MishkaInstaller.Event.Hook do
   require Logger
 
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
+  alias MishkaInstaller.Helper.Extra
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   @type okey_return :: {:ok, struct() | map() | module() | list(any())}
@@ -510,18 +511,24 @@ defmodule MishkaInstaller.Event.Hook do
     end
   end
 
-  # Cold path: rescue keeps one failing plugin from aborting the whole profile run.
+  # Cold path: each plugin runs in its own process, so one failing plugin cannot abort the profile run.
   defp time_plugin(name, state) do
-    :timer.tc(fn ->
-      args = if function_exported?(name, :call, 2), do: [state, nil], else: [state]
+    timed =
+      Extra.isolate(fn ->
+        :timer.tc(fn ->
+          args = if function_exported?(name, :call, 2), do: [state, nil], else: [state]
 
-      case apply(name, :call, args) do
-        {:reply, new_state} -> new_state
-        other -> other
-      end
-    end)
-  rescue
-    _ -> {0, state}
+          case apply(name, :call, args) do
+            {:reply, new_state} -> new_state
+            other -> other
+          end
+        end)
+      end)
+
+    case timed do
+      {:ok, {micros, next}} -> {micros, next}
+      {:exit, _reason} -> {0, state}
+    end
   end
 
   ####################################################################################
@@ -535,7 +542,7 @@ defmodule MishkaInstaller.Event.Hook do
   time-boxed process, so it never blocks the plugin or the caller).
 
   `probe` is `:ok | {:degraded, reason} | {:error, reason}` (with `{:error, :timeout}`,
-  `{:error, :no_health_check}`, `{:error, {:raised, _}}` ... for the failure variants). `healthy?`
+  `{:error, :no_health_check}`, `{:error, {:exit, _}}` ... for the failure variants). `healthy?`
   is the overall verdict.
   """
   @spec plugin_health(module(), timeout()) :: map()
@@ -610,14 +617,14 @@ defmodule MishkaInstaller.Event.Hook do
   @doc """
   Runs a plugin's `c:health_check/0` probe in a short-lived monitored process, bounded by `timeout`.
   Never blocks the plugin's `GenServer` and never crashes the caller: a slow probe yields
-  `{:error, :timeout}`, a raising/exiting one `{:error, {:raised | :exit, _}}`, a non-conforming
+  `{:error, :timeout}`, a raising/exiting one `{:error, {:exit, reason}}` (`reason` is the exit reason of the probe process), a non-conforming
   return `{:error, {:bad_return, _}}`, and a plugin without the callback `{:error, :no_health_check}`.
   """
   @spec run_health(module(), timeout()) :: :ok | {:degraded, term()} | {:error, term()}
   def run_health(plugin, timeout \\ @health_timeout) do
     if function_exported?(plugin, :health_check, 0) do
       {pid, ref} =
-        spawn_monitor(fn -> exit({:health_probe, safe_probe(plugin)}) end)
+        spawn_monitor(fn -> exit({:health_probe, normalize_probe(plugin.health_check())}) end)
 
       receive do
         {:DOWN, ^ref, :process, ^pid, {:health_probe, result}} -> result
@@ -631,14 +638,6 @@ defmodule MishkaInstaller.Event.Hook do
     else
       {:error, :no_health_check}
     end
-  end
-
-  defp safe_probe(plugin) do
-    normalize_probe(plugin.health_check())
-  rescue
-    e -> {:error, {:raised, e}}
-  catch
-    kind, reason -> {:error, {kind, reason}}
   end
 
   defp normalize_probe(:ok), do: :ok

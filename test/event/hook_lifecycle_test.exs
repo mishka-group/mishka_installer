@@ -166,6 +166,7 @@ defmodule MishkaInstaller.Event.HookTest do
   end
 
   describe "profile/2 ===>" do
+    @tag :capture_log
     test "a plugin that raises is reported with 0 µs and never aborts the profile" do
       start_supervised!(ProfileNormal)
       start_supervised!(ProfileRaiser)

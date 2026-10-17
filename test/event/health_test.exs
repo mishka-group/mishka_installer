@@ -131,8 +131,9 @@ defmodule MishkaInstaller.Event.HealthTest do
       assert Hook.run_health(ErrorProbe, 1000) == {:error, "db unreachable"}
     end
 
-    test "a raising probe becomes {:error, {:raised, _}}" do
-      assert {:error, {:raised, %RuntimeError{}}} = Hook.run_health(CrashProbe, 1000)
+    @tag :capture_log
+    test "a raising probe becomes {:error, {:exit, {exception, stacktrace}}}" do
+      assert {:error, {:exit, {%RuntimeError{}, [_ | _]}}} = Hook.run_health(CrashProbe, 1000)
     end
 
     test "a hanging probe is killed at the timeout and becomes {:error, :timeout}" do
