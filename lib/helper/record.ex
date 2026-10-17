@@ -14,7 +14,7 @@ defmodule MishkaInstaller.Helper.Record do
   > section must be implemented at the **high access level**, and they should not directly take
   > any input from the user. Ensure that you include the required safety measures.
   """
-  alias MishkaInstaller.Helper.MnesiaAssistant
+  alias MishkaInstaller.Helper.{Extra, MnesiaAssistant}
   alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Transaction}
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
@@ -93,6 +93,81 @@ defmodule MishkaInstaller.Helper.Record do
 
       {:aborted, reason} ->
         Transaction.transaction_error(reason, module, "storing", :global, :database)
+    end
+  end
+
+  @doc """
+  Merges `updated_to` onto the stored row of `module` found by `field` (`:id`, or an indexed field
+  such as `:name` or `:app`) and `value`, and returns `{:ok, struct}`.
+
+  The row is read again inside the durable transaction under a write lock, so two concurrent
+  updates of the same row cannot start from the same old values and lose one another's fields. The
+  `:id` of `updated_to` is ignored and `:updated_at` is set to the time of the write.
+
+  `build` receives `{:root, merged_map, :edit}` and returns `{:ok, struct}` or `{:error, errors}`;
+  the error is returned as it is and nothing is written. When no row matches, the error has the
+  action `:write`.
+
+  ## Example:
+
+  ```elixir
+  update(MishkaInstaller.Event.Event, :name, MyPlugin, %{status: :stopped}, &Event.builder/1)
+  ```
+  """
+  @spec update(module(), atom(), term(), map(), (tuple() -> {:ok, struct()} | error_return())) ::
+          {:ok, struct()} | error_return()
+  def update(module, field, value, updated_to, build) when is_function(build, 1) do
+    Transaction.durable_transaction(fn ->
+      case locked_read(module, field, value) do
+        nil ->
+          :mnesia.abort(:record_not_found)
+
+        data ->
+          merged =
+            data
+            |> Map.merge(Map.drop(updated_to, [:id]))
+            |> Map.merge(%{updated_at: Extra.get_unix_time()})
+
+          case build.({:root, merged, :edit}) do
+            {:ok, struct} ->
+              module |> to_tuple(struct) |> Query.write()
+              struct
+
+            {:error, _} = error ->
+              :mnesia.abort(error)
+          end
+      end
+    end)
+    |> case do
+      {:atomic, struct} ->
+        {:ok, struct}
+
+      {:aborted, :record_not_found} ->
+        message =
+          "The ID of the record you want to update is incorrect or has already been deleted."
+
+        {:error, [%{message: message, field: :global, action: :write}]}
+
+      {:aborted, {:error, _} = error} ->
+        error
+
+      {:aborted, reason} ->
+        Transaction.transaction_error(reason, module, "storing", :global, :database)
+    end
+  end
+
+  # Reads one row under a write lock (by id directly, by an indexed field via its index then id)
+  # and converts it to a struct, or `nil`. Must run inside a transaction.
+  defp locked_read(module, :id, id) do
+    :mnesia.read(module, id, :write)
+    |> MnesiaAssistant.tuple_to_map(module.keys(), module, [])
+    |> List.first()
+  end
+
+  defp locked_read(module, field, value) do
+    case :mnesia.index_read(module, value, field) do
+      [record | _] -> locked_read(module, :id, elem(record, 1))
+      _ -> nil
     end
   end
 

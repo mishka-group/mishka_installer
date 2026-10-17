@@ -79,6 +79,31 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert Installer.get(struct.id).tag == "1.0.0"
     end
 
+    test "concurrent writes to different fields of the same record don't clobber each other" do
+      {:ok, %{id: id}} =
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
+
+      for round <- 1..100 do
+        {:ok, _} = Installer.write(:id, id, %{tag: "reset-#{round}", asset: "reset-#{round}"})
+
+        t1 = Task.async(fn -> Installer.write(:id, id, %{tag: "tag-#{round}"}) end)
+
+        t2 =
+          Task.async(fn ->
+            Installer.write(:app, "mishka_developer_tools", %{asset: "a-#{round}"})
+          end)
+
+        {:ok, _} = Task.await(t1)
+        {:ok, _} = Task.await(t2)
+
+        assert %{tag: tag, asset: asset} = Installer.get(id)
+        assert tag == "tag-#{round}"
+        assert asset == "a-#{round}"
+      end
+
+      assert [_one] = Installer.get()
+    end
+
     test "All keys of Libraries Record" do
       {:ok, _data} =
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})

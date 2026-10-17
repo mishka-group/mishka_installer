@@ -824,61 +824,8 @@ defmodule MishkaInstaller.Event.Event do
   ```
   """
   @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
-  def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
-    Transaction.durable_transaction(fn ->
-      case locked_read(field, value) do
-        nil ->
-          :mnesia.abort(:record_not_found)
-
-        data ->
-          merged =
-            data |> Map.merge(updated_to) |> Map.merge(%{updated_at: Extra.get_unix_time()})
-
-          case builder({:root, merged, :edit}) do
-            {:ok, struct} ->
-              ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1)))
-              |> List.to_tuple()
-              |> Query.write()
-
-              struct
-
-            {:error, _} = error ->
-              :mnesia.abort(error)
-          end
-      end
-    end)
-    |> case do
-      {:atomic, struct} ->
-        {:ok, struct}
-
-      {:aborted, :record_not_found} ->
-        message =
-          "The ID of the record you want to update is incorrect or has already been deleted."
-
-        {:error, [%{message: message, field: :global, action: :write}]}
-
-      {:aborted, {:error, _} = error} ->
-        error
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
-    end
-  end
-
-  # Reads a single record under a write lock (by id directly, by name via its index then id) and
-  # converts it to a struct, or `nil`. Must run inside a transaction.
-  defp locked_read(:id, id) do
-    :mnesia.read(__MODULE__, id, :write)
-    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
-    |> List.first()
-  end
-
-  defp locked_read(:name, name) do
-    case :mnesia.index_read(__MODULE__, name, :name) do
-      [record | _] -> locked_read(:id, elem(record, 1))
-      _ -> nil
-    end
-  end
+  def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to),
+    do: Record.update(__MODULE__, field, value, updated_to, &builder/1)
 
   @doc """
   To get all plugins ids from Mnesia database.

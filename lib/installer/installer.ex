@@ -349,10 +349,7 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   @spec write(builder_entry) :: error_return | okey_return
   def write(data) do
-    with {:ok, struct} <- builder(data),
-         :ok <- valid_name(struct.app) do
-      Record.store(__MODULE__, struct)
-    end
+    with {:ok, struct} <- build(data), do: Record.store(__MODULE__, struct)
   end
 
   @doc """
@@ -375,24 +372,8 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec write(atom(), String.t(), map()) :: error_return | okey_return
-  def write(field, value, updated_to) when field in [:app, :id] and is_map(updated_to) do
-    selected = if field == :id, do: get(value), else: get(:app, value)
-
-    case selected do
-      nil ->
-        message =
-          "The ID of the record you want to update is incorrect or has already been deleted."
-
-        {:error, [%{message: message, field: :global, action: :write}]}
-
-      data ->
-        map =
-          Map.merge(data, Map.drop(updated_to, [:id]))
-          |> Map.merge(%{updated_at: Extra.get_unix_time()})
-
-        write({:root, map, :edit})
-    end
-  end
+  def write(field, value, updated_to) when field in [:app, :id] and is_map(updated_to),
+    do: Record.update(__MODULE__, field, value, updated_to, &build/1)
 
   @doc """
   To get all runtime libraries ids from Mnesia database.
@@ -669,6 +650,12 @@ defmodule MishkaInstaller.Installer.Installer do
   @spec app_atom(term()) :: {:ok, atom()} | error_return()
   def app_atom(app) do
     with :ok <- valid_name(app), do: {:ok, String.to_atom(app)}
+  end
+
+  defp build(data) do
+    with {:ok, struct} <- builder(data),
+         :ok <- valid_name(struct.app),
+         do: {:ok, struct}
   end
 
   defp valid_name(app) do
