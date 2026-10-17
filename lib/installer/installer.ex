@@ -701,10 +701,14 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
+  # Strictly below the extensions root: the root itself and a sibling such as `extensions-old` are outside.
+  defp inside_extensions?(path, base),
+    do: String.starts_with?(Path.expand(path), Path.expand(base) <> "/")
+
   defp allowed_extract_path(extract_path) do
     allowed = LibraryHandler.extensions_path()
 
-    if String.starts_with?(Path.expand(extract_path), Path.expand(allowed)) do
+    if inside_extensions?(extract_path, allowed) do
       :ok
     else
       message = "Your library path is not allowed. It must be inside the extensions directory."
@@ -720,7 +724,7 @@ defmodule MishkaInstaller.Installer.Installer do
     base = LibraryHandler.extensions_path()
     dir = Path.expand("#{app}-#{version}", base)
 
-    if String.starts_with?(dir, Path.expand(base) <> "/") do
+    if inside_extensions?(dir, base) do
       {:ok, dir}
     else
       message = "Invalid app/version: the package path escapes the extensions directory."

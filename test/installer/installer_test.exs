@@ -714,6 +714,42 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert File.dir?(outside)
     end
 
+    test "install rejects a sibling folder that shares the extensions directory's name as a prefix" do
+      sibling = "#{LibraryHandler.extensions_path()}-old"
+      app = uniq_app("sibling")
+      app_atom = String.to_atom(app)
+      pkg = "#{sibling}/#{app}-0.1.0"
+      {^app_atom, _module, _ebin} = EbinFixture.build_fake_app(pkg, app_atom, "0.1.0")
+      on_exit(fn -> File.rm_rf!(sibling) end)
+
+      for path <- [pkg, "#{LibraryHandler.extensions_path()}/../extensions-old/#{app}-0.1.0"] do
+        {:error, [%{action: :allowed_extract_path}]} =
+          assert Installer.install(%{app: app, version: "0.1.0", type: :path, path: path})
+      end
+
+      assert File.dir?("#{pkg}/ebin")
+      refute File.dir?("#{LibraryHandler.extensions_path()}/#{app}-0.1.0")
+      assert is_nil(Installer.get(:app, app))
+      refute app_atom in started_apps()
+    end
+
+    test "install rejects the extensions directory itself" do
+      root = LibraryHandler.extensions_path()
+      File.mkdir_p!(root)
+
+      for path <- [root, "#{root}/", "#{root}/."] do
+        {:error, [%{action: :allowed_extract_path}]} =
+          assert Installer.install(%{
+                   app: uniq_app("root"),
+                   version: "0.1.0",
+                   type: :path,
+                   path: path
+                 })
+      end
+
+      assert File.dir?(root)
+    end
+
     test "uninstall rejects a version that escapes the extensions directory" do
       assert {:error, [%{action: :package_dir}]} =
                Installer.uninstall(%{app: "demo", version: "0.1.0/../../etc", path: "p"})
