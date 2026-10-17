@@ -444,6 +444,53 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
                })
     end
 
+    test "a download that redirects off the allowlisted host installs nothing" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      app = uniq_app("redirected")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, _module} = EbinFixture.tar_fake_app(app_atom, version)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host})
+
+        case conn.host do
+          "cdn.example.com" ->
+            conn
+            |> Plug.Conn.put_resp_header("location", "https://other-host.example/evil.tar.gz")
+            |> Plug.Conn.send_resp(302, "")
+
+          _ ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/gzip", nil)
+            |> Plug.Conn.send_resp(200, tarball)
+        end
+      end)
+
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      {:error, [%{action: :download}]} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz"
+               })
+
+      assert_received {:requested, "cdn.example.com"}
+      refute_received {:requested, "other-host.example"}
+      assert is_nil(Installer.get(:app, app))
+      refute app_atom in started_apps()
+      refute File.dir?(dest)
+    end
+
     test "a download from an allowed host passes the policy and installs" do
       Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
 

@@ -13,6 +13,14 @@ defmodule MishkaInstaller.Installer.Downloader do
   - `:github_tag` — resolve the asset of a specific release **tag** via the GitHub API.
   - `:github_latest_release` — resolve the asset of the **latest** release via the GitHub API.
 
+  ## Redirects
+
+  A redirect is followed by hand, at most 3 times. Every hop must be `https` and its host must be
+  the host of the first URL, a host of `config :mishka_installer, :allowlist, url_hosts: [...]`, or,
+  when the first URL is on `github.com`/`api.github.com`, GitHub's release CDN
+  (`release-assets.githubusercontent.com`, `objects.githubusercontent.com`). Any other hop is an
+  `{:error, ...}` and nothing is downloaded from it.
+
   > #### Security considerations {: .warning}
   >
   > It is important to remember that all of the functionalities contained within this
@@ -23,6 +31,10 @@ defmodule MishkaInstaller.Installer.Downloader do
   > sources and verify its provenance/integrity before activation.
   """
   @github_api_path "https://api.github.com/repos"
+  @github_hosts ["github.com", "api.github.com"]
+  @github_release_hosts ["release-assets.githubusercontent.com", "objects.githubusercontent.com"]
+  @max_redirects 3
+  @redirect_statuses [301, 302, 303, 307, 308]
 
   @type download_type :: :url | :github_tag | :github_latest_release
 
@@ -60,9 +72,10 @@ defmodule MishkaInstaller.Installer.Downloader do
     # `raw: true` disables Req's body decompression + decoding so we get the exact on-wire bytes
     # of the `tar.gz` artifact (some CDNs set `content-encoding: gzip`, which Req would otherwise
     # transparently decompress and break `:erl_tar` extraction).
-    case build_url(path, raw: true) do
-      %Req.Response{status: 200, body: body} when is_binary(body) -> {:ok, body}
-      _ -> download_err()
+    case fetch(path, redirect_hosts(path), @max_redirects, raw: true) do
+      {:ok, %Req.Response{status: 200, body: body}} when is_binary(body) -> {:ok, body}
+      {:ok, _response} -> download_err()
+      {:error, _reason} = error -> error
     end
   end
 
@@ -83,12 +96,15 @@ defmodule MishkaInstaller.Installer.Downloader do
   ####################################################################################
   # Resolve the asset's download URL from a GitHub release payload, then download it.
   defp release_asset(api_url, pkg) do
-    case build_url(api_url) do
-      %Req.Response{status: 200, body: %{"assets" => assets}} when is_list(assets) ->
+    case fetch(api_url, redirect_hosts(api_url), @max_redirects, []) do
+      {:ok, %Req.Response{status: 200, body: %{"assets" => assets}}} when is_list(assets) ->
         case pick_asset(assets, Map.get(pkg, :asset)) do
           nil -> download_err("No matching release asset was found.")
           asset_url -> download(:url, %{path: asset_url})
         end
+
+      {:error, _reason} = error ->
+        error
 
       _ ->
         download_err()
@@ -110,8 +126,51 @@ defmodule MishkaInstaller.Installer.Downloader do
     {:error, [%{message: message, field: :path, action: :download}]}
   end
 
+  # Redirects are never followed by Req: each `Location` is checked against `hosts` and followed here.
+  defp fetch(url, hosts, hops_left, args) do
+    response = build_url(url, Keyword.put(args, :redirect, false))
+
+    if response.status in @redirect_statuses do
+      follow(response, url, hosts, hops_left, args)
+    else
+      {:ok, response}
+    end
+  end
+
+  defp follow(_response, _url, _hosts, 0, _args) do
+    download_err("The download redirected too many times.")
+  end
+
+  defp follow(response, url, hosts, hops_left, args) do
+    with [location | _] <- Req.Response.get_header(response, "location"),
+         %URI{scheme: "https", host: host} = next when is_binary(host) <-
+           URI.merge(URI.parse(url), location),
+         true <- normalize_host(host) in hosts do
+      fetch(URI.to_string(next), hosts, hops_left - 1, args)
+    else
+      _ -> download_err("The download redirected to a location that is not allowed.")
+    end
+  end
+
+  defp redirect_hosts(url) do
+    origin = normalize_host(URI.parse(url).host)
+
+    configured =
+      :mishka_installer
+      |> Application.get_env(:allowlist, [])
+      |> Keyword.get(:url_hosts, [])
+      |> Enum.map(&normalize_host/1)
+
+    github = if origin in @github_hosts, do: @github_release_hosts, else: []
+
+    Enum.uniq([origin | configured] ++ github)
+  end
+
+  defp normalize_host(nil), do: nil
+  defp normalize_host(host), do: host |> to_string() |> String.downcase()
+
   # Based on https://hexdocs.pm/req/Req.Test.html#module-example
-  defp build_url(location, args \\ []) do
+  defp build_url(location, args) do
     [base_url: location]
     |> Keyword.merge(args)
     |> Keyword.merge(Application.get_env(:mishka_installer, :downloader_req_options, []))
