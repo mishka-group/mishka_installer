@@ -45,6 +45,7 @@ end
 defmodule MishkaInstallerTest.Event.RequestFlowTest.Router do
   @moduledoc false
   use Plug.Router
+  alias MishkaInstaller.Event.Hook
 
   plug(Plug.Parsers, parsers: [:urlencoded])
   plug(:match)
@@ -53,13 +54,13 @@ defmodule MishkaInstallerTest.Event.RequestFlowTest.Router do
 
   get "/page" do
     conn
-    |> then(&MishkaInstaller.Event.Hook.call("web:request:flow_test", &1))
+    |> then(&Hook.call("web:request:flow_test", &1))
     |> send_resp(200, "page")
   end
 
   get "/broken" do
     conn
-    |> then(&MishkaInstaller.Event.Hook.call("web:request:broken_flow_test", &1))
+    |> then(&Hook.call("web:request:broken_flow_test", &1))
     |> send_resp(200, "page")
   end
 
@@ -68,7 +69,7 @@ defmodule MishkaInstallerTest.Event.RequestFlowTest.Router do
   end
 
   def gate(%Plug.Conn{request_path: "/guarded"} = conn, _opts),
-    do: MishkaInstaller.Event.Hook.call("web:request:gate_test", conn)
+    do: Hook.call("web:request:gate_test", conn)
 
   def gate(conn, _opts), do: conn
 end
