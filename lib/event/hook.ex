@@ -499,17 +499,19 @@ defmodule MishkaInstaller.Event.Hook do
   def profile(event, state) do
     module = ModuleStateCompiler.event_module(event)
 
-    if !is_nil(module) and function_exported?(module, :initialize, 0) do
-      {_final, timings} =
-        Enum.reduce(module.initialize().plugins, {state, []}, fn plugin, {acc_state, acc} ->
-          {micros, next} = time_plugin(plugin.name, acc_state)
-          {next, [%{plugin: plugin.name, microseconds: micros} | acc]}
-        end)
+    if !is_nil(module) and function_exported?(module, :initialize, 0),
+      do: {:ok, profile_plugins(module.initialize().plugins, state)},
+      else: {:error, :not_compiled}
+  end
 
-      {:ok, Enum.reverse(timings)}
-    else
-      {:error, :not_compiled}
-    end
+  defp profile_plugins(plugins, state) do
+    {_final, timings} =
+      Enum.reduce(plugins, {state, []}, fn plugin, {acc_state, acc} ->
+        {micros, next} = time_plugin(plugin.name, acc_state)
+        {next, [%{plugin: plugin.name, microseconds: micros} | acc]}
+      end)
+
+    Enum.reverse(timings)
   end
 
   # Cold path: each plugin runs in its own process, so one failing plugin cannot abort the profile run.
