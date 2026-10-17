@@ -108,10 +108,12 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
             %{module: unquote(module), plugins: unquote(escaped_plugins)}
           end
 
+          # credo:disable-for-next-line Credo.Check.Readability.PredicateFunctionNames
           def is_changed?(new_plugins) do
             new_plugins != unquote(escaped_plugins)
           end
 
+          # credo:disable-for-next-line Credo.Check.Readability.PredicateFunctionNames
           def is_initialized?(new_plugin) do
             Enum.member?(unquote(escaped_plugins), new_plugin)
           end
