@@ -60,6 +60,41 @@ defmodule MishkaInstallerTest.Installer.DownloaderTest do
     end
   end
 
+  describe "Scheme ===>" do
+    test "only an https URL is requested" do
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host})
+        binary_response(conn, "tarball")
+      end)
+
+      for path <- [
+            "http://cdn.example.com/app.tar.gz",
+            "HTTP://cdn.example.com/app.tar.gz",
+            "ftp://cdn.example.com/app.tar.gz",
+            "file:///etc/passwd",
+            "//cdn.example.com/app.tar.gz",
+            "cdn.example.com/app.tar.gz",
+            "https:///app.tar.gz",
+            ""
+          ] do
+        {:error, [%{action: :download}]} = assert Downloader.download(:url, %{path: path})
+      end
+
+      refute_received {:requested, _host}
+
+      {:ok, "tarball"} =
+        assert Downloader.download(:url, %{path: "HTTPS://cdn.example.com/app.tar.gz"})
+
+      assert_received {:requested, "cdn.example.com"}
+    end
+
+    test "a path that is not a string is an error" do
+      {:error, [%{action: :download}]} = assert Downloader.download(:url, %{path: nil})
+    end
+  end
+
   describe "Redirects ===>" do
     test "a redirect to a host that is not allowed is refused and never requested" do
       tarball = :crypto.strong_rand_bytes(16)

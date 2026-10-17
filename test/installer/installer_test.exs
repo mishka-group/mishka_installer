@@ -444,6 +444,39 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
                })
     end
 
+    test "an http or non-url source is blocked even on an allowlisted host, before downloading" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.scheme})
+        Plug.Conn.send_resp(conn, 200, "tarball")
+      end)
+
+      for path <- [
+            "http://cdn.example.com/x.tar.gz",
+            "file://cdn.example.com/x.tar.gz",
+            "cdn.example.com/x.tar.gz"
+          ] do
+        {:error, [%{action: :allowlist, message: message}]} =
+          assert Installer.install(%{
+                   app: uniq_app("plain_http"),
+                   version: "0.1.0",
+                   type: :url,
+                   path: path
+                 })
+
+        assert message =~ "url_scheme"
+      end
+
+      refute_received {:requested, _scheme}
+    end
+
     test "a download that redirects off the allowlisted host installs nothing" do
       Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
 

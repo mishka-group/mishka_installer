@@ -583,9 +583,17 @@ defmodule MishkaInstaller.Installer.Installer do
 
   # Allow/deny policy (configured under `config :mishka_installer, :allowlist, ...`). Fail-closed: a
   # remote source (`:url`/`:github_*`) is allowed only if its host/repo is in the configured list; an
-  # empty/absent list blocks every remote install. Local `:path` installs never reach here.
+  # empty/absent list blocks every remote install. A `:url` must be `https`. Local `:path` installs never reach here.
   # `:protected_apps` is always enforced and defaults to protecting `mishka_installer` itself.
-  defp allowed_source(%{type: :url, path: path}), do: allowed_in(:url_hosts, URI.parse(path).host)
+  defp allowed_source(%{type: :url, path: path}) do
+    case URI.parse(path) do
+      %URI{scheme: "https", host: host} when is_binary(host) and host != "" ->
+        allowed_in(:url_hosts, host)
+
+      _ ->
+        policy_blocked(:url_scheme, path)
+    end
+  end
 
   defp allowed_source(%{type: type, path: path})
        when type in [:github_tag, :github_latest_release],

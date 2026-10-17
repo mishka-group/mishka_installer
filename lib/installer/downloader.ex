@@ -13,6 +13,11 @@ defmodule MishkaInstaller.Installer.Downloader do
   - `:github_tag` — resolve the asset of a specific release **tag** via the GitHub API.
   - `:github_latest_release` — resolve the asset of the **latest** release via the GitHub API.
 
+  ## Scheme
+
+  Only `https` URLs are downloaded. Any other scheme (`http`, `file`, none) is an `{:error, ...}`
+  and nothing is requested.
+
   ## Redirects
 
   A redirect is followed by hand, at most 3 times. Every hop must be `https` and its host must be
@@ -68,14 +73,20 @@ defmodule MishkaInstaller.Installer.Downloader do
   ```
   """
   @spec download(download_type, pkg) :: okey_return | error_return
-  def download(:url, %{path: path}) do
-    # `raw: true` disables Req's body decompression + decoding so we get the exact on-wire bytes
-    # of the `tar.gz` artifact (some CDNs set `content-encoding: gzip`, which Req would otherwise
-    # transparently decompress and break `:erl_tar` extraction).
-    case fetch(path, redirect_hosts(path), @max_redirects, raw: true) do
-      {:ok, %Req.Response{status: 200, body: body}} when is_binary(body) -> {:ok, body}
-      {:ok, _response} -> download_err()
-      {:error, _reason} = error -> error
+  def download(:url, %{path: path}) when is_binary(path) do
+    case URI.parse(path) do
+      %URI{scheme: "https", host: host} when is_binary(host) and host != "" ->
+        # `raw: true` disables Req's body decompression + decoding so we get the exact on-wire bytes
+        # of the `tar.gz` artifact (some CDNs set `content-encoding: gzip`, which Req would otherwise
+        # transparently decompress and break `:erl_tar` extraction).
+        case fetch(path, redirect_hosts(path), @max_redirects, raw: true) do
+          {:ok, %Req.Response{status: 200, body: body}} when is_binary(body) -> {:ok, body}
+          {:ok, _response} -> download_err()
+          {:error, _reason} = error -> error
+        end
+
+      _ ->
+        download_err("Only https URLs can be downloaded.")
     end
   end
 
