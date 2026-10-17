@@ -44,7 +44,7 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   use GuardedStruct
   require Logger
-  alias MishkaInstaller.Helper.{Extra, UUID}
+  alias MishkaInstaller.Helper.{Extra, Record, UUID}
   alias MishkaInstaller.Installer.{Downloader, LibraryHandler, CompileHandler}
   alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
   alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
@@ -282,19 +282,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec get() :: list(map() | struct())
-  def get() do
-    pattern = ([__MODULE__] ++ Enum.map(1..length(keys()), fn _x -> :_ end)) |> List.to_tuple()
-
-    Transaction.transaction(fn -> Query.match_object(pattern) end)
-    |> case do
-      {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
-        []
-    end
-  end
+  def get(), do: Record.all(__MODULE__)
 
   @doc """
   To get a runtime library information from Mnesia database by id.
@@ -312,18 +300,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec get(String.t()) :: struct() | nil
-  def get(id) do
-    Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
-    |> case do
-      {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
-        |> List.first()
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
-        nil
-    end
-  end
+  def get(id), do: Record.get(__MODULE__, id)
 
   @doc """
   To get a runtime library information from Mnesia database by App name.
