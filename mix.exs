@@ -15,6 +15,8 @@ defmodule MishkaInstaller.MixProject do
       test_ignore_filters: [&String.starts_with?(&1, "test/integration/")],
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
+      dialyzer: [ignore_warnings: ".dialyzer_ignore.exs"],
       description: description(),
       package: package(),
       homepage_url: "https://github.com/mishka-group",
@@ -29,6 +31,10 @@ defmodule MishkaInstaller.MixProject do
         ]
       ]
     ]
+  end
+
+  def cli do
+    [preferred_envs: [ci: :test]]
   end
 
   def application do
@@ -52,7 +58,32 @@ defmodule MishkaInstaller.MixProject do
       {:libgraph, "~> 0.16"},
 
       # Dev and Test dependencies
-      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.40.3", only: :dev, runtime: false},
+
+      # Static analysis and security tooling
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:sobelow, "~> 0.16", only: [:dev, :test], runtime: false},
+      {:mix_audit, "~> 2.1", only: [:dev, :test], runtime: false},
+      {:jump_credo_checks, "~> 0.6", only: [:dev, :test], runtime: false},
+      {:ex_slop, "~> 0.4", only: [:dev, :test], runtime: false},
+      {:ex_dna, "~> 1.5", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
+    ]
+  end
+
+  defp aliases do
+    [
+      ci: [
+        "hex.audit",
+        "deps.audit",
+        "compile --warnings-as-errors",
+        "format --check-formatted",
+        "credo --strict",
+        "sobelow --config",
+        "dialyzer",
+        "ex_dna --max-clones 0",
+        "test"
+      ]
     ]
   end
 

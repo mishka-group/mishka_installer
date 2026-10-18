@@ -1,0 +1,20 @@
+# DOS.StringToAtom and DOS.BinToAtom: every site was read; the names that become atoms are checked first
+# (Installer.app_atom/1), come from the operator (MIX_ENV) or are a counter (erlang_fields/4), and the event
+# module atom is made only by ModuleStateCompiler.create/3.
+# Traversal.FileModule: the paths are built from the extensions directory and checked names, or are
+# operator configuration (the mnesia directory, the app file of a high-access call).
+[
+  exit: :low,
+  format: "txt",
+  ignore: ["DOS.StringToAtom", "DOS.BinToAtom", "Traversal.FileModule"],
+  ignore_files: [],
+  include_mix_tasks: false,
+  include_scripts: false,
+  out: nil,
+  private: false,
+  router: nil,
+  skip: false,
+  summary: false,
+  threshold: :low,
+  verbose: false
+]
