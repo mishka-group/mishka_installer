@@ -1,9 +1,7 @@
 defmodule MishkaInstaller.Installer.LibraryHandler do
   @moduledoc """
-  This module provides programmers with a public APIs and helpers that allow them to
-  load a **pre-built** Elixir/Erlang library (its compiled `ebin`) into a running system.
-
-  > It also includes aids and tools that allow them to work with the library while it is running.
+  Loads a **pre-built** Elixir/Erlang library (its compiled `ebin`) into a running system, and gives
+  the helpers to work with it while it is running.
 
   `MishkaInstaller.Installer.Installer` is also referred to as action and aggregator functions,
   which is something that should be taken into consideration.
@@ -116,7 +114,8 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   def read_app(app, app_path) do
     case File.read(app_path) do
       {:ok, bin} ->
-        with {:ok, tokens, _} <- :erl_scan.string(String.to_charlist(bin)),
+        with chars when is_list(chars) <- :unicode.characters_to_list(bin),
+             {:ok, tokens, _} <- :erl_scan.string(chars),
              {:ok, {:application, ^app, properties}} <- :erl_parse.parse_term(tokens) do
           {:ok, properties}
         else
@@ -158,6 +157,23 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   """
   @spec extract(:tar, binary(), String.t()) :: :ok | error_return()
   def extract(:tar, archived, name) do
+    with :ok <- valid_extract_name(name) do
+      extract_archive(archived, name)
+    end
+  end
+
+  # `name` becomes a folder of the extensions directory, so it must be one plain path segment.
+  defp valid_extract_name(name) do
+    if is_binary(name) and name not in ["", ".", ".."] and name == Path.basename(name) and
+         not String.contains?(name, <<0>>) do
+      :ok
+    else
+      message = "The name of the extracted package must be a single folder name."
+      {:error, [%{message: message, field: :path, action: :extract}]}
+    end
+  end
+
+  defp extract_archive(archived, name) do
     base = extensions_path()
     temp_path = "#{base}/temp-#{name}"
     File.rm_rf!(temp_path)

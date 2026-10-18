@@ -6,6 +6,7 @@ defmodule MishkaInstaller.ProductionReleaseTest do
   @moduletag :production_release
   @moduletag timeout: 600_000
 
+  # credo:disable-for-next-line Jump.CredoChecks.VacuousTest
   test "an install and a disabled plugin both survive an unclean mix-release restart" do
     script = Path.join([__DIR__, "integration", "production_release", "run.sh"])
     {out, status} = System.cmd("bash", [script], stderr_to_stdout: true)

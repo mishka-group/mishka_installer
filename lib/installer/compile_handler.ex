@@ -94,7 +94,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
     queues = Keyword.get(state, :queues, MishkaInstaller.QueueAssistant.new())
 
     new_state =
-      if length(running) == 0 and !MishkaInstaller.QueueAssistant.empty?(queues) do
+      if running == [] and !MishkaInstaller.QueueAssistant.empty?(queues) do
         case MishkaInstaller.QueueAssistant.out(queues) do
           {:empty, _} ->
             state
@@ -115,7 +115,7 @@ defmodule MishkaInstaller.Installer.CompileHandler do
     running = Keyword.get(state, :running, [])
 
     new_state =
-      if length(running) != 0 do
+      if running != [] do
         case Installer.install(List.first(running)) do
           {:ok, %{extension: extension} = data} ->
             Logger.info("[mishka_installer.installer] #{extension.app} installed and activated")
@@ -155,15 +155,16 @@ defmodule MishkaInstaller.Installer.CompileHandler do
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   defp replay(item) do
-    with :ok <- LibraryHandler.prepend_compiled_apps(item.prepend_paths),
-         :ok <- LibraryHandler.unload(String.to_atom(item.app)),
-         :ok <- LibraryHandler.application_ensure(String.to_atom(item.app)) do
+    with {:ok, app, prepend_paths} <- Installer.replay_paths(item),
+         :ok <- LibraryHandler.prepend_compiled_apps(prepend_paths),
+         :ok <- LibraryHandler.unload(app),
+         :ok <- LibraryHandler.application_ensure(app) do
       Logger.debug("[mishka_installer.installer] re-loaded installed app: #{item.app}")
       telemetry(:replay, %{app: item.app, result: :ok})
     else
       error ->
         Logger.error(
-          "[mishka_installer.installer] skipped re-loading #{item.app} on boot: #{inspect(error)}"
+          "[mishka_installer.installer] skipped re-loading #{inspect(item.app)} on boot: #{inspect(error)}"
         )
 
         telemetry(:replay, %{app: item.app, result: :error})

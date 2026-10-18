@@ -44,10 +44,9 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   use GuardedStruct
   require Logger
-  alias MishkaInstaller.Helper.{Extra, UUID}
-  alias MishkaInstaller.Installer.{Downloader, LibraryHandler, CompileHandler}
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
-  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
+  alias MishkaInstaller.Helper.{Extra, MnesiaAssistant, Record, UUID}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
+  alias MishkaInstaller.Installer.{CompileHandler, Downloader, LibraryHandler}
 
   @type download_type :: :path | :url | :github_tag | :github_latest_release
 
@@ -57,14 +56,8 @@ defmodule MishkaInstaller.Installer.Installer do
 
   @type builder_entry :: {:root, struct() | map(), :edit} | struct() | map()
 
-  @name_pattern ~r/^[a-z][a-z0-9_]*$/
+  @name_pattern ~r/\A[a-z][a-z0-9_]*\z/
 
-  @mnesia_info [
-    type: :set,
-    index: [:app],
-    record_name: __MODULE__,
-    storage_properties: [ets: [{:read_concurrency, true}, {:write_concurrency, true}]]
-  ]
   ####################################################################################
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
   ####################################################################################
@@ -89,6 +82,7 @@ defmodule MishkaInstaller.Installer.Installer do
     # The optional release asset name to pick for `:github_*` downloads (defaults to the first asset).
     field(:asset, String.t(), derives: "validate(not_empty_string)")
     # Optional sha256 (hex) of the downloaded artifact; verified before extraction when present.
+    # A remote install without one logs a warning, or is refused with `require_checksum: true`.
     field(:checksum, String.t(), derives: "validate(not_empty_string)")
 
     # This type can be used when you want to introduce a list of apps that a library depend on them.
@@ -106,13 +100,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ################################################################################
   @doc false
   @spec database_config() :: keyword()
-  if MishkaInstaller.__information__().env != :test do
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), disc_copies: [node()])
-  else
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), ram_copies: [node()])
-  end
+  def database_config(), do: Record.database_config(__MODULE__, [:app])
 
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
@@ -147,6 +135,14 @@ defmodule MishkaInstaller.Installer.Installer do
   > sandbox. Only install artifacts from a trusted source, built for the **same** Erlang/OTP and
   > Elixir as the host.
 
+  A `:url` must be an `https` URL. A redirect of a download is followed only to `https` hosts the
+  install may use (see `MishkaInstaller.Installer.Downloader`).
+
+  A remote install (`:url`/`:github_*`) should carry the artifact's sha256 as `checksum`. Without one
+  a warning is logged; with `config :mishka_installer, :allowlist, require_checksum: true` it is
+  refused with `{:error, [%{action: :allowlist}]}` before anything is downloaded. A `:path` install
+  is never asked for one.
+
   In reality, the structure of this module `__MODULE__.builder/1`, which likewise possesses
   a high access level validation, is what this function takes as its input.
 
@@ -170,23 +166,19 @@ defmodule MishkaInstaller.Installer.Installer do
   @spec install(t()) :: error_return() | okey_return()
   def install(app) do
     with {:ok, data} <- __MODULE__.builder(app),
-         :ok <- valid_name(data.app),
+         {:ok, app_atom} <- app_atom(data.app),
          :ok <- protected_app(data.app),
          {:ok, dest} <- fetch_package(data),
          :ok <- ebin_exist(dest),
          _ <- warn_on_native(dest, data.app),
-         {:ok, _props} <-
-           LibraryHandler.read_app(safe_atom(data.app), app_resource(dest, data.app)),
-         :ok <-
-           LibraryHandler.compare_version_with_installed_app(safe_atom(data.app), data.version),
-         {:ok, prepend_paths} <- install_steps(data, dest),
+         {:ok, _props} <- LibraryHandler.read_app(app_atom, app_resource(dest, data.app)),
+         :ok <- LibraryHandler.compare_version_with_installed_app(app_atom, data.version),
+         {:ok, prepend_paths} <- install_steps(app_atom, dest),
          merged_app <- Map.merge(data, %{prepend_paths: prepend_paths}),
          {:ok, output} <- update_or_write(data, merged_app) do
       MishkaInstaller.broadcast("installer", :install, install_output(output))
       {:ok, install_output(output)}
     end
-  after
-    File.cd!(MishkaInstaller.__information__().path)
   end
 
   @doc """
@@ -216,10 +208,9 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   @spec uninstall(t() | map()) :: :ok | error_return()
   def uninstall(app) do
-    with :ok <- valid_name(app.app),
+    with {:ok, app_atom} <- app_atom(app.app),
          :ok <- protected_app(app.app),
          {:ok, dir} <- package_dir(app.app, app.version) do
-      app_atom = safe_atom(app.app)
       Application.stop(app_atom)
       Application.unload(app_atom)
       Code.delete_path("#{dir}/ebin")
@@ -281,19 +272,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec get() :: list(map() | struct())
-  def get() do
-    pattern = ([__MODULE__] ++ Enum.map(1..length(keys()), fn _x -> :_ end)) |> List.to_tuple()
-
-    Transaction.transaction(fn -> Query.match_object(pattern) end)
-    |> case do
-      {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
-        []
-    end
-  end
+  def get(), do: Record.all(__MODULE__)
 
   @doc """
   To get a runtime library information from Mnesia database by id.
@@ -311,18 +290,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec get(String.t()) :: struct() | nil
-  def get(id) do
-    Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
-    |> case do
-      {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
-        |> List.first()
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
-        nil
-    end
-  end
+  def get(id), do: Record.get(__MODULE__, id)
 
   @doc """
   To get a runtime library information from Mnesia database by App name.
@@ -344,7 +312,7 @@ defmodule MishkaInstaller.Installer.Installer do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         |> List.first()
 
       {:aborted, reason} ->
@@ -371,23 +339,7 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   @spec write(builder_entry) :: error_return | okey_return
   def write(data) do
-    case builder(data) do
-      {:ok, struct} ->
-        values_tuple =
-          ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
-
-        Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
-        |> case do
-          {:atomic, _res} ->
-            {:ok, struct}
-
-          {:aborted, reason} ->
-            Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
-        end
-
-      error ->
-        error
-    end
+    with {:ok, struct} <- build(data), do: Record.store(__MODULE__, struct)
   end
 
   @doc """
@@ -410,24 +362,8 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec write(atom(), String.t(), map()) :: error_return | okey_return
-  def write(field, value, updated_to) when field in [:app, :id] and is_map(updated_to) do
-    selected = if field == :id, do: get(value), else: get(:app, value)
-
-    case selected do
-      nil ->
-        message =
-          "The ID of the record you want to update is incorrect or has already been deleted."
-
-        {:error, [%{message: message, field: :global, action: :write}]}
-
-      data ->
-        map =
-          Map.merge(data, Map.drop(updated_to, [:id]))
-          |> Map.merge(%{updated_at: Extra.get_unix_time()})
-
-        write({:root, map, :edit})
-    end
-  end
+  def write(field, value, updated_to) when field in [:app, :id] and is_map(updated_to),
+    do: Record.update(__MODULE__, field, value, updated_to, &build/1)
 
   @doc """
   To get all runtime libraries ids from Mnesia database.
@@ -470,26 +406,7 @@ defmodule MishkaInstaller.Installer.Installer do
   @spec delete(atom(), String.t()) :: error_return | okey_return
   def delete(field, value) when field in [:id, :app] do
     selected = if field == :id, do: get(value), else: get(:app, value)
-
-    case selected do
-      nil ->
-        message =
-          "The ID of the record you want to delete is incorrect or has already been deleted."
-
-        {:error, [%{message: message, field: :global, action: :delete}]}
-
-      data ->
-        Transaction.durable_transaction(fn ->
-          Query.delete(__MODULE__, Map.get(data, :id), :write)
-        end)
-        |> case do
-          {:atomic, _res} ->
-            {:ok, data}
-
-          {:aborted, reason} ->
-            Transaction.transaction_error(reason, __MODULE__, "deleting", :global, :database)
-        end
-    end
+    Record.delete(__MODULE__, selected)
   end
 
   @doc """
@@ -508,10 +425,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec drop() :: {:ok, :atomic} | {:error, any(), charlist()}
-  def drop() do
-    Table.clear_table(__MODULE__)
-    |> MError.error_description(__MODULE__)
-  end
+  def drop(), do: Record.drop(__MODULE__)
 
   @doc """
   To check is a runtime library unique or not in Mnesia database.
@@ -532,16 +446,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ```
   """
   @spec unique(:app, String.t()) :: :ok | error_return()
-  def unique(field, value) do
-    case get(field, value) do
-      nil ->
-        :ok
-
-      _data ->
-        message = "This event already exists in the database."
-        {:error, [%{message: message, field: :global, action: :unique}]}
-    end
-  end
+  def unique(field, value), do: Record.unique(get(field, value), "library")
 
   @doc """
   This function is exactly like `unique/2` function, except that its output is a Boolean.
@@ -574,6 +479,7 @@ defmodule MishkaInstaller.Installer.Installer do
   defp fetch_package(data) do
     with {:ok, dest} <- package_dir(data.app, data.version),
          :ok <- allowed_source(data),
+         :ok <- checksum_policy(data),
          {:ok, body} <- Downloader.download(data.type, download_pkg(data)),
          :ok <- verify_checksum(body, Map.get(data, :checksum)),
          :ok <- LibraryHandler.extract(:tar, body, Path.basename(dest)) do
@@ -583,9 +489,17 @@ defmodule MishkaInstaller.Installer.Installer do
 
   # Allow/deny policy (configured under `config :mishka_installer, :allowlist, ...`). Fail-closed: a
   # remote source (`:url`/`:github_*`) is allowed only if its host/repo is in the configured list; an
-  # empty/absent list blocks every remote install. Local `:path` installs never reach here.
+  # empty/absent list blocks every remote install. A `:url` must be `https`. Local `:path` installs never reach here.
   # `:protected_apps` is always enforced and defaults to protecting `mishka_installer` itself.
-  defp allowed_source(%{type: :url, path: path}), do: allowed_in(:url_hosts, URI.parse(path).host)
+  defp allowed_source(%{type: :url, path: path}) do
+    case URI.parse(path) do
+      %URI{scheme: "https", host: host} when is_binary(host) and host != "" ->
+        allowed_in(:url_hosts, host)
+
+      _ ->
+        policy_blocked(:url_scheme, path)
+    end
+  end
 
   defp allowed_source(%{type: type, path: path})
        when type in [:github_tag, :github_latest_release],
@@ -638,6 +552,24 @@ defmodule MishkaInstaller.Installer.Installer do
   defp maybe_put(map, _key, nil), do: map
   defp maybe_put(map, key, value), do: Map.put(map, key, value)
 
+  # A remote artifact is loaded as code, so a missing `checksum` is logged; `require_checksum: true` in
+  # the allowlist config refuses it.
+  defp checksum_policy(%{checksum: checksum}) when is_binary(checksum), do: :ok
+
+  defp checksum_policy(data) do
+    if allowlist(:require_checksum, false) == true do
+      policy_blocked(:require_checksum, data.path)
+    else
+      Logger.warning(
+        "[mishka_installer.installer] #{data.app} is installed from #{data.type} #{inspect(data.path)} " <>
+          "without a checksum, so the artifact is not verified; pass `checksum:` (sha256) " <>
+          "or set `require_checksum: true` in the :allowlist config"
+      )
+
+      :ok
+    end
+  end
+
   defp verify_checksum(_body, nil), do: :ok
 
   defp verify_checksum(body, expected) do
@@ -663,8 +595,30 @@ defmodule MishkaInstaller.Installer.Installer do
     :ok
   end
 
+  @doc false
+  @spec replay_paths(map()) :: {:ok, atom(), [{atom(), String.t()}]} | error_return()
+  def replay_paths(item) do
+    with {:ok, app} <- app_atom(item.app),
+         :ok <- protected_app(item.app),
+         {:ok, dir} <- package_dir(item.app, item.version) do
+      {:ok, app, [{app, "#{dir}/ebin"}]}
+    end
+  end
+
+  @doc false
+  @spec app_atom(term()) :: {:ok, atom()} | error_return()
+  def app_atom(app) do
+    with :ok <- valid_name(app), do: {:ok, String.to_atom(app)}
+  end
+
+  defp build(data) do
+    with {:ok, struct} <- builder(data),
+         :ok <- valid_name(struct.app),
+         do: {:ok, struct}
+  end
+
   defp valid_name(app) do
-    if Regex.match?(@name_pattern, "#{app}") and String.length("#{app}") <= 255 do
+    if is_binary(app) and Regex.match?(@name_pattern, app) and String.length(app) <= 255 do
       :ok
     else
       message =
@@ -673,8 +627,6 @@ defmodule MishkaInstaller.Installer.Installer do
       {:error, [%{message: message, field: :app, action: :valid_name}]}
     end
   end
-
-  defp safe_atom(app), do: String.to_atom(app)
 
   defp app_resource(path, app), do: "#{path}/ebin/#{app}.app"
 
@@ -693,10 +645,14 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
+  # Strictly below the extensions root: the root itself and a sibling such as `extensions-old` are outside.
+  defp inside_extensions?(path, base),
+    do: String.starts_with?(Path.expand(path), Path.expand(base) <> "/")
+
   defp allowed_extract_path(extract_path) do
     allowed = LibraryHandler.extensions_path()
 
-    if String.starts_with?(Path.expand(extract_path), Path.expand(allowed)) do
+    if inside_extensions?(extract_path, allowed) do
       :ok
     else
       message = "Your library path is not allowed. It must be inside the extensions directory."
@@ -707,12 +663,13 @@ defmodule MishkaInstaller.Installer.Installer do
   end
 
   # `app`/`version` can arrive from an admin web form, so never trust them straight into a path:
-  # build the canonical "<app>-<version>" dir and refuse anything that escapes the extensions dir.
+  # build the canonical "<app>-<version>" dir and refuse a name that is more than one path segment.
   defp package_dir(app, version) do
     base = LibraryHandler.extensions_path()
-    dir = Path.expand("#{app}-#{version}", base)
+    name = "#{app}-#{version}"
+    dir = Path.expand(name, base)
 
-    if String.starts_with?(dir, Path.expand(base) <> "/") do
+    if name == Path.basename(name) and Path.dirname(dir) == Path.expand(base) do
       {:ok, dir}
     else
       message = "Invalid app/version: the package path escapes the extensions directory."
@@ -737,8 +694,7 @@ defmodule MishkaInstaller.Installer.Installer do
     end
   end
 
-  defp install_steps(data, dest) do
-    app = safe_atom(data.app)
+  defp install_steps(app, dest) do
     ebin = "#{dest}/ebin"
     prepend_paths = [{app, ebin}]
 

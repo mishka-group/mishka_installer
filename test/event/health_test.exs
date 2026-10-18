@@ -76,22 +76,20 @@ end
 
 defmodule MishkaInstaller.Event.HealthTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, EventHandler, Hook}
-
-  alias MishkaInstaller.Event.ModuleStateCompiler
+  alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
 
   alias MishkaInstallerTest.Event.HealthTest.{
-    HealthyProbe,
+    AuditPlugin,
+    CrashProbe,
     DegradedProbe,
     ErrorProbe,
-    CrashProbe,
-    SlowProbe,
-    WeirdProbe,
+    HealthyProbe,
     NoProbe,
+    NotifyPlugin,
     OkPlugin,
     SickPlugin,
-    AuditPlugin,
-    NotifyPlugin
+    SlowProbe,
+    WeirdProbe
   }
 
   setup do
@@ -116,7 +114,10 @@ defmodule MishkaInstaller.Event.HealthTest do
     MishkaInstaller.subscribe("event")
     start_supervised!(EventHandler)
     start_supervised!(MishkaInstaller.MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
+
+    # The handler's own boot sync is over before a test writes anything it could hold or start.
+    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}
 
     :ok
   end
@@ -128,8 +129,9 @@ defmodule MishkaInstaller.Event.HealthTest do
       assert Hook.run_health(ErrorProbe, 1000) == {:error, "db unreachable"}
     end
 
-    test "a raising probe becomes {:error, {:raised, _}}" do
-      assert {:error, {:raised, %RuntimeError{}}} = Hook.run_health(CrashProbe, 1000)
+    @tag :capture_log
+    test "a raising probe becomes {:error, {:exit, {exception, stacktrace}}}" do
+      assert {:error, {:exit, {%RuntimeError{}, [_ | _]}}} = Hook.run_health(CrashProbe, 1000)
     end
 
     test "a hanging probe is killed at the timeout and becomes {:error, :timeout}" do
@@ -161,7 +163,7 @@ defmodule MishkaInstaller.Event.HealthTest do
 
     test "a started, loaded plugin with an :ok probe is healthy" do
       start_supervised!(OkPlugin)
-      assert_receive %{status: :register}, 2000
+      assert_receive %{status: :register}
       eventually(fn -> started?(OkPlugin) end)
 
       report = Hook.plugin_health(OkPlugin)

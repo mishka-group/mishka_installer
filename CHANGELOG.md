@@ -1,6 +1,63 @@
 # Changelog for MishkaInstaller Unreleased
 
+### Security:
+
+- A download no longer follows redirects off the hosts it may use. `Downloader` follows `Location`
+  by hand, at most 3 times; every hop must be `https`, and its host the host of the first URL, a
+  host of `config :mishka_installer, :allowlist, url_hosts: [...]`, or, for a URL on
+  `github.com`/`api.github.com`, GitHub's release CDN (`release-assets.githubusercontent.com`,
+  `objects.githubusercontent.com`)
+- A `:url` install and `Downloader.download(:url, ...)` accept an `https` URL only; `http://`,
+  `file://` and a URL without a host are refused before a request is made
+- `:path` installs must be below the extensions directory: a sibling folder that shares its name as
+  a prefix (`extensions-old`) and the directory itself were accepted before. `package_dir/2` takes
+  `"<app>-<version>"` as one path segment, so a version such as `"0.1.0/../other-2.0.0"` can no
+  longer point `uninstall/1` at another package
+- An app name ends at `\z`: `"foo\n"` matched the `$` of the name pattern. `Installer.write/1` and
+  `write/3` refuse a record whose `app` is not a valid name
+- Boot replay rebuilds the `ebin` path from the extensions directory and the record's app and
+  version, after the name and protected-app checks of `install/1`; the `prepend_paths` of a record
+  are no longer put on the code path
+- `Hook.call/3`, `call!/3`, `profile/2` and `event_health/2` no longer create an atom or a
+  `:persistent_term` key for an event name. `ModuleStateCompiler.event_module/1` is the read-only
+  lookup; `create/3` and `purge_create/3` are the only functions that create them
+- GitHub installs check `path` (`"owner/repo"`), `tag` and `asset` (letters, digits and `. _ + -`)
+  before they reach a URL, and the asset URL the API answers with must be an `https` URL on
+  `github.com`
+- `ModuleStateCompiler`'s `create/3` no longer hands the `CompileError` description to its caller
+
+### Added:
+
+- `config :mishka_installer, :allowlist, require_checksum: true` refuses a remote install that has
+  no `checksum`; without it such an install logs a warning
+- `MishkaInstaller.Helper.Extra.isolate/1` runs a function in a process that ends with its caller
+  and answers `{:ok, result}` or `{:exit, reason}`
+- `MishkaInstaller.Helper.Record` holds the Mnesia record functions `Event` and `Installer` shared
+- `ModuleStateCompiler.event_module/1` and `finish_call/3`
+
+### Changed:
+
+- `Downloader.download/2` and a `:url` install refuse `http://`, and a redirect to a host outside
+  the first URL's host, `url_hosts` and GitHub's release CDN is an `{:error, ...}`: a download that
+  relied on such a redirect needs that host in `url_hosts`
+- `Hook.run_health/2` answers `{:error, {:exit, {exception, stacktrace}}}` for a probe that raises,
+  where it answered `{:error, {:raised, exception}}`
+
 ### Fixed:
+
+- A failed download is `{:error, [%{action: :download}]}`; a refused connection or a timeout
+  raised `Req.TransportError` and, from `CompileHandler`, crashed the queue
+- `LibraryHandler.read_app/2` answers an error for an `.app` file that is not valid UTF-8
+- `Installer.install/1` no longer changes the working folder of the node, and no longer fails with
+  `FunctionClauseError` when no project path is set
+- `Installer.write/3` reads the record under a lock inside the transaction, as `Event.write/3`
+  does, so two writers cannot lose one another's fields
+- `LibraryHandler.extract/3` takes a single folder name
+- `Installer.unique/2` says "library", not "event"
+- A module of an event that cannot be built is `{:error, [%{action: :compile}]}`, built in an
+  isolated process, with no `rescue`; `EventHandler` marks the `:compile` telemetry event `:error`
+  for it. `Hook.profile/2` and the health probe have no `rescue` either: a probe that raises is
+  `{:error, {:exit, reason}}`, no longer `{:error, {:raised, exception}}`
 
 - Upgrading an installed app keeps the `inserted_at` of its record. The update of 0.1.14 wrote the
   new install's `inserted_at` over it; only `updated_at` moves now, and the record keeps the time

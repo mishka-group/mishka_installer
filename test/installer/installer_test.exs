@@ -1,14 +1,17 @@
 defmodule MishkaInstallerTest.Installer.InstallerTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Installer.{Installer, LibraryHandler, Downloader}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Transaction}
+  alias MishkaInstaller.Helper.UUID
+  alias MishkaInstaller.Installer.{CompileHandler, Downloader, Installer, LibraryHandler}
   alias MishkaInstallerTest.Support.EbinFixture
+  import ExUnit.CaptureLog, only: [capture_log: 1]
 
   setup do
     System.put_env("PROJECT_PATH", File.cwd!())
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{UUID.generate()}")}"
 
     on_exit(fn ->
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
@@ -58,7 +61,9 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
 
       assert Installer.get() != []
-      assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
+
+      assert %Installer{app: "mishka_developer_tools"} =
+               Installer.get(:app, "mishka_developer_tools")
     end
 
     test "Update a Library record" do
@@ -77,18 +82,45 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert Installer.get(struct.id).tag == "1.0.0"
     end
 
+    test "concurrent writes to different fields of the same record don't clobber each other" do
+      {:ok, %{id: id}} =
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
+
+      for round <- 1..100 do
+        {:ok, _} = Installer.write(:id, id, %{tag: "reset-#{round}", asset: "reset-#{round}"})
+
+        t1 = Task.async(fn -> Installer.write(:id, id, %{tag: "tag-#{round}"}) end)
+
+        t2 =
+          Task.async(fn ->
+            Installer.write(:app, "mishka_developer_tools", %{asset: "a-#{round}"})
+          end)
+
+        {:ok, _} = Task.await(t1)
+        {:ok, _} = Task.await(t2)
+
+        assert %{tag: tag, asset: asset} = Installer.get(id)
+        assert tag == "tag-#{round}"
+        assert asset == "a-#{round}"
+      end
+
+      assert [_one] = Installer.get()
+    end
+
     test "All keys of Libraries Record" do
       {:ok, _data} =
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
 
-      assert length(Installer.ids()) == 1
+      assert [_one] = Installer.ids()
     end
 
     test "Unique? Library Record by app" do
       {:ok, _data} =
         assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
 
-      assert !is_nil(Installer.get(:app, "mishka_developer_tools"))
+      assert %Installer{app: "mishka_developer_tools"} =
+               Installer.get(:app, "mishka_developer_tools")
+
       assert is_nil(Installer.get(:app, "mishka_developer_tools1"))
     end
 
@@ -99,6 +131,32 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert Installer.get() != []
       {:ok, _data} = Installer.delete(:app, "mishka_developer_tools")
       assert Installer.get() == []
+    end
+
+    test "Delete, update and unique answer for a record that is not there" do
+      {:error, [%{field: :global, action: :delete}]} =
+        assert Installer.delete(:app, "mishka_developer_tools")
+
+      {:error, [%{field: :global, action: :delete}]} = assert Installer.delete(:id, "missing")
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Installer.write(:app, "mishka_developer_tools", %{tag: "1.0.0"})
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Installer.write(:id, "missing", %{tag: "1.0.0"})
+
+      :ok = assert Installer.unique(:app, "mishka_developer_tools")
+      assert Installer.unique?(:app, "mishka_developer_tools")
+
+      {:ok, _data} =
+        assert Installer.write(%{app: "mishka_developer_tools", version: "0.1.7", path: "p"})
+
+      {:error, [%{field: :global, action: :unique, message: message}]} =
+        assert Installer.unique(:app, "mishka_developer_tools")
+
+      assert message =~ "library"
+      refute message =~ "event"
+      refute Installer.unique?(:app, "mishka_developer_tools")
     end
 
     test "Drop all Library records" do
@@ -125,6 +183,54 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert output.extension.prepend_paths == [{app_atom, "#{pkg}/ebin"}]
       assert Installer.get(:app, app).version == version
       assert app_atom in started_apps()
+      assert module.hello() == :world
+    end
+
+    test "install does not change the working folder of the node" do
+      cwd = File.cwd!()
+
+      project =
+        Path.join(System.tmp_dir!(), "mishka_project_#{System.unique_integer([:positive])}")
+
+      File.mkdir_p!(project)
+
+      on_exit(fn ->
+        File.cd!(cwd)
+        System.put_env("PROJECT_PATH", cwd)
+        File.rm_rf!(project)
+      end)
+
+      System.put_env("PROJECT_PATH", project)
+      {app, app_atom, version, pkg, module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, _} = assert Installer.install(%{app: app, version: version, path: pkg})
+
+      assert File.cwd!() == cwd
+      assert module.hello() == :world
+    end
+
+    test "install works without a project path when the extensions path is configured" do
+      cwd = File.cwd!()
+
+      extensions =
+        Path.join(System.tmp_dir!(), "mishka_ext_#{System.unique_integer([:positive])}")
+
+      on_exit(fn ->
+        System.put_env("PROJECT_PATH", cwd)
+        Application.delete_env(:mishka_installer, :extensions_path)
+        File.rm_rf!(extensions)
+      end)
+
+      System.delete_env("PROJECT_PATH")
+      Application.put_env(:mishka_installer, :extensions_path, extensions)
+      {app, app_atom, version, pkg, module} = fake_local_app()
+      on_exit(fn -> cleanup(app_atom, pkg) end)
+
+      {:ok, %{extension: %{app: ^app}}} =
+        assert Installer.install(%{app: app, version: version, path: pkg})
+
+      assert File.cwd!() == cwd
       assert module.hello() == :world
     end
 
@@ -175,14 +281,15 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
       Application.put_env(:mishka_installer, :allowlist, github_repos: ["owner/#{app}"])
 
-      # GitHub API call -> release JSON; the asset (served from a CDN) -> the tarball.
+      # GitHub API call -> release JSON; the asset on github.com -> the tarball.
       Req.Test.stub(Downloader, fn conn ->
-        if String.contains?(conn.request_path, "/releases") do
+        if conn.host == "api.github.com" do
           Req.Test.json(conn, %{
             "assets" => [
               %{
                 "name" => "#{app}.tar.gz",
-                "browser_download_url" => "https://cdn.example.com/#{app}.tar.gz"
+                "browser_download_url" =>
+                  "https://github.com/owner/#{app}/releases/download/0.1.0/#{app}.tar.gz"
               }
             ]
           })
@@ -230,7 +337,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
 
       :ok = Installer.async_install(%{app: app, version: version, path: pkg})
 
-      assert_receive %{status: :install, channel: "installer"}, 2000
+      assert_receive %{status: :install, channel: "installer"}
       assert app_atom in started_apps()
       assert module.hello() == :world
     end
@@ -271,11 +378,10 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       pid = start_supervised!(MishkaInstaller.Installer.CompileHandler)
       send(pid, %{status: :synchronized, channel: "mnesia"})
 
-      assert_receive %{status: :compile_synchronized, channel: "mnesia"}, 2000
+      assert_receive %{status: :compile_synchronized, channel: "mnesia"}
 
       assert_receive {:telemetry, [:mishka_installer, :installer, :replay],
-                      %{app: ^app, result: :ok}},
-                     2000
+                      %{app: ^app, result: :ok}}
 
       # The app is back purely from the persisted record + the on-disk ebin (no reinstall, no mix).
       assert app_atom in started_apps()
@@ -299,6 +405,34 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
         assert Installer.install(%{app: "../../etc", version: "1.0.0", path: "whatever"})
     end
 
+    test "rejects an app name that only matches because of a trailing newline" do
+      unique = System.unique_integer([:positive])
+
+      for app <- ["newline_#{unique}\n", "newline_#{unique}\n\n", "Newline_#{unique}", "1new_app"] do
+        {:error, [%{action: :valid_name, field: :app}]} =
+          assert Installer.install(%{app: app, version: "1.0.0", path: "whatever"})
+
+        {:error, [%{action: :valid_name}]} =
+          assert Installer.uninstall(%{app: app, version: "1.0.0", path: "whatever"})
+      end
+
+      assert_raise ArgumentError, fn -> String.to_existing_atom("newline_#{unique}\n") end
+    end
+
+    test "a record with an invalid app name is never stored" do
+      for app <- ["foo\n", "Foo", "foo-bar", "foo bar", "../etc", String.duplicate("a", 256)] do
+        {:error, [%{action: :valid_name, field: :app}]} =
+          assert Installer.write(%{app: app, version: "0.1.0", path: "p"})
+      end
+
+      {:ok, %{id: id}} = assert Installer.write(%{app: "valid_name", version: "0.1.0", path: "p"})
+
+      {:error, [%{action: :valid_name}]} =
+        assert Installer.write(:id, id, %{app: "valid_name\n"})
+
+      assert [%{app: "valid_name"}] = Installer.get()
+    end
+
     test "rejects re-installing the same version of an already running app" do
       {app, app_atom, version, pkg, _module} = fake_local_app()
       on_exit(fn -> cleanup(app_atom, pkg) end)
@@ -319,6 +453,19 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       {:error, _error} = assert Installer.install(%{app: app, version: "0.1.0", path: pkg})
       assert is_nil(Installer.get(:app, app))
       refute String.to_atom(app) in Enum.map(Application.loaded_applications(), &elem(&1, 0))
+    end
+
+    test "an .app file that is not valid UTF-8 aborts install with an error, not a crash" do
+      app = uniq_app("bad_utf8")
+      pkg = "#{LibraryHandler.extensions_path()}/#{app}-0.1.0"
+      File.mkdir_p!("#{pkg}/ebin")
+      File.write!("#{pkg}/ebin/#{app}.app", <<0xFF, 0xFE, 0xFA>>)
+      on_exit(fn -> File.rm_rf!(pkg) end)
+
+      {:error, [%{action: :read_app}]} =
+        assert Installer.install(%{app: app, version: "0.1.0", path: pkg})
+
+      assert is_nil(Installer.get(:app, app))
     end
 
     test "verifies a matching checksum on a downloaded artifact" do
@@ -347,6 +494,143 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
                })
 
       assert module.hello() == :world
+    end
+
+    test "a remote install without a checksum is logged, and installs when the policy is not strict" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      app = uniq_app("sum_none")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      log =
+        capture_log(fn ->
+          {:ok, _} =
+            assert Installer.install(%{
+                     app: app,
+                     version: version,
+                     type: :url,
+                     path: "https://cdn.example.com/#{app}.tar.gz"
+                   })
+        end)
+
+      assert log =~ "without a checksum"
+      assert module.hello() == :world
+    end
+
+    test "a remote install with a checksum is not warned about" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      app = uniq_app("sum_quiet")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, _module} = EbinFixture.tar_fake_app(app_atom, version)
+      checksum = :crypto.hash(:sha256, tarball) |> Base.encode16(case: :lower)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      log =
+        capture_log(fn ->
+          {:ok, _} =
+            assert Installer.install(%{
+                     app: app,
+                     version: version,
+                     type: :url,
+                     path: "https://cdn.example.com/#{app}.tar.gz",
+                     checksum: checksum
+                   })
+        end)
+
+      refute log =~ "without a checksum"
+    end
+
+    test "require_checksum refuses a remote install without a checksum before downloading" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist,
+        url_hosts: ["cdn.example.com"],
+        github_repos: ["owner/repo"],
+        require_checksum: true
+      )
+
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host})
+        Plug.Conn.send_resp(conn, 200, "tarball")
+      end)
+
+      app = uniq_app("sum_required")
+
+      capture_log(fn ->
+        for source <- [
+              %{type: :url, path: "https://cdn.example.com/#{app}.tar.gz"},
+              %{type: :github_latest_release, path: "owner/repo"},
+              %{type: :github_tag, path: "owner/repo", tag: "0.1.0"}
+            ] do
+          {:error, [%{action: :allowlist, message: message}]} =
+            assert Installer.install(Map.merge(%{app: app, version: "0.1.0"}, source))
+
+          assert message =~ "require_checksum"
+        end
+      end)
+
+      refute_received {:requested, _host}
+      assert is_nil(Installer.get(:app, app))
+    end
+
+    test "require_checksum installs a remote artifact that carries one, and never asks a :path install" do
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      Application.put_env(:mishka_installer, :allowlist,
+        url_hosts: ["cdn.example.com"],
+        require_checksum: true
+      )
+
+      app = uniq_app("sum_strict")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, module} = EbinFixture.tar_fake_app(app_atom, version)
+      checksum = :crypto.hash(:sha256, tarball) |> Base.encode16(case: :lower)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      stub_download(tarball)
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      {:ok, _} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz",
+                 checksum: checksum
+               })
+
+      assert module.hello() == :world
+
+      {local_app, local_atom, local_version, pkg, local_module} = fake_local_app()
+      on_exit(fn -> cleanup(local_atom, pkg) end)
+
+      {:ok, _} =
+        assert Installer.install(%{app: local_app, version: local_version, path: pkg})
+
+      assert local_module.hello() == :world
     end
 
     test "rejects a mismatched checksum and installs nothing" do
@@ -442,6 +726,129 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
                  path: "evil/repo",
                  tag: "0.1.0"
                })
+    end
+
+    test "an http or non-url source is blocked even on an allowlisted host, before downloading" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.scheme})
+        Plug.Conn.send_resp(conn, 200, "tarball")
+      end)
+
+      for path <- [
+            "http://cdn.example.com/x.tar.gz",
+            "file://cdn.example.com/x.tar.gz",
+            "cdn.example.com/x.tar.gz"
+          ] do
+        {:error, [%{action: :allowlist, message: message}]} =
+          assert Installer.install(%{
+                   app: uniq_app("plain_http"),
+                   version: "0.1.0",
+                   type: :url,
+                   path: path
+                 })
+
+        assert message =~ "url_scheme"
+      end
+
+      refute_received {:requested, _scheme}
+    end
+
+    test "a network failure is an error tuple, and the queue's CompileHandler survives it" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader},
+        retry: false
+      )
+
+      Req.Test.stub(Downloader, fn conn -> Req.Test.transport_error(conn, :econnrefused) end)
+
+      app = uniq_app("offline")
+
+      source = %{
+        app: app,
+        version: "0.1.0",
+        type: :url,
+        path: "https://cdn.example.com/#{app}.tar.gz"
+      }
+
+      {:error, [%{action: :download}]} = assert Installer.install(source)
+
+      test_pid = self()
+      handler = {__MODULE__, make_ref()}
+
+      :telemetry.attach(
+        handler,
+        [:mishka_installer, :installer, :install],
+        fn _event, _meas, meta, _ -> send(test_pid, {:telemetry, meta}) end,
+        nil
+      )
+
+      on_exit(fn -> :telemetry.detach(handler) end)
+
+      pid = start_supervised!(CompileHandler)
+      Req.Test.allow(Downloader, self(), pid)
+      :ok = Installer.async_install(source)
+
+      assert_receive {:telemetry, %{result: :error}}
+      assert Process.whereis(CompileHandler) == pid
+      assert Keyword.get(CompileHandler.get(), :running) == []
+      assert is_nil(Installer.get(:app, app))
+    end
+
+    test "a download that redirects off the allowlisted host installs nothing" do
+      Application.put_env(:mishka_installer, :allowlist, url_hosts: ["cdn.example.com"])
+
+      Application.put_env(:mishka_installer, :downloader_req_options,
+        plug: {Req.Test, Downloader}
+      )
+
+      app = uniq_app("redirected")
+      app_atom = String.to_atom(app)
+      version = "0.1.0"
+      {tarball, ^app_atom, _module} = EbinFixture.tar_fake_app(app_atom, version)
+      dest = "#{LibraryHandler.extensions_path()}/#{app}-#{version}"
+      test_pid = self()
+
+      Req.Test.stub(Downloader, fn conn ->
+        send(test_pid, {:requested, conn.host})
+
+        case conn.host do
+          "cdn.example.com" ->
+            conn
+            |> Plug.Conn.put_resp_header("location", "https://other-host.example/evil.tar.gz")
+            |> Plug.Conn.send_resp(302, "")
+
+          _ ->
+            conn
+            |> Plug.Conn.put_resp_content_type("application/gzip", nil)
+            |> Plug.Conn.send_resp(200, tarball)
+        end
+      end)
+
+      on_exit(fn -> cleanup(app_atom, dest) end)
+
+      {:error, [%{action: :download}]} =
+        assert Installer.install(%{
+                 app: app,
+                 version: version,
+                 type: :url,
+                 path: "https://cdn.example.com/#{app}.tar.gz"
+               })
+
+      assert_received {:requested, "cdn.example.com"}
+      refute_received {:requested, "other-host.example"}
+      assert is_nil(Installer.get(:app, app))
+      refute app_atom in started_apps()
+      refute File.dir?(dest)
     end
 
     test "a download from an allowed host passes the policy and installs" do
@@ -634,14 +1041,152 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       assert File.dir?(outside)
     end
 
+    test "install rejects a sibling folder that shares the extensions directory's name as a prefix" do
+      sibling = "#{LibraryHandler.extensions_path()}-old"
+      app = uniq_app("sibling")
+      app_atom = String.to_atom(app)
+      pkg = "#{sibling}/#{app}-0.1.0"
+      {^app_atom, _module, _ebin} = EbinFixture.build_fake_app(pkg, app_atom, "0.1.0")
+      on_exit(fn -> File.rm_rf!(sibling) end)
+
+      for path <- [pkg, "#{LibraryHandler.extensions_path()}/../extensions-old/#{app}-0.1.0"] do
+        {:error, [%{action: :allowed_extract_path}]} =
+          assert Installer.install(%{app: app, version: "0.1.0", type: :path, path: path})
+      end
+
+      assert File.dir?("#{pkg}/ebin")
+      refute File.dir?("#{LibraryHandler.extensions_path()}/#{app}-0.1.0")
+      assert is_nil(Installer.get(:app, app))
+      refute app_atom in started_apps()
+    end
+
+    test "install rejects the extensions directory itself" do
+      root = LibraryHandler.extensions_path()
+      File.mkdir_p!(root)
+
+      for path <- [root, "#{root}/", "#{root}/."] do
+        {:error, [%{action: :allowed_extract_path}]} =
+          assert Installer.install(%{
+                   app: uniq_app("root"),
+                   version: "0.1.0",
+                   type: :path,
+                   path: path
+                 })
+      end
+
+      assert File.dir?(root)
+    end
+
     test "uninstall rejects a version that escapes the extensions directory" do
       assert {:error, [%{action: :package_dir}]} =
                Installer.uninstall(%{app: "demo", version: "0.1.0/../../etc", path: "p"})
     end
 
+    test "uninstall refuses a version that points at another package of the extensions directory" do
+      {app, app_atom, version, pkg, _module} = fake_local_app()
+      {other, other_atom, other_version, other_pkg, _other_module} = fake_local_app()
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        cleanup(other_atom, other_pkg)
+      end)
+
+      {:error, [%{action: :package_dir}]} =
+        assert Installer.uninstall(%{
+                 app: app,
+                 version: "#{version}/../#{other}-#{other_version}",
+                 path: pkg
+               })
+
+      assert File.dir?(other_pkg)
+      assert File.dir?(pkg)
+    end
+
     test "uninstall rejects an invalid app name (path traversal in app)" do
       assert {:error, [%{action: :valid_name}]} =
                Installer.uninstall(%{app: "../../etc", version: "0.1.0", path: "p"})
+    end
+  end
+
+  ###################################################################################
+  ###################### (▰˘◡˘▰) Boot replay (▰˘◡˘▰) ##########################
+  ###################################################################################
+  describe "boot replay ===>" do
+    @describetag :capture_log
+
+    test "the ebin is loaded from the extensions directory, not from the path a record names" do
+      {app, app_atom, version, pkg, module} = fake_local_app()
+
+      evil =
+        Path.join(System.tmp_dir!(), "mishka_evil_ebin_#{System.unique_integer([:positive])}")
+
+      build_variant(evil, app_atom, version, :evil)
+
+      on_exit(fn ->
+        cleanup(app_atom, pkg)
+        File.rm_rf!(evil)
+        :code.purge(module)
+        :code.delete(module)
+      end)
+
+      {:ok, _} =
+        assert Installer.write(%{
+                 app: app,
+                 version: version,
+                 path: pkg,
+                 prepend_paths: [{app_atom, "#{evil}/ebin"}]
+               })
+
+      :code.purge(module)
+      :code.delete(module)
+      :code.purge(module)
+
+      replay_all()
+
+      assert_receive {:telemetry, %{app: ^app, result: :ok}}
+      assert String.to_charlist("#{pkg}/ebin") in :code.get_path()
+      refute String.to_charlist("#{evil}/ebin") in :code.get_path()
+      assert app_atom in started_apps()
+      assert module.hello() == :world
+    end
+
+    test "a record that holds an invalid name, a protected app or an escaping version is skipped" do
+      unique = System.unique_integer([:positive])
+      evil = Path.join(System.tmp_dir!(), "mishka_evil_ebin_#{unique}")
+      File.mkdir_p!("#{evil}/ebin")
+      on_exit(fn -> File.rm_rf!(evil) end)
+
+      records = [
+        %{app: "evil_newline_#{unique}\n", version: "0.1.0"},
+        %{app: "mishka_installer", version: "9.9.9"},
+        %{app: "evil_version_#{unique}", version: "0.1.0/../../mishka_evil_ebin_#{unique}"},
+        %{app: "Evil_Upper_#{unique}", version: "0.1.0"}
+      ]
+
+      for record <- records do
+        put_raw_record(
+          Map.merge(record, %{
+            id: UUID.generate(),
+            path: "p",
+            type: :path,
+            depends: [],
+            prepend_paths: [{:evil, "#{evil}/ebin"}],
+            inserted_at: 1,
+            updated_at: 1
+          })
+        )
+      end
+
+      replay_all()
+
+      for %{app: app} <- records do
+        assert_receive {:telemetry, %{app: ^app, result: :error}}
+      end
+
+      refute_received {:telemetry, %{result: :ok}}
+      refute String.to_charlist("#{evil}/ebin") in :code.get_path()
+      assert_raise ArgumentError, fn -> String.to_existing_atom("evil_newline_#{unique}\n") end
+      assert :mishka_installer in started_apps()
     end
   end
 
@@ -672,6 +1217,39 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   end
 
   defp started_apps, do: Enum.map(Application.started_applications(), &elem(&1, 0))
+
+  defp build_variant(pkg, app_atom, version, result) do
+    previous = Code.get_compiler_option(:ignore_module_conflict)
+    Code.put_compiler_option(:ignore_module_conflict, true)
+    {^app_atom, _module, _ebin} = EbinFixture.build_fake_app(pkg, app_atom, version, result)
+    Code.put_compiler_option(:ignore_module_conflict, previous)
+    pkg
+  end
+
+  # A record written straight into the table, as a peer node or a restored backup could.
+  defp put_raw_record(record) do
+    values = ([Installer] ++ Enum.map(Installer.keys(), &Map.get(record, &1))) |> List.to_tuple()
+    {:atomic, _} = Transaction.durable_transaction(fn -> Query.write(values) end)
+  end
+
+  # Boots the CompileHandler on the table as it is; every replay result arrives as `{:telemetry, meta}`.
+  defp replay_all do
+    test_pid = self()
+    handler = {__MODULE__, make_ref()}
+
+    :telemetry.attach(
+      handler,
+      [:mishka_installer, :installer, :replay],
+      fn _event, _meas, meta, _ -> send(test_pid, {:telemetry, meta}) end,
+      nil
+    )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    pid = start_supervised!(CompileHandler)
+    send(pid, %{status: :synchronized, channel: "mnesia"})
+    assert_receive %{status: :compile_synchronized, channel: "mnesia"}
+  end
 
   defp stub_download(tarball) do
     Req.Test.stub(Downloader, fn conn ->

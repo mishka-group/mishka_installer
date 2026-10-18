@@ -1,10 +1,10 @@
 defmodule MishkaInstaller.Event.Hook do
   @moduledoc """
-  The `MishkaInstaller.Event.Hook` module provides a set of functionalities to manage event hooks
-  within the Mishka Installer system.
+  Registers, starts, stops and calls the plugins of an event: `use MishkaInstaller.Event.Hook` turns a
+  module into a plugin `GenServer` of one event, and `call/3` runs the plugins of an event in order.
 
-  It leverages `GenServer` to handle asynchronous event-driven operations and offers a set of
-  macros and functions for registering, starting, stopping, and managing hooks dynamically.
+  A plugin is registered, started, stopped and removed at runtime, so the functions of this module
+  are the way to manage hooks dynamically.
 
   In addition to being one of the most significant modules of the MishkaInstaller library,
   the Hook module gives you the ability to make the library as a whole,
@@ -286,6 +286,8 @@ defmodule MishkaInstaller.Event.Hook do
   require Logger
 
   alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
+  alias MishkaInstaller.Helper.Extra
+  alias MishkaInstaller.Helper.MnesiaAssistant.Table
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   @type okey_return :: {:ok, struct() | map() | module() | list(any())}
@@ -318,7 +320,7 @@ defmodule MishkaInstaller.Event.Hook do
     quote bind_quoted: [opts: opts] do
       use GenServer, restart: :transient
       @behaviour MishkaInstaller.Event.Hook
-      alias MishkaInstaller.Event.{Event, Hook, EventHandler}
+      alias MishkaInstaller.Event.{Event, EventHandler, Hook}
       alias MishkaInstaller.Event.ModuleStateCompiler, as: MSE
 
       @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
@@ -460,8 +462,10 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec call(String.t(), any(), keyword()) :: any()
   def call(event, data, args \\ []) do
-    module = ModuleStateCompiler.module_event_name(event)
-    if function_exported?(module, :call, 2), do: module.call(data, args), else: data
+    case ModuleStateCompiler.event_module(event) do
+      nil -> data
+      module -> if function_exported?(module, :call, 2), do: module.call(data, args), else: data
+    end
   end
 
   @doc """
@@ -474,8 +478,10 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec call!(String.t(), any(), keyword()) :: any()
   def call!(event, data, args \\ []) do
-    module = ModuleStateCompiler.module_event_name(event)
-    module.call(data, args)
+    case ModuleStateCompiler.event_module(event) do
+      nil -> raise UndefinedFunctionError, message: "the event #{inspect(event)} is not compiled"
+      module -> module.call(data, args)
+    end
   end
 
   @doc """
@@ -491,33 +497,38 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec profile(String.t(), any()) :: {:ok, [map()]} | {:error, :not_compiled}
   def profile(event, state) do
-    module = ModuleStateCompiler.module_event_name(event)
+    module = ModuleStateCompiler.event_module(event)
 
-    if function_exported?(module, :initialize, 0) do
-      {_final, timings} =
-        Enum.reduce(module.initialize().plugins, {state, []}, fn plugin, {acc_state, acc} ->
-          {micros, next} = time_plugin(plugin.name, acc_state)
-          {next, [%{plugin: plugin.name, microseconds: micros} | acc]}
-        end)
+    if !is_nil(module) and function_exported?(module, :initialize, 0),
+      do: {:ok, profile_plugins(module.initialize().plugins, state)},
+      else: {:error, :not_compiled}
+  end
 
-      {:ok, Enum.reverse(timings)}
-    else
-      {:error, :not_compiled}
+  defp profile_plugins(plugins, state) do
+    {_final, timings} =
+      Enum.reduce(plugins, {state, []}, fn plugin, {acc_state, acc} ->
+        {micros, next} = time_plugin(plugin.name, acc_state)
+        {next, [%{plugin: plugin.name, microseconds: micros} | acc]}
+      end)
+
+    Enum.reverse(timings)
+  end
+
+  # Cold path: each plugin runs in its own process, so one failing plugin cannot abort the profile run.
+  defp time_plugin(name, state) do
+    case Extra.isolate(fn -> :timer.tc(&call_plugin/2, [name, state]) end) do
+      {:ok, {micros, next}} -> {micros, next}
+      {:exit, _reason} -> {0, state}
     end
   end
 
-  # Cold path: rescue keeps one failing plugin from aborting the whole profile run.
-  defp time_plugin(name, state) do
-    :timer.tc(fn ->
-      args = if function_exported?(name, :call, 2), do: [state, nil], else: [state]
+  defp call_plugin(name, state) do
+    args = if function_exported?(name, :call, 2), do: [state, nil], else: [state]
 
-      case apply(name, :call, args) do
-        {:reply, new_state} -> new_state
-        other -> other
-      end
-    end)
-  rescue
-    _ -> {0, state}
+    case apply(name, :call, args) do
+      {:reply, new_state} -> new_state
+      other -> other
+    end
   end
 
   ####################################################################################
@@ -531,7 +542,7 @@ defmodule MishkaInstaller.Event.Hook do
   time-boxed process, so it never blocks the plugin or the caller).
 
   `probe` is `:ok | {:degraded, reason} | {:error, reason}` (with `{:error, :timeout}`,
-  `{:error, :no_health_check}`, `{:error, {:raised, _}}` ... for the failure variants). `healthy?`
+  `{:error, :no_health_check}`, `{:error, {:exit, _}}` ... for the failure variants). `healthy?`
   is the overall verdict.
   """
   @spec plugin_health(module(), timeout()) :: map()
@@ -563,9 +574,12 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec event_health(String.t(), timeout()) :: map()
   def event_health(event, timeout \\ @health_timeout) do
-    module = ModuleStateCompiler.module_event_name(event)
-    compiled? = function_exported?(module, :initialize, 0)
-    mode = if function_exported?(module, :mode, 0), do: module.mode(), else: :unknown
+    module = ModuleStateCompiler.event_module(event)
+    compiled? = !is_nil(module) and function_exported?(module, :initialize, 0)
+
+    mode =
+      if compiled? and function_exported?(module, :mode, 0), do: module.mode(), else: :unknown
+
     plugins = if compiled?, do: module.initialize().plugins, else: []
 
     reports =
@@ -603,14 +617,14 @@ defmodule MishkaInstaller.Event.Hook do
   @doc """
   Runs a plugin's `c:health_check/0` probe in a short-lived monitored process, bounded by `timeout`.
   Never blocks the plugin's `GenServer` and never crashes the caller: a slow probe yields
-  `{:error, :timeout}`, a raising/exiting one `{:error, {:raised | :exit, _}}`, a non-conforming
+  `{:error, :timeout}`, a raising/exiting one `{:error, {:exit, reason}}` (`reason` is the exit reason of the probe process), a non-conforming
   return `{:error, {:bad_return, _}}`, and a plugin without the callback `{:error, :no_health_check}`.
   """
   @spec run_health(module(), timeout()) :: :ok | {:degraded, term()} | {:error, term()}
   def run_health(plugin, timeout \\ @health_timeout) do
     if function_exported?(plugin, :health_check, 0) do
       {pid, ref} =
-        spawn_monitor(fn -> exit({:health_probe, safe_probe(plugin)}) end)
+        spawn_monitor(fn -> exit({:health_probe, normalize_probe(plugin.health_check())}) end)
 
       receive do
         {:DOWN, ^ref, :process, ^pid, {:health_probe, result}} -> result
@@ -624,14 +638,6 @@ defmodule MishkaInstaller.Event.Hook do
     else
       {:error, :no_health_check}
     end
-  end
-
-  defp safe_probe(plugin) do
-    normalize_probe(plugin.health_check())
-  rescue
-    e -> {:error, {:raised, e}}
-  catch
-    kind, reason -> {:error, {kind, reason}}
   end
 
   defp normalize_probe(:ok), do: :ok
@@ -711,7 +717,7 @@ defmodule MishkaInstaller.Event.Hook do
 
   @doc false
   def plugin_continue(module, state) do
-    MishkaInstaller.Helper.MnesiaAssistant.Table.wait_for_tables([Event], @wait_for_tables)
+    Table.wait_for_tables([Event], @wait_for_tables)
 
     new_state =
       if ready?() do
@@ -729,7 +735,7 @@ defmodule MishkaInstaller.Event.Hook do
   def plugin_start_again(module, state) do
     event = Keyword.get(state, :event)
     db_plg = Event.get(:name, Keyword.get(state, :name))
-    state_module = ModuleStateCompiler.module_event_name(event)
+    state_module = ModuleStateCompiler.event_module(event)
 
     new_state =
       if ModuleStateCompiler.safe_initialize?(event) and state_module.is_initialized?(db_plg) do
@@ -761,8 +767,9 @@ defmodule MishkaInstaller.Event.Hook do
     new_state =
       with "ready" <- :persistent_term.get(:event_status, nil),
            "ready" <- :persistent_term.get(:compile_status, nil),
-           {:module, state_module} <-
-             Code.ensure_loaded(ModuleStateCompiler.module_event_name(module.config(:__event__))),
+           state_module when not is_nil(state_module) <-
+             ModuleStateCompiler.event_module(module.config(:__event__)),
+           {:module, ^state_module} <- Code.ensure_loaded(state_module),
            data when not is_nil(data) <-
              Enum.find(state_module.initialize().plugins, &(&1.name == module)),
            plugin <- Event.dirty_get(:name, module) do

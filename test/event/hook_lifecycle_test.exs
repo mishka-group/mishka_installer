@@ -103,18 +103,18 @@ defmodule MishkaInstaller.Event.HookTest do
   alias MishkaInstaller.Event.{Event, EventHandler, Hook}
 
   alias MishkaInstallerTest.Event.HookTest.{
-    IndependentPlugin,
+    CallBangPlugin,
+    CyclicA,
+    CyclicB,
     DependentPlugin,
+    IndependentPlugin,
+    LimboPlugin,
+    OverCapPlugin,
     ProfileNormal,
     ProfileRaiser,
     ReEventPlugin,
-    CallBangPlugin,
     RetryPlugin,
-    CyclicA,
-    CyclicB,
-    LimboPlugin,
-    StoppedPlugin,
-    OverCapPlugin
+    StoppedPlugin
   }
 
   setup do
@@ -139,7 +139,10 @@ defmodule MishkaInstaller.Event.HookTest do
     MishkaInstaller.subscribe("event")
     start_supervised!(EventHandler)
     start_supervised!(MishkaInstaller.MnesiaRepo)
-    assert_receive %{status: :synchronized, channel: "mnesia"}, 2000
+    assert_receive %{status: :synchronized, channel: "mnesia"}
+
+    # The handler's own boot sync is over before a test writes anything it could hold or start.
+    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}
 
     :ok
   end
@@ -163,6 +166,7 @@ defmodule MishkaInstaller.Event.HookTest do
   end
 
   describe "profile/2 ===>" do
+    @tag :capture_log
     test "a plugin that raises is reported with 0 µs and never aborts the profile" do
       start_supervised!(ProfileNormal)
       start_supervised!(ProfileRaiser)
@@ -214,6 +218,7 @@ defmodule MishkaInstaller.Event.HookTest do
   end
 
   describe "after_compile guards ===>" do
+    # credo:disable-for-next-line Jump.CredoChecks.VacuousTest
     test "a plugin with neither call/1 nor call/2 raises at compile time" do
       assert_raise RuntimeError, ~r/call\/1 or call\/2/, fn ->
         Code.eval_string("""
@@ -224,6 +229,7 @@ defmodule MishkaInstaller.Event.HookTest do
       end
     end
 
+    # credo:disable-for-next-line Jump.CredoChecks.VacuousTest
     test "a plugin defining only call/2 compiles without raising" do
       Code.eval_string("""
       defmodule MishkaTmp.Call2OnlyPlugin do
@@ -236,6 +242,7 @@ defmodule MishkaInstaller.Event.HookTest do
       assert function_exported?(MishkaTmp.Call2OnlyPlugin, :call, 2)
     end
 
+    # credo:disable-for-next-line Jump.CredoChecks.VacuousTest
     test "a plugin not dedicated to an event raises at compile time" do
       assert_raise RuntimeError, ~r/dedicated to an event/, fn ->
         Code.eval_string("""
@@ -256,7 +263,6 @@ defmodule MishkaInstaller.Event.HookTest do
       :ok = EventHandler.do_compile("callbang_evt", :start, false)
 
       reports = Hook.health()
-      assert is_list(reports)
       assert Enum.any?(reports, &(&1.event == "callbang_evt"))
     end
   end
@@ -268,7 +274,7 @@ defmodule MishkaInstaller.Event.HookTest do
 
       start_supervised!(RetryPlugin)
       # not ready -> the plugin stays :starting (it has not registered/started yet)
-      eventually(fn -> Keyword.get(RetryPlugin.get(), :status) == :starting end)
+      assert :ok = eventually(fn -> Keyword.get(RetryPlugin.get(), :status) == :starting end)
 
       # become ready and trigger the retry directly (instead of waiting the 1s timer)
       :persistent_term.put(:compile_status, "ready")
@@ -298,7 +304,7 @@ defmodule MishkaInstaller.Event.HookTest do
       log =
         ExUnit.CaptureLog.capture_log(fn ->
           start_supervised!(OverCapPlugin)
-          assert_receive %{status: :register_error, channel: "event"}, 2000
+          assert_receive %{status: :register_error, channel: "event"}
         end)
 
       assert log =~ "failed to register"

@@ -23,6 +23,24 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     {:error, _error} = assert LibraryHandler.read_app(:req1, "_build/test/lib/req/ebin/req.app")
   end
 
+  test "Read app file returns an error for a file that is not valid UTF-8" do
+    dir = Path.join(System.tmp_dir!(), "bad-utf8-#{System.unique_integer([:positive])}")
+    File.mkdir_p!(dir)
+    on_exit(fn -> File.rm_rf!(dir) end)
+
+    for {name, bytes} <- [
+          invalid: <<0xFF, 0xFE, 0xFA>>,
+          truncated: "{application, demo, []}." <> <<0xE2, 0x82>>,
+          inside_term: "{application, demo, [{description, \"" <> <<0xC3, 0x28>> <> "\"}]}."
+        ] do
+      path = Path.join(dir, "#{name}.app")
+      File.write!(path, bytes)
+
+      {:error, [%{action: :read_app, field: :erl_scan}]} =
+        assert LibraryHandler.read_app(:demo, path)
+    end
+  end
+
   test "Application ensure/load is idempotent" do
     :ok = assert LibraryHandler.application_ensure(:req)
     # Calling it again on an already-loaded/started app must still succeed (boot-replay safety).
@@ -33,7 +51,7 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
   test "Application unload" do
     Application.stop(:req)
     assert is_nil(Enum.find(Application.started_applications(), &(elem(&1, 0) == :req)))
-    assert !is_nil(Enum.find(Application.loaded_applications(), &(elem(&1, 0) == :req)))
+    assert List.keymember?(Application.loaded_applications(), :req, 0)
     :ok = assert LibraryHandler.unload(:req)
     assert is_nil(Enum.find(Application.loaded_applications(), &(elem(&1, 0) == :req)))
     :ok = assert LibraryHandler.unload(:req1)
@@ -145,6 +163,32 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     on_exit(fn -> File.rm_rf!("#{LibraryHandler.extensions_path()}/#{name}") end)
 
     {:error, [%{action: :extract}]} = assert LibraryHandler.extract(:tar, tarball, name)
+  end
+
+  test "Extract refuses a name that is not a single folder name, before touching the disk" do
+    app = :"lib_handler_name_#{System.unique_integer([:positive])}"
+    {tarball, ^app, _module} = EbinFixture.tar_fake_app(app, "0.1.0")
+    base = LibraryHandler.extensions_path()
+    outside = "#{base}-outside-#{System.unique_integer([:positive])}"
+    on_exit(fn -> File.rm_rf!(outside) end)
+
+    for name <- [
+          "",
+          ".",
+          "..",
+          "../#{Path.basename(outside)}",
+          "a/b",
+          "/abs",
+          "x/../../#{Path.basename(outside)}",
+          "nul\0byte",
+          nil,
+          :atom
+        ] do
+      {:error, [%{action: :extract, field: :path}]} =
+        assert LibraryHandler.extract(:tar, tarball, name)
+    end
+
+    refute File.exists?(outside)
   end
 
   test "Extract rejects an archive with a traversal member (tar-slip)" do

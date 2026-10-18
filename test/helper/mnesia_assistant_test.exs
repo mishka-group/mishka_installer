@@ -2,8 +2,11 @@ defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
   use ExUnit.Case, async: false
   # Some tests drive aborted Mnesia ops the Error module logs; capture those expected logs.
   @moduletag :capture_log
+  import ExUnit.CaptureLog
   alias MishkaInstaller.Helper.MnesiaAssistant
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table, Error, Information}
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Error, Information, Query, Table, Transaction}
+
+  doctest MishkaInstaller.Helper.MnesiaAssistant
 
   defmodule Rec do
     defstruct [:id, :name, :tag]
@@ -44,8 +47,6 @@ defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
   end
 
   describe "Error.error_description/2" do
-    import ExUnit.CaptureLog
-
     test "success shapes normalise to {:ok, :atomic}" do
       assert Error.error_description(:ok, :test) == {:ok, :atomic}
       assert Error.error_description({:atomic, :ok}, :test) == {:ok, :atomic}
@@ -75,7 +76,7 @@ defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
       log =
         capture_log(fn ->
           assert {:error, ^err, desc} = Error.error_description(err, :test)
-          assert is_binary(desc) or is_list(desc)
+          assert desc == "Bad type on some provided arguments"
         end)
 
       assert log =~ "error:"
@@ -134,7 +135,7 @@ defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
       assert {:atomic, matched} =
                Transaction.transaction(fn -> Query.match_object({table, :_, :_, :_}) end)
 
-      assert length(matched) == 2
+      assert [_, _] = matched
 
       assert {:atomic, ids} =
                Transaction.transaction(fn ->
@@ -169,7 +170,7 @@ defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
     test "wait_for_tables/2 times out for a table that never loads" do
       ghost = :"ghost_#{System.unique_integer([:positive])}"
       result = Table.wait_for_tables([ghost], 50)
-      assert match?({:timeout, [^ghost]}, result) or match?({:error, _}, result)
+      assert {:timeout, [^ghost]} = result
     end
   end
 

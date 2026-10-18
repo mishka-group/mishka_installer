@@ -47,6 +47,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   empty, the module's `call/2` runs none of the plugins: it answers the `:cannot_run` option, or the
   state it was given when there is none, and `mode/0` is `:error`.
 
+  Returns `:ok`, or `{:error, [%{action: :compile, field: :event, message: _}]}` when the module
+  cannot be built (a plugin entry that is not a plugin, for example). The module is built in its own
+  process, so a failure never raises in the caller.
+
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
   like a plugin joining it, and `MishkaInstaller.Event.EventHandler` rebuilds the module.
@@ -65,6 +69,28 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec create(list(struct()), String.t(), list(module())) :: :ok | error_return
   def create(plugins, event, inaccessible \\ []) do
+    case Extra.isolate(fn -> compile_event(plugins, event, inaccessible) end) do
+      {:ok, result} ->
+        result
+
+      {:exit, reason} ->
+        Logger.error(
+          "[mishka_installer.event] the module of event #{inspect(event)} was not compiled: " <>
+            inspect(reason)
+        )
+
+        {:error,
+         [
+           %{
+             message: "The module of the event could not be compiled.",
+             field: :event,
+             action: :compile
+           }
+         ]}
+    end
+  end
+
+  defp compile_event(plugins, event, inaccessible) do
     module = module_event_name(event)
     escaped_plugins = Macro.escape(plugins)
     mode = if inaccessible == [], do: :ok, else: :error
@@ -82,10 +108,12 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
             %{module: unquote(module), plugins: unquote(escaped_plugins)}
           end
 
+          # credo:disable-for-next-line Credo.Check.Readability.PredicateFunctionNames
           def is_changed?(new_plugins) do
             new_plugins != unquote(escaped_plugins)
           end
 
+          # credo:disable-for-next-line Credo.Check.Readability.PredicateFunctionNames
           def is_initialized?(new_plugin) do
             Enum.member?(unquote(escaped_plugins), new_plugin)
           end
@@ -97,12 +125,6 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     [{^module, _}] = Code.compile_quoted(ast, "#{Extra.randstring(8)}")
     {:module, ^module} = Code.ensure_loaded(module)
     :ok
-  rescue
-    e in CompileError ->
-      {:error, [%{message: e.description, field: :event, action: :compile}]}
-
-    _ ->
-      {:error, [%{message: "Unexpected error", field: :event, action: :compile}]}
   end
 
   # Started-but-not-loaded plugins compile to a stub that runs none of them: it hands back the state,
@@ -123,54 +145,47 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
     quote do
       def call(unquote(state), args \\ []) do
-        private = Keyword.get(args, :private)
-        return_status = Keyword.get(args, :return)
         unquote(meta) = Keyword.get(args, :meta)
 
         performed = unquote(build_chain(plugins, state, meta))
 
-        new_state =
-          if !is_nil(return_status) do
-            unquote(state)
-          else
-            case performed do
-              {:ok, data} when is_list(data) ->
-                if Keyword.keyword?(data) and !is_nil(private),
-                  do: {:ok, Keyword.merge(data, private)},
-                  else: {:ok, data}
-
-              {:ok, data} when is_map(data) ->
-                {:ok, if(!is_nil(private), do: Map.merge(data, private), else: data)}
-
-              {:ok, data} ->
-                {:ok, data}
-
-              {:error, _errors} = errors ->
-                errors
-
-              data when is_list(data) ->
-                if Keyword.keyword?(data) and !is_nil(private),
-                  do: Keyword.merge(data, private),
-                  else: data
-
-              data when is_map(data) ->
-                if !is_nil(private), do: Map.merge(data, private), else: data
-
-              # Any other state — a LiveView callback's `{:noreply, socket}`, a binary — comes back as
-              # the plugins left it; `:private` merges only into a list or a map.
-              other ->
-                other
-            end
-          end
-
-        new_state
+        unquote(__MODULE__).finish_call(performed, unquote(state), args)
       rescue
         e ->
-          MishkaInstaller.Event.ModuleStateCompiler.log_call_error(unquote(event), e)
+          unquote(__MODULE__).log_call_error(unquote(event), e)
           unquote(state)
       end
     end
   end
+
+  @doc false
+  @spec finish_call(any(), any(), keyword()) :: any()
+  def finish_call(performed, state, args) do
+    case Keyword.get(args, :return) do
+      nil -> merge_private(performed, Keyword.get(args, :private))
+      _return -> state
+    end
+  end
+
+  defp merge_private({:ok, data}, private) when is_list(data),
+    do: {:ok, merge_list(data, private)}
+
+  defp merge_private({:ok, data}, private) when is_map(data), do: {:ok, merge_map(data, private)}
+  defp merge_private({:ok, _data} = ok, _private), do: ok
+  defp merge_private({:error, _errors} = errors, _private), do: errors
+  defp merge_private(data, private) when is_list(data), do: merge_list(data, private)
+  defp merge_private(data, private) when is_map(data), do: merge_map(data, private)
+  # Any other state — a LiveView callback's `{:noreply, socket}`, a binary — comes back as the
+  # plugins left it; `:private` merges only into a list or a map.
+  defp merge_private(other, _private), do: other
+
+  defp merge_list(data, nil), do: data
+
+  defp merge_list(data, private),
+    do: if(Keyword.keyword?(data), do: Keyword.merge(data, private), else: data)
+
+  defp merge_map(data, nil), do: data
+  defp merge_map(data, private), do: Map.merge(data, private)
 
   # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
   # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
@@ -248,17 +263,40 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   def purge(event) do
-    module = module_event_name(event)
-    :code.purge(module)
-    :code.delete(module)
-    :ok
+    case event_module(event) do
+      nil ->
+        :ok
+
+      module ->
+        :code.purge(module)
+        :code.delete(module)
+        :ok
+    end
   end
 
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   @doc """
+  Returns the module compiled for `event` on this node, or `nil` when `create/3` never built one.
+
+  It only reads the cache that `module_event_name/1` fills, so it never creates an atom or a cache
+  key: this is the function to call with an event name that is not known to exist.
+
+  ## Examples
+  ```elixir
+  event_module("event_name")
+  ```
+  """
+  @spec event_module(String.t()) :: module() | nil
+  def event_module(event), do: :persistent_term.get({__MODULE__, :name_cache, event}, nil)
+
+  @doc """
   Generates a module name based on the event name.
+
+  It **creates** the module atom and a `:persistent_term` cache key for a name it has not seen, so
+  pass it only the name of an event that is being compiled. `create/3` and `purge_create/3` call it;
+  to find the module of an event that may not exist use `event_module/1`.
 
   > #### Security considerations {: .warning}
   >
@@ -307,7 +345,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   def initialize?(event), do: module_event_name(event).initialize?()
 
   @doc """
-  Safely checks if the event module is initialized, rescuing any errors.
+  Checks if the event module is initialized, answering `false` for an event that is not compiled
+  instead of raising.
 
   ## Examples
   ```elixir
@@ -316,10 +355,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec rescue_initialize?(String.t()) :: boolean()
   def rescue_initialize?(event) do
-    module = module_event_name(event)
-    module.initialize?()
-  rescue
-    _ -> false
+    safe_initialize?(event) and event_module(event).initialize?()
   end
 
   @doc """
@@ -334,8 +370,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec compile_initialize?(String.t()) :: boolean()
   def compile_initialize?(event) do
-    module = module_event_name(event)
-    Code.ensure_loaded?(module)
+    case event_module(event) do
+      nil -> false
+      module -> Code.ensure_loaded?(module)
+    end
   end
 
   @doc """
@@ -348,7 +386,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec safe_initialize?(String.t()) :: boolean()
   def safe_initialize?(event) do
-    module = module_event_name(event)
-    function_exported?(module, :initialize?, 0)
+    case event_module(event) do
+      nil -> false
+      module -> Code.ensure_loaded?(module) and function_exported?(module, :initialize?, 0)
+    end
   end
 end

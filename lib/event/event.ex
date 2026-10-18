@@ -60,18 +60,11 @@ defmodule MishkaInstaller.Event.Event do
   module is being created and destroyed during the compilation process.
   """
   use GuardedStruct
-  alias MishkaInstaller.Helper.{Extra, UUID}
+  alias MishkaInstaller.Helper.{Extra, MnesiaAssistant, Record, UUID}
   import MishkaInstaller.Helper.MnesiaAssistant, only: [er: 1, erl_fields: 4]
-  alias MishkaInstaller.Helper.MnesiaAssistant.{Transaction, Query, Table}
-  alias MishkaInstaller.Helper.MnesiaAssistant.Error, as: MError
   alias MishkaInstaller.Event.EventHandler
+  alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
 
-  @mnesia_info [
-    type: :set,
-    index: [:name, :event, :extension],
-    record_name: __MODULE__,
-    storage_properties: [ets: [{:read_concurrency, true}, {:write_concurrency, true}]]
-  ]
   ####################################################################################
   ########################## (▰˘◡˘▰) Schema (▰˘◡˘▰) ############################
   ####################################################################################
@@ -117,13 +110,7 @@ defmodule MishkaInstaller.Event.Event do
   ################################################################################
   @doc false
   @spec database_config() :: keyword()
-  if MishkaInstaller.__information__().env != :test do
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), disc_copies: [node()])
-  else
-    def database_config(),
-      do: Keyword.merge(@mnesia_info, attributes: keys(), ram_copies: [node()])
-  end
+  def database_config(), do: Record.database_config(__MODULE__, [:name, :event, :extension])
 
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
@@ -272,14 +259,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :start_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            case bulk_start(pl_item) do
-              {:ok, db_plg} -> acc ++ [db_plg]
-              :skip -> acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &bulk_start/1)
 
         EventHandler.do_compile(event, :start, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -302,6 +282,40 @@ defmodule MishkaInstaller.Event.Event do
     else
       if pl_item.status != :held, do: write(:id, pl_item.id, %{status: :held})
       :skip
+    end
+  end
+
+  # Applies `transition` to every plugin of an event; the plugins that moved, ordered by priority.
+  defp transition_all(plugins, transition) do
+    plugins
+    |> Enum.flat_map(fn pl_item ->
+      case transition.(pl_item) do
+        {:ok, db_plg} -> [db_plg]
+        _skipped -> []
+      end
+    end)
+    |> Enum.sort_by(&{&1.priority, &1.name})
+  end
+
+  defp restart_one(pl_item) do
+    with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
+         :ok <- startable?(data.status),
+         :ok <- allowed_events?(data.depends) do
+      write(:id, data.id, %{status: :restarted})
+    end
+  end
+
+  defp stop_one(pl_item) do
+    with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
+         :ok <- stoppable?(data.status) do
+      write(:id, data.id, %{status: :stopped})
+    end
+  end
+
+  defp unregister_one(pl_item) do
+    with {:ok, db_plg} <- delete(:name, pl_item.name) do
+      stop_if_alive(pl_item.name)
+      {:ok, db_plg}
     end
   end
 
@@ -390,18 +404,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :restart_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
-                 :ok <- startable?(data.status),
-                 :ok <- allowed_events?(data.depends),
-                 {:ok, db_plg} <- write(:id, data.id, %{status: :restarted}) do
-              acc ++ [db_plg]
-            else
-              _ -> acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &restart_one/1)
 
         EventHandler.do_compile(event, :restart, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -515,17 +518,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :stop_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            with {:ok, data} <- exist_record?(get(:name, pl_item.name)),
-                 :ok <- stoppable?(data.status),
-                 {:ok, db_plg} <- write(:id, data.id, %{status: :stopped}) do
-              acc ++ [db_plg]
-            else
-              _ -> acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &stop_one/1)
 
         EventHandler.do_compile(event, :stop, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -603,18 +596,7 @@ defmodule MishkaInstaller.Event.Event do
         {:error, [%{message: message, field: :global, action: :unregister_event}]}
 
       data ->
-        sorted_plugins =
-          Enum.reduce(data, [], fn pl_item, acc ->
-            case delete(:name, pl_item.name) do
-              {:ok, db_plg} ->
-                stop_if_alive(pl_item.name)
-                acc ++ [db_plg]
-
-              _ ->
-                acc
-            end
-          end)
-          |> Enum.sort_by(&{&1.priority, &1.name})
+        sorted_plugins = transition_all(data, &unregister_one/1)
 
         EventHandler.do_compile(event, :unregister, queue)
         sync_dependents(Enum.map(sorted_plugins, & &1.name), queue)
@@ -710,19 +692,7 @@ defmodule MishkaInstaller.Event.Event do
   ```
   """
   @spec get() :: list(map() | struct())
-  def get() do
-    pattern = ([__MODULE__] ++ Enum.map(1..length(keys()), fn _x -> :_ end)) |> List.to_tuple()
-
-    Transaction.transaction(fn -> Query.match_object(pattern) end)
-    |> case do
-      {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
-        []
-    end
-  end
+  def get(), do: Record.all(__MODULE__)
 
   @doc """
   To get all plugins or one plugin information from Mnesia database.
@@ -753,7 +723,7 @@ defmodule MishkaInstaller.Event.Event do
     Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
-        data = MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
+        data = MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
         if field in [:event, :extension], do: data, else: List.first(data)
 
       {:aborted, reason} ->
@@ -770,7 +740,7 @@ defmodule MishkaInstaller.Event.Event do
   @spec dirty_get(:name, module()) :: map() | struct() | nil
   def dirty_get(:name, value) do
     :mnesia.dirty_index_read(__MODULE__, value, :name)
-    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
+    |> MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
     |> List.first()
   end
 
@@ -790,18 +760,7 @@ defmodule MishkaInstaller.Event.Event do
   ```
   """
   @spec get(String.t()) :: map() | struct() | nil
-  def get(id) do
-    Transaction.transaction(fn -> Query.read(__MODULE__, id) end)
-    |> case do
-      {:atomic, res} ->
-        MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
-        |> List.first()
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "reading", :global, :database)
-        nil
-    end
-  end
+  def get(id), do: Record.get(__MODULE__, id)
 
   @doc """
   To Add or edit a plugin information from Mnesia database.
@@ -820,23 +779,7 @@ defmodule MishkaInstaller.Event.Event do
   """
   @spec write(builder_entry) :: error_return | okey_return
   def write(data) do
-    case builder(data) do
-      {:ok, struct} ->
-        values_tuple =
-          ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1))) |> List.to_tuple()
-
-        Transaction.durable_transaction(fn -> Query.write(values_tuple) end)
-        |> case do
-          {:atomic, _res} ->
-            {:ok, struct}
-
-          {:aborted, reason} ->
-            Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
-        end
-
-      error ->
-        error
-    end
+    with {:ok, struct} <- builder(data), do: Record.store(__MODULE__, struct)
   end
 
   @doc """
@@ -863,61 +806,8 @@ defmodule MishkaInstaller.Event.Event do
   ```
   """
   @spec write(atom(), String.t() | module(), map()) :: error_return | okey_return
-  def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to) do
-    Transaction.durable_transaction(fn ->
-      case locked_read(field, value) do
-        nil ->
-          :mnesia.abort(:record_not_found)
-
-        data ->
-          merged =
-            data |> Map.merge(updated_to) |> Map.merge(%{updated_at: Extra.get_unix_time()})
-
-          case builder({:root, merged, :edit}) do
-            {:ok, struct} ->
-              ([__MODULE__] ++ Enum.map(keys(), &Map.get(struct, &1)))
-              |> List.to_tuple()
-              |> Query.write()
-
-              struct
-
-            {:error, _} = error ->
-              :mnesia.abort(error)
-          end
-      end
-    end)
-    |> case do
-      {:atomic, struct} ->
-        {:ok, struct}
-
-      {:aborted, :record_not_found} ->
-        message =
-          "The ID of the record you want to update is incorrect or has already been deleted."
-
-        {:error, [%{message: message, field: :global, action: :write}]}
-
-      {:aborted, {:error, _} = error} ->
-        error
-
-      {:aborted, reason} ->
-        Transaction.transaction_error(reason, __MODULE__, "storing", :global, :database)
-    end
-  end
-
-  # Reads a single record under a write lock (by id directly, by name via its index then id) and
-  # converts it to a struct, or `nil`. Must run inside a transaction.
-  defp locked_read(:id, id) do
-    :mnesia.read(__MODULE__, id, :write)
-    |> MishkaInstaller.Helper.MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
-    |> List.first()
-  end
-
-  defp locked_read(:name, name) do
-    case :mnesia.index_read(__MODULE__, name, :name) do
-      [record | _] -> locked_read(:id, elem(record, 1))
-      _ -> nil
-    end
-  end
+  def write(field, value, updated_to) when field in [:id, :name] and is_map(updated_to),
+    do: Record.update(__MODULE__, field, value, updated_to, &builder/1)
 
   @doc """
   To get all plugins ids from Mnesia database.
@@ -990,26 +880,7 @@ defmodule MishkaInstaller.Event.Event do
   @spec delete(atom(), String.t() | module()) :: error_return | okey_return
   def delete(field, value) when field in [:id, :name] do
     selected = if field == :id, do: get(value), else: get(:name, value)
-
-    case selected do
-      nil ->
-        message =
-          "The ID of the record you want to delete is incorrect or has already been deleted."
-
-        {:error, [%{message: message, field: :global, action: :delete}]}
-
-      data ->
-        Transaction.durable_transaction(fn ->
-          Query.delete(__MODULE__, Map.get(data, :id), :write)
-        end)
-        |> case do
-          {:atomic, _res} ->
-            {:ok, data}
-
-          {:aborted, reason} ->
-            Transaction.transaction_error(reason, __MODULE__, "deleting", :global, :database)
-        end
-    end
+    Record.delete(__MODULE__, selected)
   end
 
   @doc """
@@ -1028,10 +899,7 @@ defmodule MishkaInstaller.Event.Event do
   ```
   """
   @spec drop() :: {:ok, :atomic} | {:error, any(), charlist()}
-  def drop() do
-    Table.clear_table(__MODULE__)
-    |> MError.error_description(__MODULE__)
-  end
+  def drop(), do: Record.drop(__MODULE__)
 
   @doc """
   To check is a plugin unique or not in Mnesia database.
@@ -1051,16 +919,7 @@ defmodule MishkaInstaller.Event.Event do
   unique(:name, TestApp.User.Auth)
   ```
   """
-  def unique(field, value) do
-    case get(field, value) do
-      nil ->
-        :ok
-
-      _data ->
-        message = "This event already exists in the database."
-        {:error, [%{message: message, field: :global, action: :unique}]}
-    end
-  end
+  def unique(field, value), do: Record.unique(get(field, value), "event")
 
   @doc """
   This function is exactly like `unique/2` function, except that its output is a Boolean.
@@ -1160,7 +1019,7 @@ defmodule MishkaInstaller.Event.Event do
       |> Enum.sort_by(&{&1.priority, &1.name})
 
     case ready do
-      [] -> Enum.reverse(acc) ++ Enum.sort_by(plugins, &{&1.priority, &1.name})
+      [] -> Enum.reverse(acc, Enum.sort_by(plugins, &{&1.priority, &1.name}))
       [next | _] -> order_loop(plugins -- [next], MapSet.delete(pending, next.name), [next | acc])
     end
   end
@@ -1239,28 +1098,29 @@ defmodule MishkaInstaller.Event.Event do
   # A single pass cannot settle a diamond (a plugin reached before one of its other dependencies was
   # updated), so passes repeat while anything changes, bounded by the size of the affected set.
   defp settle(names, index, changed, rounds) when rounds > 0 do
-    {index, changed, dirty?} =
-      Enum.reduce(names, {index, changed, false}, fn name, {index, changed, dirty?} ->
-        record = Map.get(index, name)
-        desired = if is_nil(record), do: nil, else: desired_status(record, index)
-
-        if is_nil(record) or desired == record.status do
-          {index, changed, dirty?}
-        else
-          case write(:id, record.id, %{status: desired}) do
-            {:ok, updated} ->
-              {Map.put(index, name, updated), Map.put(changed, name, updated), true}
-
-            _error ->
-              {index, changed, dirty?}
-          end
-        end
-      end)
+    {index, changed, dirty?} = Enum.reduce(names, {index, changed, false}, &settle_one/2)
 
     if dirty?, do: settle(names, index, changed, rounds - 1), else: {index, changed}
   end
 
   defp settle(_names, index, changed, _rounds), do: {index, changed}
+
+  defp settle_one(name, {index, changed, dirty?}) do
+    record = Map.get(index, name)
+    desired = if is_nil(record), do: nil, else: desired_status(record, index)
+
+    if is_nil(record) or desired == record.status do
+      {index, changed, dirty?}
+    else
+      case write(:id, record.id, %{status: desired}) do
+        {:ok, updated} ->
+          {Map.put(index, name, updated), Map.put(changed, name, updated), true}
+
+        _error ->
+          {index, changed, dirty?}
+      end
+    end
+  end
 
   # The status a plugin should hold given its dependencies, looked up either in a cascade's snapshot
   # or, with `:db`, in the database.

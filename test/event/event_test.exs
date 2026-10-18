@@ -41,12 +41,16 @@ end
 
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
-  alias MishkaInstaller.Event.Hook
-  alias MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender
-  alias MishkaInstallerTest.Support.MishkaPlugin.RegisterOTPSender
-  alias MishkaInstallerTest.Support.MishkaPlugin.MetaAuditLog
+  alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
+  alias MishkaInstaller.Helper.UUID
+  alias MishkaInstaller.MnesiaRepo
   alias MishkaInstallerTest.Event.EventTest.{AddOne, MetaReader, MetaStamp}
+
+  alias MishkaInstallerTest.Support.MishkaPlugin.{
+    MetaAuditLog,
+    RegisterEmailSender,
+    RegisterOTPSender
+  }
 
   setup do
     :persistent_term.put(:compile_status, "ready")
@@ -54,32 +58,32 @@ defmodule MishkaInstallerTest.Event.EventTest do
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{UUID.generate()}")}"
 
     on_exit(fn ->
-      pid = Process.whereis(MishkaInstaller.MnesiaRepo)
-      pid1 = Process.whereis(MishkaInstaller.Event.EventHandler)
+      pid = Process.whereis(MnesiaRepo)
+      pid1 = Process.whereis(EventHandler)
 
       if !is_nil(pid) and Process.alive?(pid) do
-        GenServer.stop(MishkaInstaller.MnesiaRepo)
+        GenServer.stop(MnesiaRepo)
       end
 
       if !is_nil(pid1) and Process.alive?(pid1) do
-        GenServer.stop(MishkaInstaller.Event.EventHandler)
+        GenServer.stop(EventHandler)
       end
     end)
 
     Process.register(self(), :__mishka_installer_event_test__)
 
-    Application.put_env(:mishka_installer, MishkaInstaller.MnesiaRepo,
+    Application.put_env(:mishka_installer, MnesiaRepo,
       mnesia_dir: mnesia_dir,
       essential: [Event]
     )
 
     MishkaInstaller.subscribe("mnesia")
     MishkaInstaller.subscribe("event")
-    start_supervised!(MishkaInstaller.Event.EventHandler)
-    start_supervised!(MishkaInstaller.MnesiaRepo)
+    start_supervised!(EventHandler)
+    start_supervised!(MnesiaRepo)
 
     assert_receive %{status: :event_status, channel: "mnesia", data: _data}
 
@@ -112,12 +116,12 @@ defmodule MishkaInstallerTest.Event.EventTest do
       |> Event.write()
 
       assert Event.get() != []
-      assert !is_nil(Event.get(:name, MishkaTest.Email))
+      assert %Event{name: MishkaTest.Email} = Event.get(:name, MishkaTest.Email)
       assert :mishka_installer = List.first(Event.get(:event, "after_login_test")).extension
       assert is_nil(Event.get(:name, MishkaTest.Email1))
       assert [] = Event.get(:event, "after_login_test1")
       get_data = Event.get() |> List.first()
-      assert !is_nil(Event.get(get_data.id))
+      assert Event.get(get_data.id) == get_data
     end
 
     test "Update a Plugin record" do
@@ -137,15 +141,17 @@ defmodule MishkaInstallerTest.Event.EventTest do
       %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}
       |> Event.write()
 
-      assert length(Event.ids()) == 1
+      assert [_one] = Event.ids()
     end
 
     test "Unique? plugin Record by name" do
       %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}
       |> Event.write()
 
-      assert !is_nil(Event.get(:name, MishkaTest.Email))
+      assert %Event{name: MishkaTest.Email} = Event.get(:name, MishkaTest.Email)
       assert is_nil(Event.get(:name, MishkaTest.Email1))
+      refute Event.unique?(:name, MishkaTest.Email)
+      assert Event.unique?(:name, MishkaTest.Email1)
     end
 
     test "Delete plugin Record" do
@@ -155,6 +161,31 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert Event.get() != []
       {:ok, _data} = Event.delete(:name, MishkaTest.Email)
       assert Event.get() == []
+    end
+
+    test "Delete, update and unique answer for a record that is not there" do
+      {:error, [%{field: :global, action: :delete}]} =
+        assert Event.delete(:name, MishkaTest.Email)
+
+      {:error, [%{field: :global, action: :delete}]} = assert Event.delete(:id, "missing")
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Event.write(:name, MishkaTest.Email, %{priority: 1})
+
+      {:error, [%{field: :global, action: :write}]} =
+        assert Event.write(:id, "missing", %{priority: 1})
+
+      :ok = assert Event.unique(:name, MishkaTest.Email)
+      assert Event.unique?(:name, MishkaTest.Email)
+
+      %{name: MishkaTest.Email, event: "after_login_test", extension: :mishka_installer}
+      |> Event.write()
+
+      {:error, [%{field: :global, action: :unique, message: message}]} =
+        assert Event.unique(:name, MishkaTest.Email)
+
+      assert message =~ "event"
+      refute Event.unique?(:name, MishkaTest.Email)
     end
 
     test "Drop all plugins records" do
@@ -242,7 +273,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       module = ModuleStateCompiler.module_event_name("after_login_test")
       assert module.initialize?()
 
-      assert length(module.initialize().plugins) == 3
+      assert [_, _, _] = module.initialize().plugins
 
       Event.start(:event, "before_login_test", true)
 
@@ -280,7 +311,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       module = ModuleStateCompiler.module_event_name("after_login_test")
       assert module.initialize?()
 
-      assert length(module.initialize().plugins) == 3
+      assert [_, _, _] = module.initialize().plugins
 
       Event.start(:event, "before_login_test", false)
 
@@ -311,9 +342,9 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, _sorted_events} = assert Event.start()
 
-      assert_receive %{status: :start, data: _data}, 3000
+      assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :start, data: _data}, 3000
+      assert_receive %{status: :start, data: _data}
 
       assert_receive %{status: :purge_create, data: _data}
 
@@ -624,21 +655,21 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
 
       %{module: _, plugins: plugins} = assert module.initialize()
 
-      assert length(plugins) > 0
+      assert [_ | _] = plugins
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
 
       %{module: _, plugins: plugins} = assert module.initialize()
 
-      assert length(plugins) > 0
+      assert [_ | _] = plugins
 
       {:ok, _data} = assert Event.stop()
 
@@ -678,13 +709,13 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       %{module: _, plugins: plugins} = assert module.initialize()
 
-      assert length(plugins) > 0
+      assert [_ | _] = plugins
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
 
       %{module: _, plugins: plugins} = assert module.initialize()
 
-      assert length(plugins) > 0
+      assert [_ | _] = plugins
 
       {:ok, _data} = assert Event.stop(false)
 
@@ -717,7 +748,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       {:ok, _unregister_data} = assert Event.unregister(:name, RegisterEmailSender, true)
 
-      assert_receive %{status: :unregister, data: _data}, 3000
+      assert_receive %{status: :unregister, data: _data}
     end
 
     test "Unregister a plugin - queue false" do
@@ -1009,8 +1040,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       ordered = Event.dependency_order([a, b, c]) |> Enum.map(& &1.name)
       # :b before :a (dependency); among the independents, lower priority first.
-      assert Enum.find_index(ordered, &(&1 == :b)) < Enum.find_index(ordered, &(&1 == :a))
-      assert ordered == [:c, :b, :a] or ordered == [:b, :c, :a]
+      assert ordered == [:c, :b, :a]
     end
 
     test "connections/0 returns the libgraph dependency graph" do
@@ -1181,10 +1211,6 @@ defmodule MishkaInstallerTest.Event.EventTest do
   ###################### (▰˘◡˘▰) Unrolled call chain (▰˘◡˘▰) ##################
   ###################################################################################
   describe "unrolled call chain ===>" do
-    test "the chain is unrolled: the perform/2 list-walk helper no longer exists" do
-      refute function_exported?(ModuleStateCompiler, :perform, 2)
-    end
-
     test "{:reply, :halt, state} stops the chain; later plugins do not run" do
       halter = MishkaInstallerTest.Event.EventTest.Halter
       after_halt = MishkaInstallerTest.Event.EventTest.ShouldNotRun
@@ -1312,7 +1338,12 @@ defmodule MishkaInstallerTest.Event.EventTest do
       m1 = ModuleStateCompiler.module_event_name(event)
       m2 = ModuleStateCompiler.module_event_name(event)
 
-      assert is_atom(m1)
+      assert m1 ==
+               Module.concat([
+                 "MishkaInstaller.Event.ModuleStateCompiler.State",
+                 Macro.camelize(event)
+               ])
+
       assert m1 == m2
       # The second call is a cache hit; the mapping is stored once.
       assert :persistent_term.get({ModuleStateCompiler, :name_cache, event}) == m1

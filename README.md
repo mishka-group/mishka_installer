@@ -107,7 +107,7 @@ Installer.uninstall(%{app: "demo", version: "0.1.0"})
 > `version:` must be a semantic version (`MAJOR.MINOR.PATCH`, with optional pre-release and build, e.g. `1.0.0-rc.1`). Anything else, such as `"1.0"`, is refused with an `{:error, [...]}` before anything is installed.
 
 > [!NOTE]
-> Remote installs (`:url`/`:github_*`) are **fail-closed**: they require the source host/repo in `config :mishka_installer, :allowlist, url_hosts:/github_repos:`. Optional `checksum:` (sha256) pins the artifact; `:protected_apps` guards apps from being overwritten/removed. See `MishkaInstaller.Installer.Installer`.
+> Remote installs (`:url`/`:github_*`) are **fail-closed**: they require the source host/repo in `config :mishka_installer, :allowlist, url_hosts:/github_repos:`, a `:url` must be `https`, and a redirect is followed only to `https` hosts the install may use. `checksum:` (sha256) pins the artifact; without one a remote install logs a warning, and `require_checksum: true` in the same config refuses it; `:protected_apps` guards apps from being overwritten/removed. See `MishkaInstaller.Installer.Installer`.
 
 ---
 

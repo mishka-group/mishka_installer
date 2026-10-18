@@ -1,6 +1,8 @@
 defmodule MishkaInstallerTest.Event.HookTest do
   use ExUnit.Case, async: false
-  alias MishkaInstaller.Event.{Event, ModuleStateCompiler}
+  alias MishkaInstaller.Event.{Event, EventHandler, ModuleStateCompiler}
+  alias MishkaInstaller.Helper.UUID
+  alias MishkaInstaller.MnesiaRepo
   alias MishkaInstallerTest.Support.MishkaPlugin.Bulk
 
   setup do
@@ -9,32 +11,32 @@ defmodule MishkaInstallerTest.Event.HookTest do
     tmp_dir = System.tmp_dir!()
 
     mnesia_dir =
-      "#{Path.join(tmp_dir, "mishka-installer-#{MishkaInstaller.Helper.UUID.generate()}")}"
+      "#{Path.join(tmp_dir, "mishka-installer-#{UUID.generate()}")}"
 
     on_exit(fn ->
-      pid = Process.whereis(MishkaInstaller.MnesiaRepo)
-      pid1 = Process.whereis(MishkaInstaller.Event.EventHandler)
+      pid = Process.whereis(MnesiaRepo)
+      pid1 = Process.whereis(EventHandler)
 
       if !is_nil(pid) and Process.alive?(pid) do
-        GenServer.stop(MishkaInstaller.MnesiaRepo)
+        GenServer.stop(MnesiaRepo)
       end
 
       if !is_nil(pid1) and Process.alive?(pid1) do
-        GenServer.stop(MishkaInstaller.Event.EventHandler)
+        GenServer.stop(EventHandler)
       end
     end)
 
     Process.register(self(), :__mishka_installer_event_test__)
 
-    Application.put_env(:mishka_installer, MishkaInstaller.MnesiaRepo,
+    Application.put_env(:mishka_installer, MnesiaRepo,
       mnesia_dir: mnesia_dir,
       essential: [Event]
     )
 
     MishkaInstaller.subscribe("mnesia")
     MishkaInstaller.subscribe("event")
-    start_supervised!(MishkaInstaller.Event.EventHandler)
-    start_supervised!(MishkaInstaller.MnesiaRepo)
+    start_supervised!(EventHandler)
+    start_supervised!(MnesiaRepo)
 
     assert_receive %{status: :event_status, channel: "mnesia", data: _data}
 
@@ -53,7 +55,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -75,7 +77,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -92,7 +94,7 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :restart, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -105,13 +107,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       {:ok, _db_plg} = assert Bulk.EventCSocial.stop()
 
       assert_receive %{status: :stop, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
@@ -125,13 +127,13 @@ defmodule MishkaInstallerTest.Event.HookTest do
 
       assert_receive %{status: :start, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       {:ok, _db_plg} = assert Bulk.EventCSocial.unregister()
 
       assert_receive %{status: :unregister, data: _data}
 
-      assert_receive %{status: :purge_create, data: _data}, 3000
+      assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("event_c")
       assert Code.ensure_loaded?(module)
