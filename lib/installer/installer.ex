@@ -333,7 +333,7 @@ defmodule MishkaInstaller.Installer.Installer do
   ## Example:
 
   ```elixir
-  data = %{app: "uniq", version: "0.6.1", tag: "0.6.1", type: :hex, path: "uniq"}
+  data = %{app: "uniq", version: "0.6.1", tag: "0.6.1", type: :github_tag, path: "owner/uniq"}
   write(data)
   ```
   """
@@ -356,9 +356,9 @@ defmodule MishkaInstaller.Installer.Installer do
   ## Example:
 
   ```elixir
-  write(:app, "mishka_developer_tools", %{type: :hex})
+  write(:app, "mishka_developer_tools", %{type: :path})
 
-  write(:id, "c63aea42-209a-40fb-b5c6-a0d28ee7e25b", %{type: :hex})
+  write(:id, "c63aea42-209a-40fb-b5c6-a0d28ee7e25b", %{type: :path})
   ```
   """
   @spec write(atom(), String.t(), map()) :: error_return | okey_return

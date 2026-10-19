@@ -16,7 +16,7 @@
 ---
 
 > [!WARNING]
-> **🔧 Low maintenance.** The author currently only responds to pull requests. Don't use `master`; the current release line is `0.1.7`.
+> **🔧 Low maintenance.** The author currently only responds to pull requests. Don't use `master`; the current release line is `0.1.14`.
 
 ---
 
