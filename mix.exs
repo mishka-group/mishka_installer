@@ -9,7 +9,7 @@ defmodule MishkaInstaller.MixProject do
       app: :mishka_installer,
       version: @version,
       elixir: "~> 1.17",
-      name: "Mishka installer",
+      name: "Mishka Installer",
       elixirc_paths: elixirc_paths(Mix.env()),
       # The release restart fixture's source lives under test/ but isn't ExUnit — don't warn on it.
       test_ignore_filters: [&String.starts_with?(&1, "test/integration/")],
@@ -19,7 +19,7 @@ defmodule MishkaInstaller.MixProject do
       dialyzer: [ignore_warnings: ".dialyzer_ignore.exs"],
       description: description(),
       package: package(),
-      homepage_url: "https://github.com/mishka-group",
+      homepage_url: "https://mishka.tools/installer",
       source_url: @source_url,
       docs: docs(),
       test_coverage: [
@@ -100,9 +100,12 @@ defmodule MishkaInstaller.MixProject do
       licenses: ["Apache-2.0"],
       maintainers: ["Shahryar Tavakkoli"],
       links: %{
+        "Mishka Installer" => "https://mishka.tools/installer",
+        "Official document" => "https://mishka.tools/installer/docs",
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/master/CHANGELOG.md",
-        "Sponsor" => "https://github.com/sponsors/mishka-group"
+        "Sponsor" => "https://github.com/sponsors/mishka-group",
+        "Contributors" => "#{@source_url}/graphs/contributors"
       }
     ]
   end
