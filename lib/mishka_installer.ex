@@ -15,7 +15,7 @@ defmodule MishkaInstaller do
   possible for the developers to write their required applications beyond the core source code.
 
   > **NOTICE**: Do not use the master branch; this library is under heavy development.
-  > Expect version 0.1.7, and for using the new features, please wait until a new release is out.
+  > The current release line is `0.1.14`, and for using the new features, please wait until a new release is out.
 
 
   ##### This library is divided into the following main sections:
@@ -143,14 +143,22 @@ defmodule MishkaInstaller do
   ```elixir
   alias MishkaInstaller.Installer.Installer
 
-  # Normal calling
-  Installer.install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+  # `path` points to the pre-built package placed inside the extensions directory.
+  {:ok, lib} = Installer.builder(%{
+    app: "some_name",
+    version: "0.1.0",
+    type: :path,
+    path: "<extensions_path>/some_name-0.1.0"
+  })
 
   # Normal calling
-  Installer.uninstall(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+  Installer.install(lib)
 
   # Normal calling
-  Installer.async_install(%__MODULE__{app: "some_name", path: "some_name", type: :hex})
+  Installer.uninstall(lib)
+
+  # Normal calling
+  Installer.async_install(lib)
   ```
 
   > For more information please see the `MishkaInstaller.Installer.Installer` module.
@@ -167,7 +175,7 @@ defmodule MishkaInstaller do
   ```elixir
   def deps do
     [
-      {:mishka_installer, "~> 0.1.7"}
+      {:mishka_installer, "~> 0.1.14"}
     ]
   end
   ```
@@ -252,8 +260,8 @@ defmodule MishkaInstaller do
 
   #### Please before using this library set these:
 
-  - Set `PROJECT_PATH` as the **System env** or `:mishka, :project_path` as the **Application env**
-  - Set `MIX_ENV` as the **System env** or `:mishka, :project_env` as the **Application env**
+  - Set `PROJECT_PATH` as the **System env** or `:mishka_installer, :project_path` as the **Application env**
+  - Set `MIX_ENV` as the **System env** or `:mishka_installer, :project_env` as the **Application env**
   """
   def __information__() do
     env =
