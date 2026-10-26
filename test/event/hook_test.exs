@@ -18,11 +18,11 @@ defmodule MishkaInstallerTest.Event.HookTest do
       pid1 = Process.whereis(EventHandler)
 
       if !is_nil(pid) and Process.alive?(pid) do
-        GenServer.stop(MnesiaRepo)
+        MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MnesiaRepo)
       end
 
       if !is_nil(pid1) and Process.alive?(pid1) do
-        GenServer.stop(EventHandler)
+        MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(EventHandler)
       end
     end)
 

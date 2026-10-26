@@ -93,7 +93,9 @@ defmodule MishkaInstallerTest.Event.RequestFlowTest do
     on_exit(fn ->
       for name <- [MnesiaRepo, EventHandler] do
         pid = Process.whereis(name)
-        if is_pid(pid) and Process.alive?(pid), do: GenServer.stop(name)
+
+        if is_pid(pid) and Process.alive?(pid),
+          do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(name)
       end
 
       ModuleStateCompiler.purge(@events)

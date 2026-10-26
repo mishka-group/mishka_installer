@@ -7,11 +7,13 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     pid1 = Process.whereis(MishkaInstaller.Event.EventHandler)
 
     if !is_nil(pid) and Process.alive?(pid) do
-      GenServer.stop(MishkaInstaller.MnesiaRepo)
+      MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MishkaInstaller.MnesiaRepo)
     end
 
     if !is_nil(pid1) and Process.alive?(pid1) do
-      GenServer.stop(MishkaInstaller.Event.EventHandler)
+      MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(
+        MishkaInstaller.Event.EventHandler
+      )
     end
 
     :ok
