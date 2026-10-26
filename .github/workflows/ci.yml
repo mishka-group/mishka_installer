@@ -61,6 +61,11 @@ jobs:
           mix format --check-formatted
           mix compile --warnings-as-errors
 
+      # mix_audit; Hex's own audit is hex-audit.yml.
+      - name: Audit dependencies
+        if: matrix.pair.elixir == '1.20.1'
+        run: mix deps.audit
+
       - name: Set up environment
         run: |
           echo "PROJECT_PATH=$(pwd)" >> $GITHUB_ENV
