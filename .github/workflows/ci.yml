@@ -8,6 +8,10 @@ on:
     branches:
       - master
 
+# No job writes to the repository, so the token can only read it.
+permissions:
+  contents: read
+
 jobs:
   ci:
     env:
