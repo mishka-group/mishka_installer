@@ -17,7 +17,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
 
       if !is_nil(pid) and Process.alive?(pid) do
-        GenServer.stop(MishkaInstaller.MnesiaRepo)
+        MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MishkaInstaller.MnesiaRepo)
       end
     end)
 

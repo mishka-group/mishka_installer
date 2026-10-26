@@ -104,7 +104,9 @@ defmodule MishkaInstaller.Event.HealthTest do
     on_exit(fn ->
       for name <- [MishkaInstaller.MnesiaRepo, EventHandler] do
         pid = Process.whereis(name)
-        if is_pid(pid) and Process.alive?(pid), do: GenServer.stop(name)
+
+        if is_pid(pid) and Process.alive?(pid),
+          do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(name)
       end
 
       File.rm_rf!(tmp)

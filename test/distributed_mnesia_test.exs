@@ -88,7 +88,10 @@ defmodule MishkaInstaller.DistributedMnesiaTest do
 
     on_exit(fn ->
       pid = Process.whereis(MnesiaRepo)
-      if is_pid(pid) and Process.alive?(pid), do: GenServer.stop(MnesiaRepo)
+
+      if is_pid(pid) and Process.alive?(pid),
+        do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MnesiaRepo)
+
       Application.delete_env(:mishka_installer, MnesiaRepo)
     end)
 
