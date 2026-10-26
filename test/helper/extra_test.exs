@@ -1,7 +1,11 @@
 defmodule MishkaInstaller.Helper.ExtraTest do
   use ExUnit.Case, async: true
-  import ExUnit.CaptureLog, only: [capture_log: 1]
   alias MishkaInstaller.Helper.Extra
+
+  # Forwards every log event to the test that attached it. See `wait_for_logs/1`.
+  defmodule LogProbe do
+    def log(event, %{config: %{pid: pid}}), do: send(pid, {:log_probe, event})
+  end
 
   doctest MishkaInstaller.Helper.Extra
 
@@ -57,19 +61,17 @@ defmodule MishkaInstaller.Helper.ExtraTest do
       assert Extra.isolate(fn -> Process.get(:isolate_probe) end) == {:ok, nil}
     end
 
+    @tag :capture_log
     test "an exception and a throw come back as {:exit, reason}, and are logged" do
-      log =
-        capture_log(fn ->
-          assert {:exit, {%RuntimeError{message: "boom"}, [_ | _]}} =
-                   Extra.isolate(fn -> raise "boom" end)
+      probe_logs()
 
-          assert {:exit, {{:nocatch, :thrown}, [_ | _]}} =
-                   Extra.isolate(fn -> throw(:thrown) end)
+      assert {:exit, {%RuntimeError{message: "boom"}, [_ | _]}} =
+               Extra.isolate(fn -> raise "boom" end)
 
-          flush_logs()
-        end)
+      assert {:exit, {{:nocatch, :thrown}, [_ | _]}} =
+               Extra.isolate(fn -> throw(:thrown) end)
 
-      assert log =~ "boom"
+      wait_for_logs(["boom", "thrown"])
     end
 
     test "an exit and a kill come back as {:exit, reason}" do
@@ -103,10 +105,26 @@ defmodule MishkaInstaller.Helper.ExtraTest do
     end
   end
 
-  # The emulator reports a crashed process through `:logger_proxy`; once it has answered, the report
-  # reached the handlers.
-  defp flush_logs do
-    :sys.get_state(:logger_proxy)
-    Logger.flush()
+  # THE CRASH IS REPORTED BY THE CRASHED PROCESS, NOT BY THIS ONE, and the emulator hands the report
+  # to the logger on its own time. A capture that ends when `isolate/1` returns can end before the
+  # report arrives, which is how this test failed on both CI runners while passing every local run.
+  # So the test waits for the reports themselves: a handler sends each log event here, and
+  # `wait_for_logs/1` returns once every expected text has been seen, whatever order they come in.
+  defp probe_logs do
+    id = :"isolate_log_probe_#{System.unique_integer([:positive])}"
+    :ok = :logger.add_handler(id, LogProbe, %{config: %{pid: self()}})
+    on_exit(fn -> :logger.remove_handler(id) end)
+  end
+
+  defp wait_for_logs([]), do: :ok
+
+  defp wait_for_logs(texts) do
+    receive do
+      {:log_probe, event} ->
+        logged = event |> :logger_formatter.format(%{template: [:msg]}) |> IO.chardata_to_string()
+        wait_for_logs(Enum.reject(texts, &String.contains?(logged, &1)))
+    after
+      5_000 -> flunk("not logged within 5 seconds: #{inspect(texts)}")
+    end
   end
 end
