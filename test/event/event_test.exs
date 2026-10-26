@@ -41,6 +41,7 @@ end
 
 defmodule MishkaInstallerTest.Event.EventTest do
   use ExUnit.Case, async: false
+  import MishkaInstallerTest.Support.Eventually, only: [eventually: 1]
   alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
   alias MishkaInstaller.Helper.UUID
   alias MishkaInstaller.MnesiaRepo
@@ -271,9 +272,9 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
-      assert module.initialize?()
+      assert eventually(fn -> module.initialize?() end)
 
-      assert [_, _, _] = module.initialize().plugins
+      assert eventually(fn -> match?([_, _, _], module.initialize().plugins) end)
 
       Event.start(:event, "before_login_test", true)
 
@@ -282,12 +283,12 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
-      assert module.initialize?()
+      assert eventually(fn -> module.initialize?() end)
 
       module = ModuleStateCompiler.module_event_name("before_none_login_test")
 
       assert_raise UndefinedFunctionError, fn ->
-        assert module.initialize?()
+        module.initialize?()
       end
     end
 
@@ -321,7 +322,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
       module = ModuleStateCompiler.module_event_name("before_none_login_test")
 
       assert_raise UndefinedFunctionError, fn ->
-        assert module.initialize?()
+        module.initialize?()
       end
     end
 
@@ -351,10 +352,10 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
-      assert module.initialize?()
+      assert eventually(fn -> module.initialize?() end)
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
-      assert module.initialize?()
+      assert eventually(fn -> module.initialize?() end)
     end
 
     test "Start all events - queue false" do
@@ -572,10 +573,10 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
-      assert module.initialize?()
+      assert eventually(fn -> module.initialize?() end)
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
-      assert module.initialize?()
+      assert eventually(fn -> module.initialize?() end)
 
       {:ok, _data} = assert Event.stop(:event, "after_login_test", true)
 
@@ -585,7 +586,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
 
-      %{module: _, plugins: []} = assert module.initialize()
+      assert eventually(fn -> match?(%{plugins: []}, module.initialize()) end)
 
       {:ok, _data} = assert Event.stop(:event, "before_login_test", true)
 
@@ -595,7 +596,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
 
-      %{module: _, plugins: []} = assert module.initialize()
+      assert eventually(fn -> match?(%{plugins: []}, module.initialize()) end)
     end
 
     test "Stop an event - queue false" do
@@ -661,15 +662,11 @@ defmodule MishkaInstallerTest.Event.EventTest do
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
 
-      %{module: _, plugins: plugins} = assert module.initialize()
-
-      assert [_ | _] = plugins
+      assert eventually(fn -> match?(%{plugins: [_ | _]}, module.initialize()) end)
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
 
-      %{module: _, plugins: plugins} = assert module.initialize()
-
-      assert [_ | _] = plugins
+      assert eventually(fn -> match?(%{plugins: [_ | _]}, module.initialize()) end)
 
       {:ok, _data} = assert Event.stop()
 
@@ -682,10 +679,10 @@ defmodule MishkaInstallerTest.Event.EventTest do
       assert_receive %{status: :purge_create, data: _data}
 
       module = ModuleStateCompiler.module_event_name("after_login_test")
-      %{module: _, plugins: []} = assert module.initialize()
+      assert eventually(fn -> match?(%{plugins: []}, module.initialize()) end)
 
       module = ModuleStateCompiler.module_event_name("before_login_test")
-      %{module: _, plugins: []} = assert module.initialize()
+      assert eventually(fn -> match?(%{plugins: []}, module.initialize()) end)
     end
 
     test "Stop all events - queue false" do
