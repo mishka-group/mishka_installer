@@ -92,6 +92,8 @@ defmodule MishkaInstaller.Event.HealthTest do
     WeirdProbe
   }
 
+  alias MishkaInstallerTest.Support.ProcessHelpers
+
   setup do
     :persistent_term.put(:compile_status, "ready")
     tmp = Path.join(System.tmp_dir!(), "mishka-health-#{System.unique_integer([:positive])}")
@@ -106,7 +108,7 @@ defmodule MishkaInstaller.Event.HealthTest do
         pid = Process.whereis(name)
 
         if is_pid(pid) and Process.alive?(pid),
-          do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(name)
+          do: ProcessHelpers.stop_if_running(name)
       end
 
       File.rm_rf!(tmp)

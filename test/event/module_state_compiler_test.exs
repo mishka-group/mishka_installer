@@ -1,19 +1,18 @@
 defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, Hook, ModuleStateCompiler}
+  alias MishkaInstallerTest.Support.ProcessHelpers
 
   setup_all do
     pid = Process.whereis(MishkaInstaller.MnesiaRepo)
     pid1 = Process.whereis(MishkaInstaller.Event.EventHandler)
 
     if !is_nil(pid) and Process.alive?(pid) do
-      MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MishkaInstaller.MnesiaRepo)
+      ProcessHelpers.stop_if_running(MishkaInstaller.MnesiaRepo)
     end
 
     if !is_nil(pid1) and Process.alive?(pid1) do
-      MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(
-        MishkaInstaller.Event.EventHandler
-      )
+      ProcessHelpers.stop_if_running(MishkaInstaller.Event.EventHandler)
     end
 
     :ok

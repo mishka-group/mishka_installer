@@ -2,6 +2,7 @@ defmodule MishkaInstaller.MnesiaRepoTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Installer.Installer
   alias MishkaInstaller.MnesiaRepo
+  alias MishkaInstallerTest.Support.ProcessHelpers
 
   @events [
     [:mishka_installer, :mnesia, :init, :start],
@@ -41,7 +42,7 @@ defmodule MishkaInstaller.MnesiaRepoTest do
       pid = Process.whereis(MnesiaRepo)
 
       if is_pid(pid) and Process.alive?(pid),
-        do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MnesiaRepo)
+        do: ProcessHelpers.stop_if_running(MnesiaRepo)
 
       File.rm_rf!(tmp)
     end)

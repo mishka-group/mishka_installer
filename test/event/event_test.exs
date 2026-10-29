@@ -53,6 +53,8 @@ defmodule MishkaInstallerTest.Event.EventTest do
     RegisterOTPSender
   }
 
+  alias MishkaInstallerTest.Support.ProcessHelpers
+
   setup do
     :persistent_term.put(:compile_status, "ready")
     # Got the idea from: https://github.com/Schultzer/ecto_qlc/blob/main/test/support/data_case.ex
@@ -66,11 +68,11 @@ defmodule MishkaInstallerTest.Event.EventTest do
       pid1 = Process.whereis(EventHandler)
 
       if !is_nil(pid) and Process.alive?(pid) do
-        MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MnesiaRepo)
+        ProcessHelpers.stop_if_running(MnesiaRepo)
       end
 
       if !is_nil(pid1) and Process.alive?(pid1) do
-        MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(EventHandler)
+        ProcessHelpers.stop_if_running(EventHandler)
       end
     end)
 

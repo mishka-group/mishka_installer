@@ -4,6 +4,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
   alias MishkaInstaller.Helper.UUID
   alias MishkaInstaller.Installer.{CompileHandler, Downloader, Installer, LibraryHandler}
   alias MishkaInstallerTest.Support.EbinFixture
+  alias MishkaInstallerTest.Support.ProcessHelpers
   import ExUnit.CaptureLog, only: [capture_log: 1]
 
   setup do
@@ -17,7 +18,7 @@ defmodule MishkaInstallerTest.Installer.InstallerTest do
       pid = Process.whereis(MishkaInstaller.MnesiaRepo)
 
       if !is_nil(pid) and Process.alive?(pid) do
-        MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MishkaInstaller.MnesiaRepo)
+        ProcessHelpers.stop_if_running(MishkaInstaller.MnesiaRepo)
       end
     end)
 
