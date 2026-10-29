@@ -3,6 +3,7 @@ defmodule MishkaInstaller.DistributedMnesiaTest do
   alias MishkaInstaller.Helper.MnesiaAssistant
   alias MishkaInstaller.Helper.MnesiaAssistant.{Query, Table, Transaction}
   alias MishkaInstaller.MnesiaRepo
+  alias MishkaInstallerTest.Support.ProcessHelpers
 
   @moduletag :distributed
 
@@ -90,7 +91,7 @@ defmodule MishkaInstaller.DistributedMnesiaTest do
       pid = Process.whereis(MnesiaRepo)
 
       if is_pid(pid) and Process.alive?(pid),
-        do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(MnesiaRepo)
+        do: ProcessHelpers.stop_if_running(MnesiaRepo)
 
       Application.delete_env(:mishka_installer, MnesiaRepo)
     end)

@@ -64,6 +64,8 @@ defmodule MishkaInstallerTest.Event.DependencyTest do
     Sibling
   }
 
+  alias MishkaInstallerTest.Support.ProcessHelpers
+
   @root_evt "dep_root_evt"
   @mid_evt "dep_mid_evt"
   @leaf_evt "dep_leaf_evt"
@@ -83,7 +85,7 @@ defmodule MishkaInstallerTest.Event.DependencyTest do
         pid = Process.whereis(name)
 
         if is_pid(pid) and Process.alive?(pid),
-          do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(name)
+          do: ProcessHelpers.stop_if_running(name)
       end
 
       for event <- [@root_evt, @mid_evt, @leaf_evt, @diamond_evt],

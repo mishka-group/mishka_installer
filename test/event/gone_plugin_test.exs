@@ -19,6 +19,7 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
 
   alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
   alias MishkaInstallerTest.Event.GonePluginTest.{Dependent, Kept}
+  alias MishkaInstallerTest.Support.ProcessHelpers
 
   @removed MishkaInstallerTest.Event.GonePluginTest.Removed
   @event "gone_plugin_evt"
@@ -38,7 +39,7 @@ defmodule MishkaInstallerTest.Event.GonePluginTest do
         pid = Process.whereis(name)
 
         if is_pid(pid) and Process.alive?(pid),
-          do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(name)
+          do: ProcessHelpers.stop_if_running(name)
       end
 
       for event <- [@event, @dependent_event], do: ModuleStateCompiler.purge(event)

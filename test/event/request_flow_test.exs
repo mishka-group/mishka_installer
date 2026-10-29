@@ -82,6 +82,7 @@ defmodule MishkaInstallerTest.Event.RequestFlowTest do
   alias MishkaInstaller.MnesiaRepo
   alias MishkaInstallerTest.Event.RequestFlowTest.{BrokenPlugin, FirstPlugin, GatePlugin}
   alias MishkaInstallerTest.Event.RequestFlowTest.{Router, SecondPlugin}
+  alias MishkaInstallerTest.Support.ProcessHelpers
 
   @events ["web:request:flow_test", "web:request:broken_flow_test", "web:request:gate_test"]
 
@@ -95,7 +96,7 @@ defmodule MishkaInstallerTest.Event.RequestFlowTest do
         pid = Process.whereis(name)
 
         if is_pid(pid) and Process.alive?(pid),
-          do: MishkaInstallerTest.Support.ProcessHelpers.stop_if_running(name)
+          do: ProcessHelpers.stop_if_running(name)
       end
 
       ModuleStateCompiler.purge(@events)

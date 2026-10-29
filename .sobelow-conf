@@ -3,10 +3,20 @@
 # module atom is made only by ModuleStateCompiler.create/3.
 # Traversal.FileModule: the paths are built from the extensions directory and checked names, or are
 # operator configuration (the mnesia directory, the app file of a high-access call).
+# DOS.ModuleConcat: the one Module.concat/1 is ModuleStateCompiler.build_module_name/1, the same
+# place that makes the event module atom (see above).
+# RCE.Compile: ModuleStateCompiler.compile_event/3 compiles a fixed module template, the escaped
+# plugin list and the event module name; no outside source or file is compiled.
 [
   exit: :low,
   format: "txt",
-  ignore: ["DOS.StringToAtom", "DOS.BinToAtom", "Traversal.FileModule"],
+  ignore: [
+    "DOS.StringToAtom",
+    "DOS.BinToAtom",
+    "DOS.ModuleConcat",
+    "RCE.Compile",
+    "Traversal.FileModule"
+  ],
   ignore_files: [],
   include_mix_tasks: false,
   include_scripts: false,
