@@ -25,8 +25,8 @@ jobs:
               elixir: "1.17.1"
               otp: "27.0"
           - pair:
-              elixir: "1.20.1"
-              otp: "29.0.2"
+              elixir: "1.20.5-otp-29"
+              otp: "29.1.2"
 
     runs-on: ubuntu-latest
 
@@ -60,14 +60,14 @@ jobs:
           mix deps.compile
 
       - name: Check formatting and compile warnings
-        if: matrix.pair.elixir == '1.20.1'
+        if: matrix.pair.elixir == '1.20.5-otp-29'
         run: |
           mix format --check-formatted
           mix compile --warnings-as-errors
 
       # mix_audit; Hex's own audit is hex-audit.yml.
       - name: Audit dependencies
-        if: matrix.pair.elixir == '1.20.1'
+        if: matrix.pair.elixir == '1.20.5-otp-29'
         run: mix deps.audit
 
       - name: Set up environment
