@@ -1,4 +1,4 @@
-# Changelog for MishkaInstaller Unreleased
+# Changelog for MishkaInstaller 0.1.15
 
 ### Security:
 
@@ -25,6 +25,8 @@
   before they reach a URL, and the asset URL the API answers with must be an `https` URL on
   `github.com`
 - `ModuleStateCompiler`'s `create/3` no longer hands the `CompileError` description to its caller
+- `plug_crypto` 2.2.1 replaces the release that showed the secret key base in stack trace arguments
+  (EEF-CVE-2026-105963)
 
 ### Added:
 
@@ -42,6 +44,19 @@
   relied on such a redirect needs that host in `url_hosts`
 - `Hook.run_health/2` answers `{:error, {:exit, {exception, stacktrace}}}` for a probe that raises,
   where it answered `{:error, {:raised, exception}}`
+- Every dependency is at its latest release: `html_sanitize_ex` 1.5.6, `jump_credo_checks` 0.7.1,
+  `sobelow` 0.18.1, `spark` 2.7.9 and `splode` 0.3.3 among them. The release runs on Erlang 29.1.2
+  and Elixir 1.20.5 with the temporary OTP 29.0.5 pin removed, and the oldest supported pair,
+  Elixir 1.17.1 with OTP 27.0, stays in the test matrix
+- The code passes `mix ci`: `hex.audit` and `deps.audit` first, then compile with warnings as
+  errors, format, credo, sobelow, dialyzer, ex_dna and the tests. Related functions of `Event`,
+  `Installer` and `Hook` are split into small steps, and the moduledocs of `Hook` and
+  `LibraryHandler` start with what they do. The tests no longer race the processes they stop
+- A GitHub Actions workflow runs `mix hex.audit` on pull requests, master and every day and sends
+  its report to code scanning, the CI workflow runs `mix deps.audit`, Dependabot checks the Hex
+  dependencies and the Actions every week, and Hex dependency graph submission feeds GitHub's
+  dependency graph. Workflows that never write get a read-only `GITHUB_TOKEN`
+- The package links point to mishka.tools, the official docs, the sponsors and the contributors
 
 ### Fixed:
 
@@ -206,6 +221,12 @@
 
 - Add optional :meta arg passing read-only context to `call/2` plugins
 
+# Changelog for MishkaInstaller 0.1.7
+
+### Changed:
+
+- `guarded_struct` is `~> 0.1.0`, the stable release that follows `0.1.0-beta.8`
+
 # Changelog for MishkaInstaller 0.1.6
 
 ### Features:
@@ -240,6 +261,39 @@
 - Fix `@impl`/deprecation/codegen warnings (declare `on_dependency_error/1`, `module.initialize?()` parens, generated `:halt` clause) [#102](https://github.com/mishka-group/mishka_installer/pull/102)
 
 
+# Changelog for MishkaInstaller 0.1.5
+
+### Changed:
+
+- `mishka_developer_tools` is `~> 0.1.10` and `guarded_struct` is `~> 0.0.5`
+
+# Changelog for MishkaInstaller 0.1.4
+
+### Changed:
+
+- Dependencies are updated to `phoenix_pubsub` 2.2, `req` 0.5.17, `plug` 1.19, `telemetry` 1.4,
+  `ex_doc` 0.40 and `hex_core` 0.15
+
+# Changelog for MishkaInstaller 0.1.3
+
+### Changed:
+
+- Hook registration is lazy instead of forced when a Hook starts
+- A plugin module that has no `call/2` hands back the data it was given, where it answered
+  `{:error, :undefined_function_error}`
+- `mishka_developer_tools` is `~> 0.1.9`
+
+# Changelog for MishkaInstaller 0.1.2
+
+### Fixed:
+
+- Elixir 1.18 works: the Hook keeps only the project settings that can be serialized at compile time
+
+### Changed:
+
+- **(BREAKING CHANGE)** Elixir `~> 1.17` is required
+- `req` is `~> 0.5.15`, `plug` is `~> 1.18.1` and `guarded_struct` is `~> 0.0.4`
+
 # Changelog for MishkaInstaller 0.1.1
 
 ### Global
@@ -261,3 +315,53 @@ You will see that this version of the project has undergone a total overhaul, an
 Because of this, it is not possible to write down the details, and each area has its own document that you are able to study thoroughly.
 
 - Based on: https://github.com/mishka-group/mishka_installer/pull/99
+
+# Changelog for MishkaInstaller 0.0.4
+
+### Added:
+
+- `MishkaInstaller.Helper.LibraryMaker` downloads an extension from GitHub or Hex and extracts it
+- The dashboard installs an extension from an uploaded archive, a git URL or Hex, can switch an
+  extension's status, and shows a description for each dependency
+- A plugin can name its owner library, and `get_app_by_extension` hands the Hook actions the
+  plugins of one extension
+
+### Changed:
+
+- The runtime sourcing module compiles a dependency outside the user's project and keeps the
+  extensions directory outside it too
+- The project asks for the user's `PubSub` and times out when the root project's `Repo` is not
+  connected
+- Every module and function of the library has documentation, with graphs of how the parts connect
+
+### Fixed:
+
+- Installing an extension whose module uses a `__using__` macro as a database
+- Installing from an uploaded zip file, and sending an update to an extension installed from a path
+
+# Changelog for MishkaInstaller 0.0.3
+
+### Added:
+
+- Dependencies are installed and updated at run time from `git`, `hex` or an uploaded file, through
+  a queue of `Oban` jobs, with an auto update checker and a mix file creator
+- A dashboard installs plugins and components, and shows the compiling activities, the installed
+  plugins and the list of updates
+- Plugins are called from `ETS`, carry read-only private state and parameters, and the behaviour of
+  a plugin is optional. A plugin router behaviour was added
+- A settings `ETS` that works with an external `Gettext` and `mishka_cms` live settings
+- Elixir 1.13.4 and Erlang OTP 25
+
+# Changelog for MishkaInstaller 0.0.2
+
+### Added:
+
+- The `OnUserBeforeLogin` behaviour and its callbacks
+
+### Fixed:
+
+- The `priv` folder is part of the package files, and the Hex docs are built
+
+# Changelog for MishkaInstaller 0.0.1
+
+Initial release.

@@ -15,7 +15,7 @@ defmodule MishkaInstaller do
   possible for the developers to write their required applications beyond the core source code.
 
   > **NOTICE**: Do not use the master branch; this library is under heavy development.
-  > The current release line is `0.1.14`, and for using the new features, please wait until a new release is out.
+  > The current release line is `0.1.15`, and for using the new features, please wait until a new release is out.
 
 
   ##### This library is divided into the following main sections:
@@ -175,7 +175,7 @@ defmodule MishkaInstaller do
   ```elixir
   def deps do
     [
-      {:mishka_installer, "~> 0.1.14"}
+      {:mishka_installer, "~> 0.1.15"}
     ]
   end
   ```
