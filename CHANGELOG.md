@@ -20,6 +20,9 @@
 - An event's compiled `call/2` reads `meta` only when one of its plugins takes it with `call/2`, and
   a call with no args answers what the chain answered without scanning them. On an Apple M4, a chain
   of 5 plugins went from 58 ns to 38 ns a call (`bench/hook_call.exs`)
+- An event's module runs its chain as one private step function per plugin instead of nested
+  `case`s, so building it takes time linear in the chain: 99 plugins went from 2.5 s to 0.22 s,
+  25 from 258 ms to 69 ms, with `Hook.call/3` as fast
 - A plugin's `config/0` is one literal built when the plugin compiles, so `config/1`, which every
   lifecycle function and status poll reads, no longer merges a keyword list on each call (115 ns
   to 13 ns)
@@ -32,6 +35,25 @@
   5.5 µs to 0.7 µs a read. `Event.dirty_get/2` is now the same read as `get(:name, _)`
 
 ### Fixed:
+
+- `return: false` answers the plugins' result, like no `:return` at all; only `return: true`
+  answers the state given. Every value but `nil` acted as `true` before. Anything but a boolean
+  raises an `ArgumentError` naming the option
+
+- A bad `:private` option is the caller's `ArgumentError`, not a plugin crash. The compiled
+  `call/2` finishes (`:return`, `:private`) in the `else` of its `try`, outside the plugin rescue,
+  so `private: 5` no longer gets logged as "a plugin raised" with the plugins' result lost.
+  `private` is a map or a keyword list and merges into either result shape: `private: [x: 1]`
+  into a map result raised before
+
+- `Hook.call/3` and `call!/3` with `args` that are not a list (`nil`, a map, a string) raise an
+  `ArgumentError` that names them, before any plugin runs. They raised a `FunctionClauseError`
+  inside the chain, which the plugin rescue then logged as a plugin crash and hit again while
+  reading `:raised`. The compiled `call/2` takes only a list
+
+- A rebuild drops every slot module of the event that no process runs any more, except the one
+  that answered until that rebuild, so slots no longer pile up after callers outlived builds.
+  `purge/1` also drops the event's name and slot keys once nothing runs its modules
 
 - An event's compiled chain holds only `:started` and `:restarted` plugins, as the `Hook` status
   table says. A `:registered` plugin, stored but never started, ran in the chain before; it now

@@ -68,7 +68,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   otherwise into the next free slot (`...ModuleStateCompiler.State1.YourEvent`, and so on). The
   caller finishes on the version it entered, and later calls run the new one. Once nothing runs
   the old version, the next build goes back to the event's own name, so an event uses more than one
-  slot only while a caller outlives two builds.
+  slot only while a caller outlives two builds. Each build also drops every other slot that no
+  process runs, except the one that answered until this build: a caller that looked it up just
+  before still finds it.
 
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
@@ -110,7 +112,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   defp compile_event(plugins, event, inaccessible) do
-    module = free_slot(event, module_event_name(event), 0)
+    base = module_event_name(event)
+    previous = event_module(event)
+    module = free_slot(event, base, 0)
     escaped_plugins = Macro.escape(plugins)
     mode = if inaccessible == [], do: :ok, else: :error
 
@@ -145,25 +149,28 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     {:module, ^module} = Code.ensure_loaded(module)
     # An atom value: putting the same one again is a no-op, and erasing it needs no global GC.
     :persistent_term.put(compiled_key(event), module)
+    retire_idle(event, base, [module, previous])
+    :ok
   end
 
   # Started-but-not-loaded plugins compile to a stub that runs none of them: it hands back the state,
   # or the caller's `:cannot_run` answer.
   defp call_ast(:error, _event, _plugins) do
     quote do
-      def call(state, args \\ []), do: Keyword.get(args, :cannot_run, state)
+      def call(state, args \\ []) when is_list(args), do: Keyword.get(args, :cannot_run, state)
     end
   end
 
-  # One shared `state` var for the param and the unrolled chain. `meta` is read from the args only
-  # when a plugin of the chain takes it with `call/2`, so a chain of `call/1` plugins never scans them.
+  # `meta` is read from the args only when a plugin of the chain takes it with `call/2`, so a chain of
+  # `call/1` plugins never scans them.
   defp call_ast(:ok, event, plugins) do
     state = Macro.var(:state, __MODULE__)
     meta = Macro.var(:meta, __MODULE__)
-    chain = build_chain(plugins, state, meta)
+    takes_meta? = any_call2?(plugins)
+    chain = first_step(plugins, state, meta, takes_meta?)
 
     performed =
-      if any_call2?(plugins) do
+      if takes_meta? do
         quote do
           unquote(meta) = Keyword.get(args, :meta)
           unquote(chain)
@@ -172,14 +179,24 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
         chain
       end
 
+    # `finish_call/3` runs in the `else` of the `try`, outside the rescue: a bad `:return` or
+    # `:private` is the caller's ArgumentError, never reported as a plugin crash. The `try` stays
+    # explicit because a function-level `else` reads as a mistake.
     quote do
-      def call(unquote(state), args \\ []) do
-        unquote(__MODULE__).finish_call(unquote(performed), unquote(state), args)
-      rescue
-        e ->
-          unquote(__MODULE__).log_call_error(unquote(event), e, __STACKTRACE__)
-          Keyword.get(args, :raised, unquote(state))
+      def call(unquote(state), args \\ []) when is_list(args) do
+        # credo:disable-for-next-line Credo.Check.Readability.PreferImplicitTry
+        try do
+          unquote(performed)
+        rescue
+          e ->
+            unquote(__MODULE__).log_call_error(unquote(event), e, __STACKTRACE__)
+            Keyword.get(args, :raised, unquote(state))
+        else
+          performed -> unquote(__MODULE__).finish_call(performed, unquote(state), args)
+        end
       end
+
+      unquote_splicing(build_steps(plugins, 0, takes_meta?))
     end
   end
 
@@ -189,48 +206,104 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
   def finish_call(performed, state, args) do
     case Keyword.get(args, :return) do
-      nil -> merge_private(performed, Keyword.get(args, :private))
-      _return -> state
+      true ->
+        state
+
+      returned when returned in [false, nil] ->
+        merge_private(performed, Keyword.get(args, :private))
+
+      other ->
+        raise ArgumentError, return_error(other)
     end
   end
 
+  defp return_error(return),
+    do:
+      "the :return option of MishkaInstaller.Event.Hook.call/3 must be a boolean, got: " <>
+        inspect(return)
+
+  # `:private` is a map or a keyword list; anything else is the caller's ArgumentError.
   defp merge_private(data, nil), do: data
+  defp merge_private(data, private) when is_map(private), do: merge_into(data, private)
 
-  defp merge_private({:ok, data}, private) when is_list(data),
-    do: {:ok, merge_list(data, private)}
+  defp merge_private(data, private) when is_list(private) do
+    if Keyword.keyword?(private),
+      do: merge_into(data, private),
+      else: raise(ArgumentError, private_error(private, "a map or a keyword list"))
+  end
 
-  defp merge_private({:ok, data}, private) when is_map(data), do: {:ok, merge_map(data, private)}
-  defp merge_private({:ok, _data} = ok, _private), do: ok
-  defp merge_private({:error, _errors} = errors, _private), do: errors
-  defp merge_private(data, private) when is_list(data), do: merge_list(data, private)
-  defp merge_private(data, private) when is_map(data), do: merge_map(data, private)
-  # Any other state — a LiveView callback's `{:noreply, socket}`, a binary — comes back as the
-  # plugins left it; `:private` merges only into a list or a map.
-  defp merge_private(other, _private), do: other
+  defp merge_private(_data, private),
+    do: raise(ArgumentError, private_error(private, "a map or a keyword list"))
+
+  defp merge_into({:ok, data}, private) when is_list(data) or is_map(data),
+    do: {:ok, merge_into(data, private)}
+
+  defp merge_into(data, private) when is_map(data) and is_map(private),
+    do: Map.merge(data, private)
+
+  defp merge_into(data, private) when is_map(data), do: Map.merge(data, Map.new(private))
+  defp merge_into(data, private) when is_list(data), do: merge_list(data, private)
+
+  # Any other state — a LiveView callback's `{:noreply, socket}`, `{:error, _}`, a binary — comes
+  # back as the plugins left it; `:private` merges only into a list or a map.
+  defp merge_into(other, _private), do: other
 
   defp merge_list(data, private),
-    do: if(Keyword.keyword?(data), do: Keyword.merge(data, private), else: data)
+    do: if(Keyword.keyword?(data), do: Keyword.merge(data, keyword(private)), else: data)
 
-  defp merge_map(data, private), do: Map.merge(data, private)
+  defp keyword(private) when is_list(private), do: private
 
-  # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
-  # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
-  # invoked exactly as before. The arity is resolved here, at dispatch-compile time. `apply/3` with a
+  defp keyword(private) do
+    pairs = Map.to_list(private)
+
+    if Keyword.keyword?(pairs),
+      do: pairs,
+      else: raise(ArgumentError, private_error(private, "a map with atom keys or a keyword list"))
+  end
+
+  defp private_error(private, expected),
+    do:
+      "the :private option of MishkaInstaller.Event.Hook.call/3 must be #{expected} to merge " <>
+        "into the result, got: #{inspect(private)}"
+
+  # Unroll the plugin chain into one private step function per plugin, each a direct call and a
+  # tail call to the next: `{:reply, state}` continues, `{:reply, :halt, state}` halts. Flat steps
+  # compile in time linear in the chain (nested `case`s grew quadratically: 2.5 s for 99 plugins) and
+  # run as fast. A plugin that defines `call/2` is handed `meta` as a second, read-only argument;
+  # `call/1` plugins are invoked exactly as before. The arity is resolved here, at dispatch-compile
+  # time, and `meta` is passed along only when a plugin of the chain takes it. `apply/3` with a
   # literal module, function and argument list compiles to the same direct remote call, and keeps the
   # type checker from warning on every build that a plugin which never halts makes the halt clause
   # unreachable.
-  defp build_chain([], state_var, _meta_var), do: state_var
+  defp first_step([], state, _meta, _takes_meta?), do: state
+  defp first_step(_plugins, state, meta, takes_meta?), do: step_call(0, state, meta, takes_meta?)
 
-  defp build_chain([plugin | rest], state_var, meta_var) do
-    next = Macro.unique_var(:state, __MODULE__)
-    call_args = if call2?(plugin), do: [state_var, meta_var], else: [state_var]
+  defp step_call(index, state, meta, true), do: {step_name(index), [], [state, meta]}
+  defp step_call(index, state, _meta, false), do: {step_name(index), [], [state]}
 
-    quote do
-      case apply(unquote(plugin.name), :call, unquote(call_args)) do
-        {:reply, :halt, halted} -> halted
-        {:reply, unquote(next)} -> unquote(build_chain(rest, next, meta_var))
+  defp step_name(index), do: String.to_atom("step_" <> Integer.to_string(index))
+
+  defp build_steps([], _index, _takes_meta?), do: []
+
+  defp build_steps([plugin | rest], index, takes_meta?) do
+    state = Macro.var(:state, __MODULE__)
+    meta = Macro.var(:meta, __MODULE__)
+    next = Macro.var(:next, __MODULE__)
+    params = if takes_meta?, do: [state, meta], else: [state]
+    call_args = if call2?(plugin), do: [state, meta], else: [state]
+    continue = if rest == [], do: next, else: step_call(index + 1, next, meta, takes_meta?)
+
+    step =
+      quote do
+        defp unquote(step_name(index))(unquote_splicing(params)) do
+          case apply(unquote(plugin.name), :call, unquote(call_args)) do
+            {:reply, :halt, halted} -> halted
+            {:reply, unquote(next)} -> unquote(continue)
+          end
+        end
       end
-    end
+
+    [step | build_steps(rest, index + 1, takes_meta?)]
   end
 
   defp any_call2?(plugins), do: Enum.any?(plugins, &call2?/1)
@@ -272,7 +345,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   The event leaves the `event_module/1` lookup before its code is deleted, so
   `MishkaInstaller.Event.Hook.call/3` answers the state it is given from then on, as for an event
   that was never compiled. A process still running a version of the event finishes on it: that
-  version is dropped once nothing runs it, at the latest by the event's next build.
+  version is dropped once nothing runs it, at the latest by the event's next build. When nothing
+  runs any version, the event's `:persistent_term` keys go too.
 
   > #### Security considerations {: .warning}
   >
@@ -298,9 +372,24 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
       _module ->
         :persistent_term.erase(compiled_key(event))
-        base = module_event_name(event)
-        for index <- 0..last_slot(event), do: retire(slot(base, index))
+
+        if retire_idle(event, module_event_name(event), []) do
+          :persistent_term.erase({__MODULE__, :last_slot, event})
+          :persistent_term.erase({__MODULE__, :name_cache, event})
+        end
+
         :ok
+    end
+  end
+
+  # Drops every slot of the event but `keep` that no process runs, and answers whether all of them
+  # are gone. A slot that is neither loaded nor holds an old version costs two BIF checks.
+  defp retire_idle(event, base, keep) do
+    for index <- 0..last_slot(event),
+        module = slot(base, index),
+        module not in keep,
+        reduce: true do
+      gone? -> retire(module) and gone?
     end
   end
 
@@ -331,10 +420,19 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     if index > last_slot(event), do: :persistent_term.put({__MODULE__, :last_slot, event}, index)
   end
 
-  # Drops a slot's code unless a process still runs its old version; the next build of the event
-  # drops that version once it is free.
+  # Drops a slot's code and answers whether it is gone. A version a process still runs stays, and a
+  # later build drops it once it is free.
   defp retire(module) do
-    if :code.soft_purge(module) and :code.delete(module), do: :code.soft_purge(module)
+    if :erlang.module_loaded(module) or :erlang.check_old_code(module) do
+      :code.soft_purge(module) and drop_current(module)
+    else
+      true
+    end
+  end
+
+  defp drop_current(module) do
+    :code.delete(module)
+    :code.soft_purge(module)
   end
 
   ####################################################################################

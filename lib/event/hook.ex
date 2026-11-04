@@ -466,9 +466,13 @@ defmodule MishkaInstaller.Event.Hook do
   ## Parameters
   - `event` (String.t()): The name of the event.
   - `data` (any()): The data to be passed to the event module.
-  - `args` (keyword()): Additional arguments for the call:
-    - `private` — merged into a list or map result, untouched by the plugins.
-    - `return` — when set, the plugins run and `data` is returned as it was given.
+  - `args` (keyword()): Additional arguments for the call. Anything but a list raises an
+    `ArgumentError` before any plugin runs:
+    - `private` — merged into a map or keyword-list result (also inside `{:ok, _}`), untouched by
+      the plugins. A map or a keyword list; anything else raises an `ArgumentError` naming the
+      option, outside the plugin rescue, so it is never reported as a plugin crash.
+    - `return` — `true`: the plugins run and `data` is returned as it was given. `false` or no
+      option: the plugins' result. Anything else raises an `ArgumentError` naming the option.
     - `meta` — read-only side context handed to plugins that opt in with `call/2`; unlike `private`
       it is never merged into the result.
     - `cannot_run` — the answer when the event cannot run: one of its plugins is started but not
@@ -509,12 +513,16 @@ defmodule MishkaInstaller.Event.Hook do
   ```
   """
   @spec call(String.t(), any(), keyword()) :: any()
-  def call(event, data, args \\ []) do
+  def call(event, data, args \\ [])
+
+  def call(event, data, args) when is_list(args) do
     case ModuleStateCompiler.event_module(event) do
       nil -> data
       module -> module.call(data, args)
     end
   end
+
+  def call(_event, _data, args), do: raise(ArgumentError, args_error(args))
 
   @doc """
   The only difference between this function and the `call/3` function is that the former
@@ -526,12 +534,20 @@ defmodule MishkaInstaller.Event.Hook do
   `cannot_run`, or `data`, and a plugin that raises makes it answer `raised`, or `data`.
   """
   @spec call!(String.t(), any(), keyword()) :: any()
-  def call!(event, data, args \\ []) do
+  def call!(event, data, args \\ [])
+
+  def call!(event, data, args) when is_list(args) do
     case ModuleStateCompiler.event_module(event) do
       nil -> raise UndefinedFunctionError, message: "the event #{inspect(event)} is not compiled"
       module -> module.call(data, args)
     end
   end
+
+  def call!(_event, _data, args), do: raise(ArgumentError, args_error(args))
+
+  defp args_error(args),
+    do:
+      "the args of MishkaInstaller.Event.Hook.call/3 must be a keyword list, got: #{inspect(args)}"
 
   @doc """
   Profiles an event's compiled plugin chain: runs each plugin once with `state` and returns how long

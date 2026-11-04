@@ -1,3 +1,16 @@
+for n <- 1..40 do
+  defmodule Module.concat(MishkaInstallerTest.Event.ModuleStateCompilerTest.Long, "P#{n}") do
+    @moduledoc false
+    @n n
+    def call(state), do: {:reply, [@n | state]}
+  end
+end
+
+defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest.Long.Halt do
+  @moduledoc false
+  def call(state, meta), do: {:reply, :halt, [{:halt, meta} | state]}
+end
+
 defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, Hook, ModuleStateCompiler}
@@ -50,6 +63,32 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     assert module.initialize?()
     %{module: _, plugins: plugins} = assert module.initialize()
     assert [_ | _] = plugins
+  end
+
+  test "a long chain runs every plugin in order, hands meta along, and stops at a halt" do
+    event = "ms_long_#{System.unique_integer([:positive])}"
+    on_exit(fn -> ModuleStateCompiler.purge(event) end)
+    long = MishkaInstallerTest.Event.ModuleStateCompilerTest.Long
+    names = for n <- 1..40, do: Module.concat(long, "P#{n}")
+
+    build = fn modules ->
+      for name <- modules do
+        {:ok, plugin} =
+          Event.builder(%{name: name, event: event, extension: :mishka_installer})
+
+        plugin
+      end
+    end
+
+    :ok = ModuleStateCompiler.create(build.(names), event)
+    assert Hook.call(event, []) == Enum.to_list(40..1//-1)
+
+    {first, rest} = Enum.split(names, 30)
+
+    :ok =
+      ModuleStateCompiler.create(build.(first ++ [Module.concat(long, "Halt")] ++ rest), event)
+
+    assert Hook.call(event, [], meta: :m) == [{:halt, :m} | Enum.to_list(30..1//-1)]
   end
 
   test "building an event prints no compiler warning for plugins that never halt" do
@@ -129,9 +168,9 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   end
 
   describe "finish_call/3 ===>" do
-    test "return hands back the state the call was given" do
+    test "return: true hands back the state the call was given, return: false the result" do
       assert ModuleStateCompiler.finish_call({:ok, %{a: 2}}, %{a: 1}, return: true) == %{a: 1}
-      assert ModuleStateCompiler.finish_call(:anything, :given, return: false) == :given
+      assert ModuleStateCompiler.finish_call(:anything, :given, return: false) == :anything
     end
 
     test "private is merged into a keyword list or a map, and into nothing else" do

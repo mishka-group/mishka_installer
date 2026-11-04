@@ -96,6 +96,70 @@ defmodule MishkaInstallerTest.Event.RecompileTest do
     finishes(caller, ref)
   end
 
+  test "a slot no caller runs any more is dropped by the next rebuilds" do
+    {caller, ref} = blocked_caller()
+    compile([Blocker, Two])
+    compile([Blocker, Three])
+    slot = ModuleStateCompiler.event_module(@event)
+    refute slot == ModuleStateCompiler.module_event_name(@event)
+    finishes(caller, ref)
+
+    compile([Two])
+    compile([Three])
+
+    refute :erlang.module_loaded(slot)
+    refute :erlang.check_old_code(slot)
+    assert Hook.call(@event, %{}) == %{three: true}
+  end
+
+  test "slots stay bounded while callers keep outliving rebuilds" do
+    callers =
+      for plugins <- [[Blocker, Two], [Blocker, Three], [Blocker, Two, Three]] do
+        caller = blocked_caller()
+        compile(plugins)
+        caller
+      end
+
+    for {caller, ref} <- callers, do: finishes(caller, ref)
+    for plugins <- [[Two], [Three], [Two, Three]], do: compile(plugins)
+
+    assert loaded_slots() == [ModuleStateCompiler.event_module(@event)]
+  end
+
+  test "purge/1 leaves no module or key of the event behind once nothing runs it" do
+    {caller, ref} = blocked_caller()
+    compile([Blocker, Two])
+    compile([Blocker, Three])
+    finishes(caller, ref)
+    slots = loaded_slots()
+
+    :ok = ModuleStateCompiler.purge(@event)
+
+    for module <- slots do
+      refute :erlang.module_loaded(module)
+      refute :erlang.check_old_code(module)
+    end
+
+    for key <- [:compiled, :name_cache, :last_slot] do
+      assert :persistent_term.get({ModuleStateCompiler, key, @event}, :none) == :none
+    end
+  end
+
+  # Every module of this event that is loaded or has an old version, in slot order.
+  defp loaded_slots do
+    name = Atom.to_string(ModuleStateCompiler.module_event_name(@event))
+
+    suffix =
+      String.replace_prefix(name, "Elixir.MishkaInstaller.Event.ModuleStateCompiler.State.", "")
+
+    for {module, _} <- :code.all_loaded(),
+        text = Atom.to_string(module),
+        text == name or
+          (String.starts_with?(text, "Elixir.MishkaInstaller.Event.ModuleStateCompiler.State") and
+             String.ends_with?(text, "." <> suffix)),
+        do: module
+  end
+
   test "once no caller runs an old version, the event is built under its own name again" do
     {caller, ref} = blocked_caller()
     compile([Blocker, Two])
