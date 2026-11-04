@@ -70,6 +70,7 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
 
   test "initialize? / safe_initialize? / compile_initialize? / rescue_initialize? track compile state" do
     evt = "ms_init_evt"
+    on_exit(fn -> ModuleStateCompiler.purge(evt) end)
     # uncompiled: the safe/compile/rescue variants say false (and don't raise)
     refute ModuleStateCompiler.safe_initialize?(evt)
     refute ModuleStateCompiler.compile_initialize?(evt)
