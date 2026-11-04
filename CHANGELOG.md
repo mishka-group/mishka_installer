@@ -19,6 +19,13 @@
 - A plugin's `config/0` is one literal built when the plugin compiles, so `config/1`, which every
   lifecycle function and status poll reads, no longer merges a keyword list on each call (115 ns
   to 13 ns)
+- The registry reads `Event.get/0`, `get/1`, `get/2`, `group_events/1` and `Installer.get/0`,
+  `get/1`, `get/2` are dirty reads through `Transaction.dirty/1`: an ETS lookup on the node's copy
+  of the table instead of a transaction. They take no lock, so they never queue behind Mnesia's
+  transaction and lock managers or wait for a status write that holds the record, and they still
+  answer `[]`, `nil` or the error tuple while Mnesia is stopped. A record becomes its struct in one
+  map build. `Event.get(:name, plugin)` went from 7.5 µs to 0.9 µs, and 16 readers at once from
+  5.5 µs to 0.7 µs a read. `Event.dirty_get/2` is now the same read as `get(:name, _)`
 
 ### Fixed:
 

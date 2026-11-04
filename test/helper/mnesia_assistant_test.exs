@@ -28,6 +28,11 @@ defmodule MishkaInstaller.Helper.MnesiaAssistantTest do
                [%Rec{id: 1, name: "a", tag: "x"}]
     end
 
+    test "a record shorter than the struct keeps the struct's defaults for the rest" do
+      assert MnesiaAssistant.tuple_to_map([{Rec, 1, "a"}], [:id, :name, :tag], Rec, []) ==
+               [%Rec{id: 1, name: "a", tag: nil}]
+    end
+
     test "handles :\"$end_of_table\" and {records, cont}" do
       assert MnesiaAssistant.tuple_to_map(:"$end_of_table", [:id], nil, []) == []
 

@@ -309,7 +309,7 @@ defmodule MishkaInstaller.Installer.Installer do
   """
   @spec get(:app, String.t()) :: struct() | nil
   def get(field, value) when field in [:app] do
-    Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
+    Transaction.dirty(fn -> Query.dirty_index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
         MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])

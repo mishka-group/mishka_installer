@@ -776,7 +776,7 @@ defmodule MishkaInstaller.Event.Hook do
   @doc false
   def plugin_re_event(state) do
     new_state =
-      case Event.dirty_get(:name, state[:name]) do
+      case Event.get(:name, state[:name]) do
         nil -> state
         data -> Keyword.merge(state, status: data.status, depends: data.depends)
       end
