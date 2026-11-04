@@ -204,6 +204,25 @@ Supervisor.start_link(children, opts)
 
 <!-- livebook:{"break_markdown":true} -->
 
+To give the plugins their own restart budget, run them as one group: a crash storm of plugins then stops only the group, and its parent starts it again while the other children keep running.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+children = [
+  ...
+  {MishkaInstaller.Event.PluginSupervisor,
+   name: UserManagement.Plugins,
+   plugins: [
+     UserManagement.Plugins.SendSmsPlugin,
+     UserManagement.Plugins.SendEmailPlugin,
+     UserManagement.Plugins.SendOTPPlugin
+   ]}
+]
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
 Since we did not add the `Application` module in `LiveBook`, we have to start it manually, but the above method is recommended for the actual project.
 
 ```elixir

@@ -76,6 +76,14 @@ To start a plugin automatically, add its module to your supervision tree:
 children = [RegisterEmailSender, ...]
 ```
 
+Or run an extension's plugins as one group with its own restart budget, so a crash storm of plugins stops only the group and the rest of your tree keeps running:
+
+```elixir
+children = [{MishkaInstaller.Event.PluginSupervisor, name: MyApp.Plugins, plugins: [RegisterEmailSender, ...]}]
+```
+
+A plugin's process only drives its lifecycle; the event runs in the caller's process. When the process dies, its supervisor starts it again with its stored status, and the event keeps running the plugin meanwhile. `unregister/0` ends the process for good.
+
 Switch a plugin off and on again — `stop/0` disables it, `enable/0` is the only way back:
 
 ```elixir

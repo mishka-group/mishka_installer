@@ -40,8 +40,8 @@ defmodule MishkaInstaller.Event.Hook do
   If this opportunity is provided, the management can manage its own plugins in different ways
   if it has a dashboard.
 
-  It is crucial to highlight that each plugin is its own `GenServer`; in addition,
-  it is dynamically supervised, and the information is stored in the database as well as in Mnesia.
+  It is crucial to highlight that each plugin is its own `GenServer`, started by your own
+  supervision tree (see "Supervision" below), and its record is stored in Mnesia.
 
   Furthermore, this section is very useful even if the programmer wants to perform many tasks
   that are not associated with Perform defined functions.
@@ -157,6 +157,27 @@ defmodule MishkaInstaller.Event.Hook do
   opts = [strategy: :one_for_one, name: SomeModule.Supervisor]
   Supervisor.start_link(children, opts)
   ```
+
+  ### Supervision
+
+  A plugin is an ordinary worker: `use MishkaInstaller.Event.Hook` gives it a `child_spec/1` with
+  `restart: :transient`, so any supervisor starts it, as above. To give an extension's plugins
+  their own restart budget, run them as one group with `MishkaInstaller.Event.PluginSupervisor`;
+  a crash storm of plugins then stops only the group, and the rest of the tree keeps running:
+
+  ```elixir
+  children = [
+    ...
+    {MishkaInstaller.Event.PluginSupervisor, name: SomeModule.Plugins, plugins: [RegisterEmailSender]}
+  ]
+  ```
+
+  The process drives the plugin's lifecycle (register, start, a status poll) and is not on the call
+  path: `call/3` runs the event's compiled module in the caller's process. When the process dies,
+  its supervisor starts it again and it registers with its stored status. The event keeps running
+  the plugin meanwhile, even after the supervisor gave up; `plugin_health/2` reports
+  `alive?: false`. `unregister/0` ends the process for good, `stop/0` switches the plugin off and
+  leaves the process running, and `Supervisor.terminate_child/2` does not switch it off.
 
   #### You can call all plugins of an event:
 

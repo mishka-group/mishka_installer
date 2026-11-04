@@ -6,6 +6,10 @@
   replies with something other than `{:reply, _}` or `{:reply, :halt, _}`. The plugins after it do
   not run. Without it the call answers the state it was given, as before. The log line names the
   event and carries the stacktrace, so it shows the plugin that raised
+- `MishkaInstaller.Event.PluginSupervisor` runs a list of plugins as one `:one_for_one` group in
+  your own tree, with its own `:max_restarts`/`:max_seconds`: a burst of plugin deaths stops only
+  the group, and its parent starts it again. Its docs and `Hook`'s new "Supervision" section say
+  what happens when a plugin process dies
 
 ### Changed:
 
