@@ -351,26 +351,23 @@ defmodule MishkaInstaller.Event.Hook do
                       is_nil(v)
                   end)
       @plugin_event Keyword.get(opts, :event)
-      @initial Keyword.get(opts, :initial, %{})
-      @plugin_name __MODULE__
       @after_compile __MODULE__
-      @checking Keyword.get(opts, :checking, 1000)
-      @queue Keyword.get(opts, :queue, true)
 
-      # `config/0` carries the plugin's compile-time options; the rest of the macro delegates to `Hook.*`.
+      # `config/0` carries the plugin's compile-time options as one literal, built here once; the
+      # rest of the macro delegates to `Hook.*`.
+      @hook_config Keyword.merge(@app_config,
+                     __plugin__: __MODULE__,
+                     __event__: @plugin_event,
+                     __initial__: Keyword.get(opts, :initial, %{}),
+                     __queue__: Keyword.get(opts, :queue, true),
+                     __checking__: Keyword.get(opts, :checking, 1000)
+                   )
+
       @spec config() :: keyword()
-      def config() do
-        Keyword.merge(@app_config,
-          __plugin__: @plugin_name,
-          __event__: @plugin_event,
-          __initial__: @initial,
-          __queue__: @queue,
-          __checking__: @checking
-        )
-      end
+      def config(), do: @hook_config
 
       @spec config(atom()) :: any()
-      def config(key), do: Keyword.get(config(), key)
+      def config(key), do: Keyword.get(@hook_config, key)
 
       @spec register() :: okey_return | error_return
       def register(), do: Hook.plugin_register(__MODULE__)

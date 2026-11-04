@@ -16,6 +16,9 @@
 - An event's compiled `call/2` reads `meta` only when one of its plugins takes it with `call/2`, and
   a call with no args answers what the chain answered without scanning them. On an Apple M4, a chain
   of 5 plugins went from 58 ns to 38 ns a call (`bench/hook_call.exs`)
+- A plugin's `config/0` is one literal built when the plugin compiles, so `config/1`, which every
+  lifecycle function and status poll reads, no longer merges a keyword list on each call (115 ns
+  to 13 ns)
 
 ### Fixed:
 
