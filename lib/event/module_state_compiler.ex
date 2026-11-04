@@ -161,15 +161,16 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     end
   end
 
-  # One shared `state` var for the param and the unrolled chain. `meta` is read from the args only
-  # when a plugin of the chain takes it with `call/2`, so a chain of `call/1` plugins never scans them.
+  # `meta` is read from the args only when a plugin of the chain takes it with `call/2`, so a chain of
+  # `call/1` plugins never scans them.
   defp call_ast(:ok, event, plugins) do
     state = Macro.var(:state, __MODULE__)
     meta = Macro.var(:meta, __MODULE__)
-    chain = build_chain(plugins, state, meta)
+    takes_meta? = any_call2?(plugins)
+    chain = first_step(plugins, state, meta, takes_meta?)
 
     performed =
-      if any_call2?(plugins) do
+      if takes_meta? do
         quote do
           unquote(meta) = Keyword.get(args, :meta)
           unquote(chain)
@@ -194,6 +195,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
           performed -> unquote(__MODULE__).finish_call(performed, unquote(state), args)
         end
       end
+
+      unquote_splicing(build_steps(plugins, 0, takes_meta?))
     end
   end
 
@@ -263,24 +266,44 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       "the :private option of MishkaInstaller.Event.Hook.call/3 must be #{expected} to merge " <>
         "into the result, got: #{inspect(private)}"
 
-  # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
-  # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
-  # invoked exactly as before. The arity is resolved here, at dispatch-compile time. `apply/3` with a
+  # Unroll the plugin chain into one private step function per plugin, each a direct call and a
+  # tail call to the next: `{:reply, state}` continues, `{:reply, :halt, state}` halts. Flat steps
+  # compile in time linear in the chain (nested `case`s grew quadratically: 2.5 s for 99 plugins) and
+  # run as fast. A plugin that defines `call/2` is handed `meta` as a second, read-only argument;
+  # `call/1` plugins are invoked exactly as before. The arity is resolved here, at dispatch-compile
+  # time, and `meta` is passed along only when a plugin of the chain takes it. `apply/3` with a
   # literal module, function and argument list compiles to the same direct remote call, and keeps the
   # type checker from warning on every build that a plugin which never halts makes the halt clause
   # unreachable.
-  defp build_chain([], state_var, _meta_var), do: state_var
+  defp first_step([], state, _meta, _takes_meta?), do: state
+  defp first_step(_plugins, state, meta, takes_meta?), do: step_call(0, state, meta, takes_meta?)
 
-  defp build_chain([plugin | rest], state_var, meta_var) do
-    next = Macro.unique_var(:state, __MODULE__)
-    call_args = if call2?(plugin), do: [state_var, meta_var], else: [state_var]
+  defp step_call(index, state, meta, true), do: {step_name(index), [], [state, meta]}
+  defp step_call(index, state, _meta, false), do: {step_name(index), [], [state]}
 
-    quote do
-      case apply(unquote(plugin.name), :call, unquote(call_args)) do
-        {:reply, :halt, halted} -> halted
-        {:reply, unquote(next)} -> unquote(build_chain(rest, next, meta_var))
+  defp step_name(index), do: String.to_atom("step_" <> Integer.to_string(index))
+
+  defp build_steps([], _index, _takes_meta?), do: []
+
+  defp build_steps([plugin | rest], index, takes_meta?) do
+    state = Macro.var(:state, __MODULE__)
+    meta = Macro.var(:meta, __MODULE__)
+    next = Macro.var(:next, __MODULE__)
+    params = if takes_meta?, do: [state, meta], else: [state]
+    call_args = if call2?(plugin), do: [state, meta], else: [state]
+    continue = if rest == [], do: next, else: step_call(index + 1, next, meta, takes_meta?)
+
+    step =
+      quote do
+        defp unquote(step_name(index))(unquote_splicing(params)) do
+          case apply(unquote(plugin.name), :call, unquote(call_args)) do
+            {:reply, :halt, halted} -> halted
+            {:reply, unquote(next)} -> unquote(continue)
+          end
+        end
       end
-    end
+
+    [step | build_steps(rest, index + 1, takes_meta?)]
   end
 
   defp any_call2?(plugins), do: Enum.any?(plugins, &call2?/1)

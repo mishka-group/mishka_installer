@@ -20,6 +20,9 @@
 - An event's compiled `call/2` reads `meta` only when one of its plugins takes it with `call/2`, and
   a call with no args answers what the chain answered without scanning them. On an Apple M4, a chain
   of 5 plugins went from 58 ns to 38 ns a call (`bench/hook_call.exs`)
+- An event's module runs its chain as one private step function per plugin instead of nested
+  `case`s, so building it takes time linear in the chain: 99 plugins went from 2.5 s to 0.22 s,
+  25 from 258 ms to 69 ms, with `Hook.call/3` as fast
 - A plugin's `config/0` is one literal built when the plugin compiles, so `config/1`, which every
   lifecycle function and status poll reads, no longer merges a keyword list on each call (115 ns
   to 13 ns)
