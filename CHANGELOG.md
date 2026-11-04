@@ -33,6 +33,13 @@
 
 ### Fixed:
 
+- An event's compiled chain holds only `:started` and `:restarted` plugins, as the `Hook` status
+  table says. A `:registered` plugin, stored but never started, ran in the chain before; it now
+  joins it when it starts. A plugin process starts itself after it registers, and boot starts every
+  plugin that is not stopped, so this changes only code that registers a plugin and rebuilds its
+  event without starting it: call `start/0` (or `Event.start/3`) after `register/0` there.
+  `Event.plugin_status/1` is gone
+
 - Building an event prints no `the following clause will never match` warning for a plugin that
   always replies `{:reply, state}`: the chain calls each plugin through `apply/3` with literal
   arguments, the same direct call in the BEAM, which the type checker does not read

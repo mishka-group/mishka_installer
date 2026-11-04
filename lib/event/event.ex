@@ -1169,15 +1169,6 @@ defmodule MishkaInstaller.Event.Event do
 
   defp depends_status(_deps, _status), do: %{status: :held}
 
-  @doc false
-  @spec plugin_status(:stopped | :held) :: :ok | error_return()
-  def plugin_status(status) when status in [:stopped, :held] do
-    message = "The status of the plugin is not allowed."
-    {:error, [%{message: message, field: :global, action: :plugin_status}]}
-  end
-
-  def plugin_status(_status), do: :ok
-
   # `:stopped` is the operator's decision and only `enable/2` may leave it; `:held` may be started,
   # its dependencies are re-checked by `allowed_events?/1` right after.
   defp startable?(:stopped) do

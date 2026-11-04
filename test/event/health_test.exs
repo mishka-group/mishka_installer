@@ -214,7 +214,12 @@ defmodule MishkaInstaller.Event.HealthTest do
   describe "real-world event: working pipeline + LIVE health ===>" do
     setup do
       :persistent_term.put({:health_demo, :service_up}, true)
-      on_exit(fn -> :persistent_term.erase({:health_demo, :service_up}) end)
+
+      on_exit(fn ->
+        :persistent_term.erase({:health_demo, :service_up})
+        ModuleStateCompiler.purge("login_flow")
+      end)
+
       :ok
     end
 
@@ -224,11 +229,8 @@ defmodule MishkaInstaller.Event.HealthTest do
       start_supervised!(AuditPlugin)
       start_supervised!(NotifyPlugin)
 
-      # A plugin that registered but has not started yet is already in the chain, so the chain
-      # holding both does not mean both are started.
-      eventually(fn ->
-        compiled_with?("login_flow", 2) and started?(AuditPlugin) and started?(NotifyPlugin)
-      end)
+      # Only started plugins are in the chain, so a chain of two means both started.
+      eventually(fn -> compiled_with?("login_flow", 2) end)
 
       # 1. The real plugin chain runs and actually transforms the data.
       assert Hook.call("login_flow", %{user: 7}) == %{user: 7, audited: true, notified: true}

@@ -62,6 +62,7 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
         name: MishkaTest.Unbuildable,
         event: event,
         extension: :mishka_installer,
+        status: :started,
         extra: [%{callback: fn -> :not_a_literal end}]
       })
 

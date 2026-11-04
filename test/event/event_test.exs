@@ -45,7 +45,7 @@ defmodule MishkaInstallerTest.Event.EventTest do
   alias MishkaInstaller.Event.{Event, EventHandler, Hook, ModuleStateCompiler}
   alias MishkaInstaller.Helper.UUID
   alias MishkaInstaller.MnesiaRepo
-  alias MishkaInstallerTest.Event.EventTest.{AddOne, MetaReader, MetaStamp}
+  alias MishkaInstallerTest.Event.EventTest.{AddOne, Double, MetaReader, MetaStamp, ShouldNotRun}
 
   alias MishkaInstallerTest.Support.MishkaPlugin.{
     MetaAuditLog,
@@ -943,6 +943,34 @@ defmodule MishkaInstallerTest.Event.EventTest do
   ###################################################################################
   #################### (▰˘◡˘▰) Inaccessible plugins (▰˘◡˘▰) ###################
   ###################################################################################
+  describe "the compiled chain ===>" do
+    test "runs started and restarted plugins, and a registered one only once it starts" do
+      for {name, status, priority} <- [
+            {AddOne, :started, 1},
+            {Double, :restarted, 2},
+            {ShouldNotRun, :registered, 3}
+          ] do
+        {:ok, _} =
+          Event.write(%{
+            name: name,
+            event: "chain_status_evt",
+            extension: :mishka_installer,
+            status: status,
+            priority: priority
+          })
+      end
+
+      :ok = EventHandler.do_compile("chain_status_evt", :start, false)
+      assert Hook.call("chain_status_evt", %{n: 1}) == %{n: 4}
+
+      {:ok, _} = Event.start(:name, ShouldNotRun, false)
+      assert Hook.call("chain_status_evt", %{n: 1}) == %{n: 4, ran: true}
+
+      {:ok, _} = Event.stop(:name, ShouldNotRun, false)
+      assert Hook.call("chain_status_evt", %{n: 1}) == %{n: 4}
+    end
+  end
+
   describe "inaccessible plugins ===>" do
     test "an event with a started but unloaded plugin compiles to a stub that runs none of them" do
       {:ok, _} =
