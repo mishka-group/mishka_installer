@@ -32,6 +32,10 @@ defmodule MishkaInstaller.Event.EventHandlerTelemetryTest do
     start_supervised!(MishkaInstaller.MnesiaRepo)
     assert_receive %{status: :synchronized, channel: "mnesia"}
 
+    # The handler's own boot sync unregisters plugins whose module is gone; it is over before a
+    # test writes one.
+    assert_receive %{status: :event_status, channel: "mnesia", data: "ready"}
+
     on_exit(fn ->
       :telemetry.detach(handler)
       File.rm_rf!(tmp)
