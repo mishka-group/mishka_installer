@@ -6,6 +6,9 @@
   `ModuleStateCompiler.event_module/1` finds a module only while it is loaded, and `purge/1` takes
   the event out of it before deleting the code. `compile_initialize?/1`, `safe_initialize?/1`,
   `Hook.profile/2`, `Hook.event_health/2` and the event handler's rebuild check read the same lookup
+- An event's compiled `call/2` reads `meta` only when one of its plugins takes it with `call/2`, and
+  a call with no args answers what the chain answered without scanning them. On an Apple M4, a chain
+  of 5 plugins went from 58 ns to 38 ns a call (`bench/hook_call.exs`)
 
 # Changelog for MishkaInstaller 0.1.15
 

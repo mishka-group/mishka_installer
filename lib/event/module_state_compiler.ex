@@ -140,21 +140,26 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     end
   end
 
+  # One shared `state` var for the param and the unrolled chain. `meta` is read from the args only
+  # when a plugin of the chain takes it with `call/2`, so a chain of `call/1` plugins never scans them.
   defp call_ast(:ok, event, plugins) do
-    # One shared `state` var for the param and the unrolled chain.
     state = Macro.var(:state, __MODULE__)
+    meta = Macro.var(:meta, __MODULE__)
+    chain = build_chain(plugins, state, meta)
 
-    # `meta` is read-only side context handed to plugins that opt in with `call/2`. When no plugin uses
-    # it the var is named `_meta`, so the binding never trips an "unused variable" warning.
-    meta = Macro.var(if(any_call2?(plugins), do: :meta, else: :_meta), __MODULE__)
+    performed =
+      if any_call2?(plugins) do
+        quote do
+          unquote(meta) = Keyword.get(args, :meta)
+          unquote(chain)
+        end
+      else
+        chain
+      end
 
     quote do
       def call(unquote(state), args \\ []) do
-        unquote(meta) = Keyword.get(args, :meta)
-
-        performed = unquote(build_chain(plugins, state, meta))
-
-        unquote(__MODULE__).finish_call(performed, unquote(state), args)
+        unquote(__MODULE__).finish_call(unquote(performed), unquote(state), args)
       rescue
         e ->
           unquote(__MODULE__).log_call_error(unquote(event), e)
@@ -165,12 +170,16 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
   @doc false
   @spec finish_call(any(), any(), keyword()) :: any()
+  def finish_call(performed, _state, []), do: performed
+
   def finish_call(performed, state, args) do
     case Keyword.get(args, :return) do
       nil -> merge_private(performed, Keyword.get(args, :private))
       _return -> state
     end
   end
+
+  defp merge_private(data, nil), do: data
 
   defp merge_private({:ok, data}, private) when is_list(data),
     do: {:ok, merge_list(data, private)}
@@ -184,18 +193,15 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   # plugins left it; `:private` merges only into a list or a map.
   defp merge_private(other, _private), do: other
 
-  defp merge_list(data, nil), do: data
-
   defp merge_list(data, private),
     do: if(Keyword.keyword?(data), do: Keyword.merge(data, private), else: data)
 
-  defp merge_map(data, nil), do: data
   defp merge_map(data, private), do: Map.merge(data, private)
 
   # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
   # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
   # invoked exactly as before. The arity is resolved here, at dispatch-compile time, so the hot path stays
-  # a direct call with no per-invocation arity check.
+  # a direct remote call with no per-invocation arity check.
   defp build_chain([], state_var, _meta_var), do: state_var
 
   defp build_chain([plugin | rest], state_var, meta_var) do
@@ -203,7 +209,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     call_args = if call2?(plugin), do: [state_var, meta_var], else: [state_var]
 
     quote do
-      case apply(unquote(plugin.name), :call, unquote(call_args)) do
+      case unquote(plugin.name).call(unquote_splicing(call_args)) do
         {:reply, :halt, halted} -> halted
         {:reply, unquote(next)} -> unquote(build_chain(rest, next, meta_var))
       end
