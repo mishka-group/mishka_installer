@@ -129,9 +129,9 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
   end
 
   describe "finish_call/3 ===>" do
-    test "return hands back the state the call was given" do
+    test "return: true hands back the state the call was given, return: false the result" do
       assert ModuleStateCompiler.finish_call({:ok, %{a: 2}}, %{a: 1}, return: true) == %{a: 1}
-      assert ModuleStateCompiler.finish_call(:anything, :given, return: false) == :given
+      assert ModuleStateCompiler.finish_call(:anything, :given, return: false) == :anything
     end
 
     test "private is merged into a keyword list or a map, and into nothing else" do

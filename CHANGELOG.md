@@ -33,6 +33,10 @@
 
 ### Fixed:
 
+- `return: false` answers the plugins' result, like no `:return` at all; only `return: true`
+  answers the state given. Every value but `nil` acted as `true` before. Anything but a boolean
+  raises an `ArgumentError` naming the option
+
 - A bad `:private` option is the caller's `ArgumentError`, not a plugin crash. The compiled
   `call/2` finishes (`:return`, `:private`) in the `else` of its `try`, outside the plugin rescue,
   so `private: 5` no longer gets logged as "a plugin raised" with the plugins' result lost.

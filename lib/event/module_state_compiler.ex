@@ -203,10 +203,21 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
   def finish_call(performed, state, args) do
     case Keyword.get(args, :return) do
-      nil -> merge_private(performed, Keyword.get(args, :private))
-      _return -> state
+      true ->
+        state
+
+      returned when returned in [false, nil] ->
+        merge_private(performed, Keyword.get(args, :private))
+
+      other ->
+        raise ArgumentError, return_error(other)
     end
   end
+
+  defp return_error(return),
+    do:
+      "the :return option of MishkaInstaller.Event.Hook.call/3 must be a boolean, got: " <>
+        inspect(return)
 
   # `:private` is a map or a keyword list; anything else is the caller's ArgumentError.
   defp merge_private(data, nil), do: data

@@ -37,6 +37,29 @@ defmodule MishkaInstallerTest.Event.CallArgsTest do
     :ok = ModuleStateCompiler.create(built, event)
   end
 
+  describe "return" do
+    test "true answers the state given; false, nil or no option answer the plugins' result" do
+      assert Hook.call(@runs, %{a: 1}, return: true) == %{a: 1}
+      assert Hook.call(@runs, %{a: 1}, return: false) == %{a: 1, marked: true}
+      assert Hook.call(@runs, %{a: 1}, return: nil) == %{a: 1, marked: true}
+      assert Hook.call(@runs, %{a: 1}, meta: :m) == %{a: 1, marked: true}
+
+      assert Hook.call(@runs, %{a: 1}, return: false, private: %{p: 1}) == %{
+               a: 1,
+               marked: true,
+               p: 1
+             }
+    end
+
+    test "anything else is an ArgumentError naming the option" do
+      for return <- [:yes, "true", 1] do
+        error = assert_raise ArgumentError, fn -> Hook.call(@runs, %{a: 1}, return: return) end
+        assert error.message =~ ":return"
+        assert error.message =~ inspect(return)
+      end
+    end
+  end
+
   describe "private" do
     test "a keyword list or a map merges into a map or a keyword-list result" do
       assert Hook.call(@runs, %{a: 1}, private: [x: 1]) == %{a: 1, marked: true, x: 1}

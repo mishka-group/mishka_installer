@@ -471,7 +471,8 @@ defmodule MishkaInstaller.Event.Hook do
     - `private` — merged into a map or keyword-list result (also inside `{:ok, _}`), untouched by
       the plugins. A map or a keyword list; anything else raises an `ArgumentError` naming the
       option, outside the plugin rescue, so it is never reported as a plugin crash.
-    - `return` — when set, the plugins run and `data` is returned as it was given.
+    - `return` — `true`: the plugins run and `data` is returned as it was given. `false` or no
+      option: the plugins' result. Anything else raises an `ArgumentError` naming the option.
     - `meta` — read-only side context handed to plugins that opt in with `call/2`; unlike `private`
       it is never merged into the result.
     - `cannot_run` — the answer when the event cannot run: one of its plugins is started but not
