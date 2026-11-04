@@ -223,7 +223,12 @@ defmodule MishkaInstaller.Event.HealthTest do
       # Nothing here is forced: we just wait for the natural flow to settle.
       start_supervised!(AuditPlugin)
       start_supervised!(NotifyPlugin)
-      eventually(fn -> compiled_with?("login_flow", 2) end)
+
+      # A plugin that registered but has not started yet is already in the chain, so the chain
+      # holding both does not mean both are started.
+      eventually(fn ->
+        compiled_with?("login_flow", 2) and started?(AuditPlugin) and started?(NotifyPlugin)
+      end)
 
       # 1. The real plugin chain runs and actually transforms the data.
       assert Hook.call("login_flow", %{user: 7}) == %{user: 7, audited: true, notified: true}
