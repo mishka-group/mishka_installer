@@ -33,6 +33,10 @@
 
 ### Fixed:
 
+- Building an event prints no `the following clause will never match` warning for a plugin that
+  always replies `{:reply, state}`: the chain calls each plugin through `apply/3` with literal
+  arguments, the same direct call in the BEAM, which the type checker does not read
+
 - Rebuilding an event no longer kills a caller that is still running an earlier version, for
   example a request waiting inside a slow plugin while the event is rebuilt twice. Loading a module
   over an old version that a process still runs kills that process, and `purge_create/3` also

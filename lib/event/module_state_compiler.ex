@@ -215,8 +215,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
   # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
   # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
-  # invoked exactly as before. The arity is resolved here, at dispatch-compile time, so the hot path stays
-  # a direct remote call with no per-invocation arity check.
+  # invoked exactly as before. The arity is resolved here, at dispatch-compile time. `apply/3` with a
+  # literal module, function and argument list compiles to the same direct remote call, and keeps the
+  # type checker from warning on every build that a plugin which never halts makes the halt clause
+  # unreachable.
   defp build_chain([], state_var, _meta_var), do: state_var
 
   defp build_chain([plugin | rest], state_var, meta_var) do
@@ -224,7 +226,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     call_args = if call2?(plugin), do: [state_var, meta_var], else: [state_var]
 
     quote do
-      case unquote(plugin.name).call(unquote_splicing(call_args)) do
+      case apply(unquote(plugin.name), :call, unquote(call_args)) do
         {:reply, :halt, halted} -> halted
         {:reply, unquote(next)} -> unquote(build_chain(rest, next, meta_var))
       end

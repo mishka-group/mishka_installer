@@ -52,6 +52,24 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     assert [_ | _] = plugins
   end
 
+  test "building an event prints no compiler warning for plugins that never halt" do
+    event = "ms_quiet_#{System.unique_integer([:positive])}"
+    on_exit(fn -> ModuleStateCompiler.purge(event) end)
+
+    {:ok, plugin} =
+      Event.builder(%{
+        name: MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender,
+        event: event,
+        extension: :mishka_installer
+      })
+
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn -> ModuleStateCompiler.create([plugin], event) end)
+
+    assert output == ""
+    assert ModuleStateCompiler.compile_initialize?(event)
+  end
+
   test "create/3 with inaccessible plugins compiles a stub that runs none of them" do
     {:ok, plugin} =
       Event.builder(%{
