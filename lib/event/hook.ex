@@ -468,7 +468,9 @@ defmodule MishkaInstaller.Event.Hook do
   - `data` (any()): The data to be passed to the event module.
   - `args` (keyword()): Additional arguments for the call. Anything but a list raises an
     `ArgumentError` before any plugin runs:
-    - `private` — merged into a list or map result, untouched by the plugins.
+    - `private` — merged into a map or keyword-list result (also inside `{:ok, _}`), untouched by
+      the plugins. A map or a keyword list; anything else raises an `ArgumentError` naming the
+      option, outside the plugin rescue, so it is never reported as a plugin crash.
     - `return` — when set, the plugins run and `data` is returned as it was given.
     - `meta` — read-only side context handed to plugins that opt in with `call/2`; unlike `private`
       it is never merged into the result.

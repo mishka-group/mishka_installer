@@ -33,6 +33,12 @@
 
 ### Fixed:
 
+- A bad `:private` option is the caller's `ArgumentError`, not a plugin crash. The compiled
+  `call/2` finishes (`:return`, `:private`) in the `else` of its `try`, outside the plugin rescue,
+  so `private: 5` no longer gets logged as "a plugin raised" with the plugins' result lost.
+  `private` is a map or a keyword list and merges into either result shape: `private: [x: 1]`
+  into a map result raised before
+
 - `Hook.call/3` and `call!/3` with `args` that are not a list (`nil`, a map, a string) raise an
   `ArgumentError` that names them, before any plugin runs. They raised a `FunctionClauseError`
   inside the chain, which the plugin rescue then logged as a plugin crash and hit again while

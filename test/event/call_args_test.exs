@@ -37,6 +37,43 @@ defmodule MishkaInstallerTest.Event.CallArgsTest do
     :ok = ModuleStateCompiler.create(built, event)
   end
 
+  describe "private" do
+    test "a keyword list or a map merges into a map or a keyword-list result" do
+      assert Hook.call(@runs, %{a: 1}, private: [x: 1]) == %{a: 1, marked: true, x: 1}
+      assert Hook.call(@runs, %{a: 1}, private: %{x: 1}) == %{a: 1, marked: true, x: 1}
+
+      for private <- [[x: 1], %{x: 1}] do
+        merged = Hook.call(@runs, [a: 1], private: private)
+        assert Enum.sort(merged) == [a: 1, marked: true, x: 1]
+      end
+
+      assert Hook.call(@runs, {:ok, %{a: 1}}, private: [x: 1]) == {:ok, %{a: 1, x: 1}}
+      assert Hook.call(@runs, {:noreply, :socket}, private: [x: 1]) == {:noreply, :socket}
+    end
+
+    test "anything else is an ArgumentError naming the option, not a plugin crash" do
+      for {data, private} <- [
+            {%{a: 1}, 5},
+            {%{a: 1}, [1, 2]},
+            {[a: 1], %{"x" => 1}},
+            {{:noreply, :socket}, "str"}
+          ] do
+        log =
+          capture_log(fn ->
+            error =
+              assert_raise ArgumentError, fn ->
+                Hook.call(@runs, data, private: private, raised: :failed)
+              end
+
+            assert error.message =~ ":private"
+            assert error.message =~ inspect(private)
+          end)
+
+        refute log =~ "raised"
+      end
+    end
+  end
+
   describe "args that are not a list" do
     test "are refused with an ArgumentError before any plugin runs" do
       for args <- [nil, %{}, "str", :raised, {:raised, :x}],

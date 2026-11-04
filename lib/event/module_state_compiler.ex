@@ -178,13 +178,21 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
         chain
       end
 
+    # `finish_call/3` runs in the `else` of the `try`, outside the rescue: a bad `:return` or
+    # `:private` is the caller's ArgumentError, never reported as a plugin crash. The `try` stays
+    # explicit because a function-level `else` reads as a mistake.
     quote do
       def call(unquote(state), args \\ []) when is_list(args) do
-        unquote(__MODULE__).finish_call(unquote(performed), unquote(state), args)
-      rescue
-        e ->
-          unquote(__MODULE__).log_call_error(unquote(event), e, __STACKTRACE__)
-          Keyword.get(args, :raised, unquote(state))
+        # credo:disable-for-next-line Credo.Check.Readability.PreferImplicitTry
+        try do
+          unquote(performed)
+        rescue
+          e ->
+            unquote(__MODULE__).log_call_error(unquote(event), e, __STACKTRACE__)
+            Keyword.get(args, :raised, unquote(state))
+        else
+          performed -> unquote(__MODULE__).finish_call(performed, unquote(state), args)
+        end
       end
     end
   end
@@ -200,24 +208,49 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     end
   end
 
+  # `:private` is a map or a keyword list; anything else is the caller's ArgumentError.
   defp merge_private(data, nil), do: data
+  defp merge_private(data, private) when is_map(private), do: merge_into(data, private)
 
-  defp merge_private({:ok, data}, private) when is_list(data),
-    do: {:ok, merge_list(data, private)}
+  defp merge_private(data, private) when is_list(private) do
+    if Keyword.keyword?(private),
+      do: merge_into(data, private),
+      else: raise(ArgumentError, private_error(private, "a map or a keyword list"))
+  end
 
-  defp merge_private({:ok, data}, private) when is_map(data), do: {:ok, merge_map(data, private)}
-  defp merge_private({:ok, _data} = ok, _private), do: ok
-  defp merge_private({:error, _errors} = errors, _private), do: errors
-  defp merge_private(data, private) when is_list(data), do: merge_list(data, private)
-  defp merge_private(data, private) when is_map(data), do: merge_map(data, private)
-  # Any other state — a LiveView callback's `{:noreply, socket}`, a binary — comes back as the
-  # plugins left it; `:private` merges only into a list or a map.
-  defp merge_private(other, _private), do: other
+  defp merge_private(_data, private),
+    do: raise(ArgumentError, private_error(private, "a map or a keyword list"))
+
+  defp merge_into({:ok, data}, private) when is_list(data) or is_map(data),
+    do: {:ok, merge_into(data, private)}
+
+  defp merge_into(data, private) when is_map(data) and is_map(private),
+    do: Map.merge(data, private)
+
+  defp merge_into(data, private) when is_map(data), do: Map.merge(data, Map.new(private))
+  defp merge_into(data, private) when is_list(data), do: merge_list(data, private)
+
+  # Any other state — a LiveView callback's `{:noreply, socket}`, `{:error, _}`, a binary — comes
+  # back as the plugins left it; `:private` merges only into a list or a map.
+  defp merge_into(other, _private), do: other
 
   defp merge_list(data, private),
-    do: if(Keyword.keyword?(data), do: Keyword.merge(data, private), else: data)
+    do: if(Keyword.keyword?(data), do: Keyword.merge(data, keyword(private)), else: data)
 
-  defp merge_map(data, private), do: Map.merge(data, private)
+  defp keyword(private) when is_list(private), do: private
+
+  defp keyword(private) do
+    pairs = Map.to_list(private)
+
+    if Keyword.keyword?(pairs),
+      do: pairs,
+      else: raise(ArgumentError, private_error(private, "a map with atom keys or a keyword list"))
+  end
+
+  defp private_error(private, expected),
+    do:
+      "the :private option of MishkaInstaller.Event.Hook.call/3 must be #{expected} to merge " <>
+        "into the result, got: #{inspect(private)}"
 
   # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
   # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
