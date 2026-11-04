@@ -47,6 +47,11 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   empty, the module's `call/2` runs none of the plugins: it answers the `:cannot_run` option, or the
   state it was given when there is none, and `mode/0` is `:error`.
 
+  When a plugin of the module's `call/2` raises, or replies with something other than
+  `{:reply, state}` or `{:reply, :halt, state}`, the plugins after it do not run, the exception is
+  logged with its stacktrace, and `call/2` answers the `:raised` option, or the state it was given
+  when there is none.
+
   Returns `:ok`, or `{:error, [%{action: :compile, field: :event, message: _}]}` when the module
   cannot be built (a plugin entry that is not a plugin, for example). The module is built in its own
   process, so a failure never raises in the caller.
@@ -162,8 +167,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
         unquote(__MODULE__).finish_call(unquote(performed), unquote(state), args)
       rescue
         e ->
-          unquote(__MODULE__).log_call_error(unquote(event), e)
-          unquote(state)
+          unquote(__MODULE__).log_call_error(unquote(event), e, __STACKTRACE__)
+          Keyword.get(args, :raised, unquote(state))
       end
     end
   end
@@ -222,10 +227,11 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     do: Code.ensure_loaded?(plugin.name) and function_exported?(plugin.name, :call, 2)
 
   @doc false
-  @spec log_call_error(String.t(), Exception.t()) :: :ok
-  def log_call_error(event, error) do
+  @spec log_call_error(String.t(), Exception.t(), Exception.stacktrace()) :: :ok
+  def log_call_error(event, error, stacktrace) do
     Logger.error(
-      "[mishka_installer.event] plugin pipeline raised in event #{inspect(event)}: #{inspect(error)}"
+      "[mishka_installer.event] a plugin of event #{inspect(event)} raised: " <>
+        Exception.format(:error, error, stacktrace)
     )
   end
 

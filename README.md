@@ -65,7 +65,10 @@ Hook.call("after_success_login", params)
 Hook.call("after_success_login", params, private: keep_this)  # extra data, untouched by plugins
 Hook.call("after_success_login", params, return: true)        # return the original input
 Hook.call("after_success_login", params, cannot_run: :refused) # the answer while a plugin is not loaded
+Hook.call("after_success_login", params, raised: :failed)       # the answer when a plugin raises
 ```
+
+A plugin that raises stops the chain: the plugins after it do not run, the error is logged with its stacktrace, and the call answers `raised:`, or `params` without it.
 
 To start a plugin automatically, add its module to your supervision tree:
 

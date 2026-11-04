@@ -1,5 +1,12 @@
 # Changelog for MishkaInstaller 0.1.16
 
+### Added:
+
+- `Hook.call/3` and `call!/3` take `raised:`, the answer when a plugin of the event raises or
+  replies with something other than `{:reply, _}` or `{:reply, :halt, _}`. The plugins after it do
+  not run. Without it the call answers the state it was given, as before. The log line names the
+  event and carries the stacktrace, so it shows the plugin that raised
+
 ### Changed:
 
 - `Hook.call/3` runs a compiled event with one `:persistent_term` read and no export check:

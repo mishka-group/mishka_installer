@@ -174,7 +174,16 @@ defmodule MishkaInstaller.Event.Hook do
 
   # If you want another answer than `params` when a plugin of the event is not loaded
   Hook.call("after_success_login", params, [cannot_run: {:error, :refused}])
+
+  # If you want another answer than `params` when a plugin of the event raises
+  Hook.call("after_success_login", params, [raised: {:error, :raised}])
   ```
+
+  A plugin that raises, or replies with something other than `{:reply, state}` or
+  `{:reply, :halt, state}`, stops the chain: the plugins after it do not run, the exception is logged
+  with its stacktrace, and the call answers `raised:`, or `params` without it. An `exit` or a
+  `throw` from a plugin (a `GenServer.call/2` timeout inside its `call/1`, for example) is not
+  caught and reaches the caller.
 
   > #### Use cases information {: .tip}
   >
@@ -447,17 +456,38 @@ defmodule MishkaInstaller.Event.Hook do
     - `cannot_run` — the answer when the event cannot run: one of its plugins is started but not
       loaded, so none of them runs. Without it that event answers `data`. An event whose plugins
       all run ignores it.
+    - `raised` — the answer when a plugin of the event raises, or replies with something other
+      than `{:reply, state}` or `{:reply, :halt, state}`: the plugins after it do not run, and the
+      exception is logged with its stacktrace. Without it the event answers `data`. It wins over
+      `return` and `private`, and a call whose plugins all reply ignores it. An `exit` or a `throw`
+      from a plugin is not caught.
+
+  Neither option costs anything when it is not used: `cannot_run` is read only by an event that
+  cannot run, and `raised` only after a plugin raised.
 
   ## Returns
   - `any()`: The result of the event module's `call/2` function; `data` when the event is not
-    compiled (it has no plugins); the `cannot_run` answer, or `data`, when it cannot run.
+    compiled (it has no plugins); the `cannot_run` answer, or `data`, when it cannot run; the
+    `raised` answer, or `data`, when a plugin raised.
 
   ## Examples
   ```elixir
   MishkaInstaller.Event.Hook.call("my_event", %{}, [])
 
-  # A decision the plugins take part in refuses when they cannot run
-  MishkaInstaller.Event.Hook.call("auth:gate:check", gate, cannot_run: %{gate | allowed?: false})
+  # A decision the plugins take part in refuses when they cannot run, or when one of them raises
+  MishkaInstaller.Event.Hook.call("auth:gate:check", gate,
+    cannot_run: %{gate | allowed?: false},
+    raised: %{gate | allowed?: false}
+  )
+
+  # A caller that must tell the three outcomes apart
+  "import:item"
+  |> MishkaInstaller.Event.Hook.call(item, cannot_run: :cannot_run, raised: :raised)
+  |> case do
+    :cannot_run -> {:skipped, "plugins_cannot_run"}
+    :raised -> {:skipped, "plugins_failed"}
+    %{} = item -> {:ok, item}
+  end
   ```
   """
   @spec call(String.t(), any(), keyword()) :: any()
@@ -474,7 +504,8 @@ defmodule MishkaInstaller.Event.Hook do
   When you are 100% certain that the event you want is present in the system,
   using it is the best option.
 
-  It takes the same `args`, `cannot_run` included: an event that cannot run answers it, or `data`.
+  It takes the same `args`, `cannot_run` and `raised` included: an event that cannot run answers
+  `cannot_run`, or `data`, and a plugin that raises makes it answer `raised`, or `data`.
   """
   @spec call!(String.t(), any(), keyword()) :: any()
   def call!(event, data, args \\ []) do
