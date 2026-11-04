@@ -157,7 +157,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   # or the caller's `:cannot_run` answer.
   defp call_ast(:error, _event, _plugins) do
     quote do
-      def call(state, args \\ []), do: Keyword.get(args, :cannot_run, state)
+      def call(state, args \\ []) when is_list(args), do: Keyword.get(args, :cannot_run, state)
     end
   end
 
@@ -179,7 +179,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       end
 
     quote do
-      def call(unquote(state), args \\ []) do
+      def call(unquote(state), args \\ []) when is_list(args) do
         unquote(__MODULE__).finish_call(unquote(performed), unquote(state), args)
       rescue
         e ->

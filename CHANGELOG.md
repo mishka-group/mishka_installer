@@ -33,6 +33,11 @@
 
 ### Fixed:
 
+- `Hook.call/3` and `call!/3` with `args` that are not a list (`nil`, a map, a string) raise an
+  `ArgumentError` that names them, before any plugin runs. They raised a `FunctionClauseError`
+  inside the chain, which the plugin rescue then logged as a plugin crash and hit again while
+  reading `:raised`. The compiled `call/2` takes only a list
+
 - A rebuild drops every slot module of the event that no process runs any more, except the one
   that answered until that rebuild, so slots no longer pile up after callers outlived builds.
   `purge/1` also drops the event's name and slot keys once nothing runs its modules
