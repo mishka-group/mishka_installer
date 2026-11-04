@@ -68,7 +68,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   otherwise into the next free slot (`...ModuleStateCompiler.State1.YourEvent`, and so on). The
   caller finishes on the version it entered, and later calls run the new one. Once nothing runs
   the old version, the next build goes back to the event's own name, so an event uses more than one
-  slot only while a caller outlives two builds.
+  slot only while a caller outlives two builds. Each build also drops every other slot that no
+  process runs, except the one that answered until this build: a caller that looked it up just
+  before still finds it.
 
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
@@ -110,7 +112,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   defp compile_event(plugins, event, inaccessible) do
-    module = free_slot(event, module_event_name(event), 0)
+    base = module_event_name(event)
+    previous = event_module(event)
+    module = free_slot(event, base, 0)
     escaped_plugins = Macro.escape(plugins)
     mode = if inaccessible == [], do: :ok, else: :error
 
@@ -145,6 +149,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     {:module, ^module} = Code.ensure_loaded(module)
     # An atom value: putting the same one again is a no-op, and erasing it needs no global GC.
     :persistent_term.put(compiled_key(event), module)
+    retire_idle(event, base, [module, previous])
+    :ok
   end
 
   # Started-but-not-loaded plugins compile to a stub that runs none of them: it hands back the state,
@@ -272,7 +278,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   The event leaves the `event_module/1` lookup before its code is deleted, so
   `MishkaInstaller.Event.Hook.call/3` answers the state it is given from then on, as for an event
   that was never compiled. A process still running a version of the event finishes on it: that
-  version is dropped once nothing runs it, at the latest by the event's next build.
+  version is dropped once nothing runs it, at the latest by the event's next build. When nothing
+  runs any version, the event's `:persistent_term` keys go too.
 
   > #### Security considerations {: .warning}
   >
@@ -298,9 +305,24 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
 
       _module ->
         :persistent_term.erase(compiled_key(event))
-        base = module_event_name(event)
-        for index <- 0..last_slot(event), do: retire(slot(base, index))
+
+        if retire_idle(event, module_event_name(event), []) do
+          :persistent_term.erase({__MODULE__, :last_slot, event})
+          :persistent_term.erase({__MODULE__, :name_cache, event})
+        end
+
         :ok
+    end
+  end
+
+  # Drops every slot of the event but `keep` that no process runs, and answers whether all of them
+  # are gone. A slot that is neither loaded nor holds an old version costs two BIF checks.
+  defp retire_idle(event, base, keep) do
+    for index <- 0..last_slot(event),
+        module = slot(base, index),
+        module not in keep,
+        reduce: true do
+      gone? -> retire(module) and gone?
     end
   end
 
@@ -331,10 +353,19 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     if index > last_slot(event), do: :persistent_term.put({__MODULE__, :last_slot, event}, index)
   end
 
-  # Drops a slot's code unless a process still runs its old version; the next build of the event
-  # drops that version once it is free.
+  # Drops a slot's code and answers whether it is gone. A version a process still runs stays, and a
+  # later build drops it once it is free.
   defp retire(module) do
-    if :code.soft_purge(module) and :code.delete(module), do: :code.soft_purge(module)
+    if :erlang.module_loaded(module) or :erlang.check_old_code(module) do
+      :code.soft_purge(module) and drop_current(module)
+    else
+      true
+    end
+  end
+
+  defp drop_current(module) do
+    :code.delete(module)
+    :code.soft_purge(module)
   end
 
   ####################################################################################

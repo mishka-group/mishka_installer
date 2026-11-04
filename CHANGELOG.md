@@ -33,6 +33,10 @@
 
 ### Fixed:
 
+- A rebuild drops every slot module of the event that no process runs any more, except the one
+  that answered until that rebuild, so slots no longer pile up after callers outlived builds.
+  `purge/1` also drops the event's name and slot keys once nothing runs its modules
+
 - An event's compiled chain holds only `:started` and `:restarted` plugins, as the `Hook` status
   table says. A `:registered` plugin, stored but never started, ran in the chain before; it now
   joins it when it starts. A plugin process starts itself after it registers, and boot starts every
