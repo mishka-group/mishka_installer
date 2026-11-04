@@ -33,6 +33,13 @@
 
 ### Fixed:
 
+- Rebuilding an event no longer kills a caller that is still running an earlier version, for
+  example a request waiting inside a slow plugin while the event is rebuilt twice. Loading a module
+  over an old version that a process still runs kills that process, and `purge_create/3` also
+  purged hard before each build. `create/3` now loads a new version into the event's own module
+  name only when no process runs its old version (`:code.soft_purge/1`), and otherwise into the
+  next free slot (`ModuleStateCompiler.State1.YourEvent`, ...); `event_module/1` points at it.
+  `purge/1` drops only versions nothing runs. Nothing is purged hard any more
 - A plugin process no longer crashes once a second while Mnesia is stopped. Its status poll copies
   the status the plugin has in its event's compiled chain instead of reading Mnesia, so it costs no
   Mnesia read per plugin per tick

@@ -31,6 +31,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   require Logger
   alias MishkaInstaller.Helper.Extra
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
+  @slot_dir "Elixir.MishkaInstaller.Event.ModuleStateCompiler.State"
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   ####################################################################################
@@ -59,6 +60,15 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   Once the module is loaded, `event_module/1` finds it, so `MishkaInstaller.Event.Hook.call/3`
   starts running it. A failed build leaves the lookup as it was: the module built before keeps
   answering, and an event that never built one has none.
+
+  A build never stops a process that is still running an earlier version, for example a caller
+  waiting inside a slow plugin. Loading a module over an old version that a process still runs
+  would kill that process, so the new version goes into the event's own module name
+  (`module_event_name/1`) when no process runs its old version (`:code.soft_purge/1`), and
+  otherwise into the next free slot (`...ModuleStateCompiler.State1.YourEvent`, and so on). The
+  caller finishes on the version it entered, and later calls run the new one. Once nothing runs
+  the old version, the next build goes back to the event's own name, so an event uses more than one
+  slot only while a caller outlives two builds.
 
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
@@ -100,7 +110,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   defp compile_event(plugins, event, inaccessible) do
-    module = module_event_name(event)
+    module = free_slot(event, module_event_name(event), 0)
     escaped_plugins = Macro.escape(plugins)
     mode = if inaccessible == [], do: :ok, else: :error
 
@@ -236,7 +246,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
-  Purges (`purge/1`) an existing module and creates a new one (`create/2`) with the provided plugins and event name.
+  Rebuilds the module of an event with the provided plugins: the same as `create/3`, which already
+  replaces an earlier version without stopping a process that still runs it.
 
   > #### Security considerations {: .warning}
   >
@@ -251,20 +262,15 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec purge_create(list(struct()), String.t(), list(module())) :: :ok | error_return
-  def purge_create(plugins, event, inaccessible \\ []) do
-    module = module_event_name(event)
-
-    # Drop only the old copy then recompile; the current version stays callable until the new one loads.
-    :code.purge(module)
-    create(plugins, event, inaccessible)
-  end
+  def purge_create(plugins, event, inaccessible \\ []), do: create(plugins, event, inaccessible)
 
   @doc """
   Purges the specified event modules or a module.
 
   The event leaves the `event_module/1` lookup before its code is deleted, so
   `MishkaInstaller.Event.Hook.call/3` answers the state it is given from then on, as for an event
-  that was never compiled.
+  that was never compiled. A process still running a version of the event finishes on it: that
+  version is dropped once nothing runs it, at the latest by the event's next build.
 
   > #### Security considerations {: .warning}
   >
@@ -288,12 +294,45 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       nil ->
         :ok
 
-      module ->
+      _module ->
         :persistent_term.erase(compiled_key(event))
-        :code.purge(module)
-        :code.delete(module)
+        base = module_event_name(event)
+        for index <- 0..last_slot(event), do: retire(slot(base, index))
         :ok
     end
+  end
+
+  # The module a new version of the event is loaded into: the first slot whose old version no
+  # process runs. A slot whose old version is still running is skipped, never purged.
+  defp free_slot(event, base, index) do
+    module = slot(base, index)
+
+    if :code.soft_purge(module) do
+      remember_slot(event, index)
+      module
+    else
+      free_slot(event, base, index + 1)
+    end
+  end
+
+  defp slot(base, 0), do: base
+
+  defp slot(base, index) do
+    "Elixir." <> @state_dir <> name = Atom.to_string(base)
+    String.to_atom(@slot_dir <> Integer.to_string(index) <> "." <> name)
+  end
+
+  # The highest slot an event used, kept as a small integer so updating it needs no global GC.
+  defp last_slot(event), do: :persistent_term.get({__MODULE__, :last_slot, event}, 0)
+
+  defp remember_slot(event, index) do
+    if index > last_slot(event), do: :persistent_term.put({__MODULE__, :last_slot, event}, index)
+  end
+
+  # Drops a slot's code unless a process still runs its old version; the next build of the event
+  # drops that version once it is free.
+  defp retire(module) do
+    if :code.soft_purge(module) and :code.delete(module), do: :code.soft_purge(module)
   end
 
   ####################################################################################
@@ -323,6 +362,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   It **creates** the module atom and a `:persistent_term` cache key for a name it has not seen, so
   pass it only the name of an event that is being compiled. `create/3` and `purge_create/3` call it;
   to find the module of an event that may not exist use `event_module/1`.
+
+  It is the event's own module name, which runs the event unless a caller outlived two builds (see
+  `create/3`); `event_module/1` always answers the module that runs it now.
 
   > #### Security considerations {: .warning}
   >
@@ -367,7 +409,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec initialize?(String.t()) :: boolean()
-  def initialize?(event), do: module_event_name(event).initialize?()
+  def initialize?(event), do: event_module(event).initialize?()
 
   @doc """
   Checks if the event module is initialized, answering `false` for an event that is not compiled
