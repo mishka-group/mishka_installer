@@ -17,6 +17,12 @@
   a call with no args answers what the chain answered without scanning them. On an Apple M4, a chain
   of 5 plugins went from 58 ns to 38 ns a call (`bench/hook_call.exs`)
 
+### Fixed:
+
+- A plugin process no longer crashes once a second while Mnesia is stopped. Its status poll copies
+  the status the plugin has in its event's compiled chain instead of reading Mnesia, so it costs no
+  Mnesia read per plugin per tick
+
 # Changelog for MishkaInstaller 0.1.15
 
 ### Security:

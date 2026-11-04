@@ -787,20 +787,19 @@ defmodule MishkaInstaller.Event.Hook do
     {:noreply, new_state}
   end
 
+  # The poll copies the status the plugin has in its event's compiled chain, which every status
+  # change rebuilds. It reads no Mnesia, so it costs one lookup a tick and keeps working while
+  # Mnesia is down.
   @doc false
   def plugin_status_poll(module, state) do
     Process.send_after(module, :status, module.config(:__checking__))
 
     new_state =
-      with "ready" <- :persistent_term.get(:event_status, nil),
-           "ready" <- :persistent_term.get(:compile_status, nil),
+      with true <- ready?(),
            state_module when not is_nil(state_module) <-
              ModuleStateCompiler.event_module(module.config(:__event__)),
-           {:module, ^state_module} <- Code.ensure_loaded(state_module),
-           data when not is_nil(data) <-
-             Enum.find(state_module.initialize().plugins, &(&1.name == module)),
-           plugin <- Event.dirty_get(:name, module) do
-        if is_nil(plugin), do: state, else: Keyword.merge(state, status: plugin.status)
+           %{status: status} <- Enum.find(state_module.initialize().plugins, &(&1.name == module)) do
+        Keyword.put(state, :status, status)
       else
         _ -> state
       end
