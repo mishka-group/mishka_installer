@@ -64,7 +64,8 @@ defmodule MishkaInstaller.Helper.MnesiaAssistant do
   - `{records, cont}` (a paginated select result) keeps the continuation: `{converted, cont}`.
   - a list of record tuples becomes a list; each tuple is zipped with `fields` (the leading record
     tag is dropped), `drop` keys are removed, and — when `struct` is not `nil` — wrapped with
-    `struct!/2`.
+    `struct!/2`. A record that has exactly `fields` and nothing to drop becomes the struct in one
+    map build, without the per-key checks of `struct!/2`.
 
   ## Examples
 
@@ -81,15 +82,25 @@ defmodule MishkaInstaller.Helper.MnesiaAssistant do
     {tuple_to_map(records, fields, struct, drop), cont}
   end
 
-  def tuple_to_map(records, fields, struct, drop) when is_list(records) do
-    Enum.map(records, fn item ->
-      map =
-        fields
-        |> Enum.zip(item |> Tuple.delete_at(0) |> Tuple.to_list())
-        |> Map.new()
-        |> Map.drop(drop)
+  def tuple_to_map(records, fields, struct, [])
+      when is_list(records) and is_atom(struct) and not is_nil(struct) do
+    size = length(fields) + 1
+    Enum.map(records, &to_struct(&1, fields, struct, size))
+  end
 
-      if is_nil(struct), do: map, else: struct!(struct, map)
-    end)
+  def tuple_to_map(records, fields, struct, drop) when is_list(records),
+    do: Enum.map(records, &to_map(&1, fields, struct, drop))
+
+  defp to_struct(record, fields, struct, size) when tuple_size(record) == size do
+    [_tag | values] = Tuple.to_list(record)
+    :maps.from_list([{:__struct__, struct} | :lists.zip(fields, values)])
+  end
+
+  defp to_struct(record, fields, struct, _size), do: to_map(record, fields, struct, [])
+
+  defp to_map(record, fields, struct, drop) do
+    [_tag | values] = Tuple.to_list(record)
+    map = fields |> Enum.zip(values) |> Map.new() |> Map.drop(drop)
+    if is_nil(struct), do: map, else: struct!(struct, map)
   end
 end

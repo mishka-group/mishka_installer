@@ -150,7 +150,8 @@ defmodule MishkaInstallerTest.Event.RequestFlowTest do
       compile("web:request:broken_flow_test")
 
       log = capture_log(fn -> assert request("/broken").status == 200 end)
-      assert log =~ "plugin pipeline raised"
+      assert log =~ "web:request:broken_flow_test"
+      assert log =~ "a plugin bug"
     end
 
     test "a gate plugin refuses the request before the page is served" do

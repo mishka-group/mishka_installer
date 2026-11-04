@@ -100,6 +100,14 @@ end
 
 You can see that we make use of the `call!` function by looking at the code that is located above. When we are absolutely certain that the state module exists for the event that we want, we should use this function. If we are not certain, we should use the `call` method instead.
 
+Both take two answers for when the plugins do not finish: `cannot_run:` when a plugin of the event is not loaded, so none of them runs, and `raised:` when a plugin raises, so the plugins after it do not run. Without them the call answers the params it was given.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+Hook.call("after_register", params, cannot_run: {:error, :cannot_run}, raised: {:error, :raised})
+```
+
 > **For more information please read the document. [click](https://hexdocs.pm/mishka_installer/)**.
 
 ## Step 2: Create a custom plugin
@@ -192,6 +200,25 @@ children = [
 ...
 opts = [strategy: :one_for_one, name: SomeModule.Supervisor]
 Supervisor.start_link(children, opts)
+```
+
+<!-- livebook:{"break_markdown":true} -->
+
+To give the plugins their own restart budget, run them as one group: a crash storm of plugins then stops only the group, and its parent starts it again while the other children keep running.
+
+<!-- livebook:{"force_markdown":true} -->
+
+```elixir
+children = [
+  ...
+  {MishkaInstaller.Event.PluginSupervisor,
+   name: UserManagement.Plugins,
+   plugins: [
+     UserManagement.Plugins.SendSmsPlugin,
+     UserManagement.Plugins.SendEmailPlugin,
+     UserManagement.Plugins.SendOTPPlugin
+   ]}
+]
 ```
 
 <!-- livebook:{"break_markdown":true} -->

@@ -53,6 +53,9 @@ defmodule MishkaInstaller.Helper.Record do
   @doc """
   Returns every stored row of `module` as a struct of `module`, or `[]` when the read aborts.
 
+  It is a dirty read (`MishkaInstaller.Helper.MnesiaAssistant.Transaction.dirty/1`), like `get/2`:
+  no lock, and no wait on a write that holds a row.
+
   ## Example:
 
   ```elixir
@@ -64,7 +67,7 @@ defmodule MishkaInstaller.Helper.Record do
     keys = module.keys()
     pattern = ([module] ++ Enum.map(keys, fn _key -> :_ end)) |> List.to_tuple()
 
-    Transaction.transaction(fn -> Query.match_object(pattern) end)
+    Transaction.dirty(fn -> Query.dirty_match_object(pattern) end)
     |> case do
       {:atomic, res} ->
         MnesiaAssistant.tuple_to_map(res, keys, module, [])
@@ -87,7 +90,7 @@ defmodule MishkaInstaller.Helper.Record do
   """
   @spec get(module(), String.t()) :: struct() | nil
   def get(module, id) do
-    Transaction.transaction(fn -> Query.read(module, id) end)
+    Transaction.dirty(fn -> Query.dirty_read(module, id) end)
     |> case do
       {:atomic, res} ->
         res |> MnesiaAssistant.tuple_to_map(module.keys(), module, []) |> List.first()

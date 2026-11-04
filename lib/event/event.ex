@@ -697,6 +697,11 @@ defmodule MishkaInstaller.Event.Event do
   @doc """
   To get all plugins or one plugin information from Mnesia database.
 
+  Every read of the registry (`get/0`, `get/1`, `get/2` and `group_events/1`) is a dirty read: an
+  ETS lookup on this node's copy of the table, with no lock and no message to Mnesia's transaction
+  or lock manager, so readers never queue behind one process or behind a status write. It sees each
+  record as last committed. While Mnesia is not running it answers `[]`, `nil` or the error tuple
+  instead of exiting.
 
   > #### Security considerations {: .warning}
   >
@@ -720,7 +725,7 @@ defmodule MishkaInstaller.Event.Event do
   @spec get(:name | :event | :extension, module() | String.t()) ::
           list(map() | struct()) | map() | struct() | nil
   def get(field, value) when field in [:name, :event, :extension] do
-    Transaction.transaction(fn -> Query.index_read(__MODULE__, value, field) end)
+    Transaction.dirty(fn -> Query.dirty_index_read(__MODULE__, value, field) end)
     |> case do
       {:atomic, res} ->
         data = MnesiaAssistant.tuple_to_map(res, keys(), __MODULE__, [])
@@ -733,16 +738,10 @@ defmodule MishkaInstaller.Event.Event do
   end
 
   @doc """
-  Like `get(:name, name)` but a **dirty** (non-transactional) index read — a direct ETS lookup with
-  no lock or commit overhead. Use only where a slightly stale read is fine (e.g. the background plugin
-  status sync), never where you need transactional consistency.
+  The same read as `get(:name, name)`, which is a dirty index read as well.
   """
   @spec dirty_get(:name, module()) :: map() | struct() | nil
-  def dirty_get(:name, value) do
-    :mnesia.dirty_index_read(__MODULE__, value, :name)
-    |> MnesiaAssistant.tuple_to_map(keys(), __MODULE__, [])
-    |> List.first()
-  end
+  def dirty_get(:name, value), do: get(:name, value)
 
   @doc """
   To get a plugin information from Mnesia database by id.
@@ -848,8 +847,10 @@ defmodule MishkaInstaller.Event.Event do
   """
   @spec group_events(list(atom())) :: error_return() | okey_return()
   def group_events(key \\ [:event]) do
-    Transaction.transaction(fn ->
-      Query.select(__MODULE__, [{erl_fields({__MODULE__}, keys(), key, 1), [], er(:selected)}])
+    Transaction.dirty(fn ->
+      Query.dirty_select(__MODULE__, [
+        {erl_fields({__MODULE__}, keys(), key, 1), [], er(:selected)}
+      ])
     end)
     |> case do
       {:atomic, result} ->
@@ -1167,15 +1168,6 @@ defmodule MishkaInstaller.Event.Event do
   defp depends_status([], status), do: %{status: status}
 
   defp depends_status(_deps, _status), do: %{status: :held}
-
-  @doc false
-  @spec plugin_status(:stopped | :held) :: :ok | error_return()
-  def plugin_status(status) when status in [:stopped, :held] do
-    message = "The status of the plugin is not allowed."
-    {:error, [%{message: message, field: :global, action: :plugin_status}]}
-  end
-
-  def plugin_status(_status), do: :ok
 
   # `:stopped` is the operator's decision and only `enable/2` may leave it; `:held` may be started,
   # its dependencies are re-checked by `allowed_events?/1` right after.

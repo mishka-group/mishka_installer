@@ -40,8 +40,8 @@ defmodule MishkaInstaller.Event.Hook do
   If this opportunity is provided, the management can manage its own plugins in different ways
   if it has a dashboard.
 
-  It is crucial to highlight that each plugin is its own `GenServer`; in addition,
-  it is dynamically supervised, and the information is stored in the database as well as in Mnesia.
+  It is crucial to highlight that each plugin is its own `GenServer`, started by your own
+  supervision tree (see "Supervision" below), and its record is stored in Mnesia.
 
   Furthermore, this section is very useful even if the programmer wants to perform many tasks
   that are not associated with Perform defined functions.
@@ -158,6 +158,27 @@ defmodule MishkaInstaller.Event.Hook do
   Supervisor.start_link(children, opts)
   ```
 
+  ### Supervision
+
+  A plugin is an ordinary worker: `use MishkaInstaller.Event.Hook` gives it a `child_spec/1` with
+  `restart: :transient`, so any supervisor starts it, as above. To give an extension's plugins
+  their own restart budget, run them as one group with `MishkaInstaller.Event.PluginSupervisor`;
+  a crash storm of plugins then stops only the group, and the rest of the tree keeps running:
+
+  ```elixir
+  children = [
+    ...
+    {MishkaInstaller.Event.PluginSupervisor, name: SomeModule.Plugins, plugins: [RegisterEmailSender]}
+  ]
+  ```
+
+  The process drives the plugin's lifecycle (register, start, a status poll) and is not on the call
+  path: `call/3` runs the event's compiled module in the caller's process. When the process dies,
+  its supervisor starts it again and it registers with its stored status. The event keeps running
+  the plugin meanwhile, even after the supervisor gave up; `plugin_health/2` reports
+  `alive?: false`. `unregister/0` ends the process for good, `stop/0` switches the plugin off and
+  leaves the process running, and `Supervisor.terminate_child/2` does not switch it off.
+
   #### You can call all plugins of an event:
 
   ```elixir
@@ -174,7 +195,16 @@ defmodule MishkaInstaller.Event.Hook do
 
   # If you want another answer than `params` when a plugin of the event is not loaded
   Hook.call("after_success_login", params, [cannot_run: {:error, :refused}])
+
+  # If you want another answer than `params` when a plugin of the event raises
+  Hook.call("after_success_login", params, [raised: {:error, :raised}])
   ```
+
+  A plugin that raises, or replies with something other than `{:reply, state}` or
+  `{:reply, :halt, state}`, stops the chain: the plugins after it do not run, the exception is logged
+  with its stacktrace, and the call answers `raised:`, or `params` without it. An `exit` or a
+  `throw` from a plugin (a `GenServer.call/2` timeout inside its `call/1`, for example) is not
+  caught and reaches the caller.
 
   > #### Use cases information {: .tip}
   >
@@ -342,26 +372,23 @@ defmodule MishkaInstaller.Event.Hook do
                       is_nil(v)
                   end)
       @plugin_event Keyword.get(opts, :event)
-      @initial Keyword.get(opts, :initial, %{})
-      @plugin_name __MODULE__
       @after_compile __MODULE__
-      @checking Keyword.get(opts, :checking, 1000)
-      @queue Keyword.get(opts, :queue, true)
 
-      # `config/0` carries the plugin's compile-time options; the rest of the macro delegates to `Hook.*`.
+      # `config/0` carries the plugin's compile-time options as one literal, built here once; the
+      # rest of the macro delegates to `Hook.*`.
+      @hook_config Keyword.merge(@app_config,
+                     __plugin__: __MODULE__,
+                     __event__: @plugin_event,
+                     __initial__: Keyword.get(opts, :initial, %{}),
+                     __queue__: Keyword.get(opts, :queue, true),
+                     __checking__: Keyword.get(opts, :checking, 1000)
+                   )
+
       @spec config() :: keyword()
-      def config() do
-        Keyword.merge(@app_config,
-          __plugin__: @plugin_name,
-          __event__: @plugin_event,
-          __initial__: @initial,
-          __queue__: @queue,
-          __checking__: @checking
-        )
-      end
+      def config(), do: @hook_config
 
       @spec config(atom()) :: any()
-      def config(key), do: Keyword.get(config(), key)
+      def config(key), do: Keyword.get(@hook_config, key)
 
       @spec register() :: okey_return | error_return
       def register(), do: Hook.plugin_register(__MODULE__)
@@ -447,24 +474,45 @@ defmodule MishkaInstaller.Event.Hook do
     - `cannot_run` — the answer when the event cannot run: one of its plugins is started but not
       loaded, so none of them runs. Without it that event answers `data`. An event whose plugins
       all run ignores it.
+    - `raised` — the answer when a plugin of the event raises, or replies with something other
+      than `{:reply, state}` or `{:reply, :halt, state}`: the plugins after it do not run, and the
+      exception is logged with its stacktrace. Without it the event answers `data`. It wins over
+      `return` and `private`, and a call whose plugins all reply ignores it. An `exit` or a `throw`
+      from a plugin is not caught.
+
+  Neither option costs anything when it is not used: `cannot_run` is read only by an event that
+  cannot run, and `raised` only after a plugin raised.
 
   ## Returns
   - `any()`: The result of the event module's `call/2` function; `data` when the event is not
-    compiled (it has no plugins); the `cannot_run` answer, or `data`, when it cannot run.
+    compiled (it has no plugins); the `cannot_run` answer, or `data`, when it cannot run; the
+    `raised` answer, or `data`, when a plugin raised.
 
   ## Examples
   ```elixir
   MishkaInstaller.Event.Hook.call("my_event", %{}, [])
 
-  # A decision the plugins take part in refuses when they cannot run
-  MishkaInstaller.Event.Hook.call("auth:gate:check", gate, cannot_run: %{gate | allowed?: false})
+  # A decision the plugins take part in refuses when they cannot run, or when one of them raises
+  MishkaInstaller.Event.Hook.call("auth:gate:check", gate,
+    cannot_run: %{gate | allowed?: false},
+    raised: %{gate | allowed?: false}
+  )
+
+  # A caller that must tell the three outcomes apart
+  "import:item"
+  |> MishkaInstaller.Event.Hook.call(item, cannot_run: :cannot_run, raised: :raised)
+  |> case do
+    :cannot_run -> {:skipped, "plugins_cannot_run"}
+    :raised -> {:skipped, "plugins_failed"}
+    %{} = item -> {:ok, item}
+  end
   ```
   """
   @spec call(String.t(), any(), keyword()) :: any()
   def call(event, data, args \\ []) do
     case ModuleStateCompiler.event_module(event) do
       nil -> data
-      module -> if function_exported?(module, :call, 2), do: module.call(data, args), else: data
+      module -> module.call(data, args)
     end
   end
 
@@ -474,7 +522,8 @@ defmodule MishkaInstaller.Event.Hook do
   When you are 100% certain that the event you want is present in the system,
   using it is the best option.
 
-  It takes the same `args`, `cannot_run` included: an event that cannot run answers it, or `data`.
+  It takes the same `args`, `cannot_run` and `raised` included: an event that cannot run answers
+  `cannot_run`, or `data`, and a plugin that raises makes it answer `raised`, or `data`.
   """
   @spec call!(String.t(), any(), keyword()) :: any()
   def call!(event, data, args \\ []) do
@@ -497,11 +546,10 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec profile(String.t(), any()) :: {:ok, [map()]} | {:error, :not_compiled}
   def profile(event, state) do
-    module = ModuleStateCompiler.event_module(event)
-
-    if !is_nil(module) and function_exported?(module, :initialize, 0),
-      do: {:ok, profile_plugins(module.initialize().plugins, state)},
-      else: {:error, :not_compiled}
+    case ModuleStateCompiler.event_module(event) do
+      nil -> {:error, :not_compiled}
+      module -> {:ok, profile_plugins(module.initialize().plugins, state)}
+    end
   end
 
   defp profile_plugins(plugins, state) do
@@ -575,11 +623,8 @@ defmodule MishkaInstaller.Event.Hook do
   @spec event_health(String.t(), timeout()) :: map()
   def event_health(event, timeout \\ @health_timeout) do
     module = ModuleStateCompiler.event_module(event)
-    compiled? = !is_nil(module) and function_exported?(module, :initialize, 0)
-
-    mode =
-      if compiled? and function_exported?(module, :mode, 0), do: module.mode(), else: :unknown
-
+    compiled? = not is_nil(module)
+    mode = if compiled?, do: module.mode(), else: :unknown
     plugins = if compiled?, do: module.initialize().plugins, else: []
 
     reports =
@@ -752,7 +797,7 @@ defmodule MishkaInstaller.Event.Hook do
   @doc false
   def plugin_re_event(state) do
     new_state =
-      case Event.dirty_get(:name, state[:name]) do
+      case Event.get(:name, state[:name]) do
         nil -> state
         data -> Keyword.merge(state, status: data.status, depends: data.depends)
       end
@@ -760,20 +805,19 @@ defmodule MishkaInstaller.Event.Hook do
     {:noreply, new_state}
   end
 
+  # The poll copies the status the plugin has in its event's compiled chain, which every status
+  # change rebuilds. It reads no Mnesia, so it costs one lookup a tick and keeps working while
+  # Mnesia is down.
   @doc false
   def plugin_status_poll(module, state) do
     Process.send_after(module, :status, module.config(:__checking__))
 
     new_state =
-      with "ready" <- :persistent_term.get(:event_status, nil),
-           "ready" <- :persistent_term.get(:compile_status, nil),
+      with true <- ready?(),
            state_module when not is_nil(state_module) <-
              ModuleStateCompiler.event_module(module.config(:__event__)),
-           {:module, ^state_module} <- Code.ensure_loaded(state_module),
-           data when not is_nil(data) <-
-             Enum.find(state_module.initialize().plugins, &(&1.name == module)),
-           plugin <- Event.dirty_get(:name, module) do
-        if is_nil(plugin), do: state, else: Keyword.merge(state, status: plugin.status)
+           %{status: status} <- Enum.find(state_module.initialize().plugins, &(&1.name == module)) do
+        Keyword.put(state, :status, status)
       else
         _ -> state
       end

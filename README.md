@@ -65,13 +65,24 @@ Hook.call("after_success_login", params)
 Hook.call("after_success_login", params, private: keep_this)  # extra data, untouched by plugins
 Hook.call("after_success_login", params, return: true)        # return the original input
 Hook.call("after_success_login", params, cannot_run: :refused) # the answer while a plugin is not loaded
+Hook.call("after_success_login", params, raised: :failed)       # the answer when a plugin raises
 ```
+
+A plugin that raises stops the chain: the plugins after it do not run, the error is logged with its stacktrace, and the call answers `raised:`, or `params` without it.
 
 To start a plugin automatically, add its module to your supervision tree:
 
 ```elixir
 children = [RegisterEmailSender, ...]
 ```
+
+Or run an extension's plugins as one group with its own restart budget, so a crash storm of plugins stops only the group and the rest of your tree keeps running:
+
+```elixir
+children = [{MishkaInstaller.Event.PluginSupervisor, name: MyApp.Plugins, plugins: [RegisterEmailSender, ...]}]
+```
+
+A plugin's process only drives its lifecycle; the event runs in the caller's process. When the process dies, its supervisor starts it again with its stored status, and the event keeps running the plugin meanwhile. `unregister/0` ends the process for good.
 
 Switch a plugin off and on again — `stop/0` disables it, `enable/0` is the only way back:
 

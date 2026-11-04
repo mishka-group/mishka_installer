@@ -52,6 +52,24 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
     assert [_ | _] = plugins
   end
 
+  test "building an event prints no compiler warning for plugins that never halt" do
+    event = "ms_quiet_#{System.unique_integer([:positive])}"
+    on_exit(fn -> ModuleStateCompiler.purge(event) end)
+
+    {:ok, plugin} =
+      Event.builder(%{
+        name: MishkaInstallerTest.Support.MishkaPlugin.RegisterEmailSender,
+        event: event,
+        extension: :mishka_installer
+      })
+
+    output =
+      ExUnit.CaptureIO.capture_io(:stderr, fn -> ModuleStateCompiler.create([plugin], event) end)
+
+    assert output == ""
+    assert ModuleStateCompiler.compile_initialize?(event)
+  end
+
   test "create/3 with inaccessible plugins compiles a stub that runs none of them" do
     {:ok, plugin} =
       Event.builder(%{
@@ -70,6 +88,7 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
 
   test "initialize? / safe_initialize? / compile_initialize? / rescue_initialize? track compile state" do
     evt = "ms_init_evt"
+    on_exit(fn -> ModuleStateCompiler.purge(evt) end)
     # uncompiled: the safe/compile/rescue variants say false (and don't raise)
     refute ModuleStateCompiler.safe_initialize?(evt)
     refute ModuleStateCompiler.compile_initialize?(evt)
@@ -165,6 +184,7 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
 
       assert {:error, [%{action: :compile}]} = ModuleStateCompiler.purge_create([plugin], event)
       refute ModuleStateCompiler.compile_initialize?(event)
+      assert ModuleStateCompiler.event_module(event) == nil
       assert Hook.call(event, %{a: 1}) == %{a: 1}
     end
 
@@ -242,8 +262,13 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
 
       :ok = ModuleStateCompiler.purge(event)
       refute ModuleStateCompiler.compile_initialize?(event)
+      assert ModuleStateCompiler.event_module(event) == nil
       assert Hook.call(event, %{a: 1}) == %{a: 1}
       assert_raise UndefinedFunctionError, fn -> Hook.call!(event, %{a: 1}) end
+
+      :ok = ModuleStateCompiler.create([plugin], event)
+      assert ModuleStateCompiler.event_module(event) == module
+      assert Hook.call(event, %{a: 1}) == %{a: 1}
     end
   end
 end

@@ -98,6 +98,13 @@ defmodule MishkaInstallerTest.Event.HookTest.StoppedPlugin do
   def call(state), do: {:reply, state}
 end
 
+defmodule MishkaInstallerTest.Event.HookTest.PollPlugin do
+  @moduledoc false
+  use MishkaInstaller.Event.Hook, event: "poll_evt"
+  @impl true
+  def call(state), do: {:reply, Map.put(state, :polled, true)}
+end
+
 defmodule MishkaInstaller.Event.HookTest do
   use ExUnit.Case, async: false
   alias MishkaInstaller.Event.{Event, EventHandler, Hook}
@@ -110,6 +117,7 @@ defmodule MishkaInstaller.Event.HookTest do
     IndependentPlugin,
     LimboPlugin,
     OverCapPlugin,
+    PollPlugin,
     ProfileNormal,
     ProfileRaiser,
     ReEventPlugin,
@@ -300,6 +308,21 @@ defmodule MishkaInstaller.Event.HookTest do
 
       assert {:error, [%{action: :register, field: :depends}]} =
                :persistent_term.get({:hook_test, :dep_error})
+    end
+  end
+
+  describe "status poll ===>" do
+    test "a plugin keeps running its status poll while Mnesia is stopped" do
+      start_supervised!(PollPlugin)
+      assert_receive %{status: :purge_create, channel: "event", data: "poll_evt"}
+      pid = Process.whereis(PollPlugin)
+
+      :stopped = :mnesia.stop()
+      send(PollPlugin, :status)
+
+      assert Keyword.get(PollPlugin.get(), :status) == :started
+      assert Process.whereis(PollPlugin) == pid
+      assert Hook.call("poll_evt", %{}) == %{polled: true}
     end
   end
 

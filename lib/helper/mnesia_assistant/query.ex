@@ -2,7 +2,8 @@ defmodule MishkaInstaller.Helper.MnesiaAssistant.Query do
   @moduledoc """
   Record-level Mnesia operations (read / write / delete / select / match).
 
-  Every function must run inside a `MishkaInstaller.Helper.MnesiaAssistant.Transaction` activity.
+  Every function must run inside a `MishkaInstaller.Helper.MnesiaAssistant.Transaction` activity;
+  the `dirty_*` reads run in `MishkaInstaller.Helper.MnesiaAssistant.Transaction.dirty/1`.
   """
 
   @doc """
@@ -42,4 +43,32 @@ defmodule MishkaInstaller.Helper.MnesiaAssistant.Query do
   """
   @spec match_object(tuple()) :: [tuple()]
   def match_object(pattern), do: :mnesia.match_object(pattern)
+
+  @doc """
+  Reads the records stored under `key` in `table` without a lock. Delegates to
+  `:mnesia.dirty_read/2`.
+  """
+  @spec dirty_read(atom(), term()) :: [tuple()]
+  def dirty_read(table, key), do: :mnesia.dirty_read(table, key)
+
+  @doc """
+  Reads the records whose indexed `attr` is `key` without a lock. Delegates to
+  `:mnesia.dirty_index_read/3`.
+  """
+  @spec dirty_index_read(atom(), term(), atom()) :: [tuple()]
+  def dirty_index_read(table, key, attr), do: :mnesia.dirty_index_read(table, key, attr)
+
+  @doc """
+  Runs a match specification against `table` without a lock. Delegates to
+  `:mnesia.dirty_select/2`.
+  """
+  @spec dirty_select(atom(), list()) :: list()
+  def dirty_select(table, spec), do: :mnesia.dirty_select(table, spec)
+
+  @doc """
+  Returns every record in a table matching `pattern` without a lock. Delegates to
+  `:mnesia.dirty_match_object/1`.
+  """
+  @spec dirty_match_object(tuple()) :: [tuple()]
+  def dirty_match_object(pattern), do: :mnesia.dirty_match_object(pattern)
 end

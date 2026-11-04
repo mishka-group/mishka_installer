@@ -37,6 +37,26 @@ defmodule MishkaInstaller.Helper.MnesiaAssistant.Transaction do
   end
 
   @doc """
+  Runs `fun`, a function of dirty reads (`MishkaInstaller.Helper.MnesiaAssistant.Query`'s `dirty_*`
+  functions), and answers like `transaction/1`: `{:atomic, result}`, or `{:aborted, reason}` when
+  Mnesia aborts a read because it is not running or the table does not exist.
+
+  A dirty read looks the record up in the node's own ETS copy of the table. It takes no lock and
+  sends nothing to Mnesia's transaction or lock manager, so concurrent readers never queue behind
+  one process, and a read never waits for a write that holds the record. It sees every record as
+  last committed; the writes stay in `durable_transaction/1`, which re-reads under a write lock.
+
+  The `catch` is the boundary where Mnesia's abort exit becomes `{:aborted, reason}`: a read that
+  succeeds runs no exception code.
+  """
+  @spec dirty((-> any())) :: {:atomic, any()} | {:aborted, term()}
+  def dirty(fun) when is_function(fun, 0) do
+    {:atomic, fun.()}
+  catch
+    :exit, {:aborted, reason} -> {:aborted, reason}
+  end
+
+  @doc """
   Runs `fun` as a fast, dirty `ets` activity. Delegates to `:mnesia.ets/1`.
 
   > Only safe for `ram_copies` tables or read-only access on `disc_copies`.

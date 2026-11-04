@@ -214,7 +214,12 @@ defmodule MishkaInstaller.Event.HealthTest do
   describe "real-world event: working pipeline + LIVE health ===>" do
     setup do
       :persistent_term.put({:health_demo, :service_up}, true)
-      on_exit(fn -> :persistent_term.erase({:health_demo, :service_up}) end)
+
+      on_exit(fn ->
+        :persistent_term.erase({:health_demo, :service_up})
+        ModuleStateCompiler.purge("login_flow")
+      end)
+
       :ok
     end
 
@@ -223,6 +228,8 @@ defmodule MishkaInstaller.Event.HealthTest do
       # Nothing here is forced: we just wait for the natural flow to settle.
       start_supervised!(AuditPlugin)
       start_supervised!(NotifyPlugin)
+
+      # Only started plugins are in the chain, so a chain of two means both started.
       eventually(fn -> compiled_with?("login_flow", 2) end)
 
       # 1. The real plugin chain runs and actually transforms the data.
@@ -254,10 +261,10 @@ defmodule MishkaInstaller.Event.HealthTest do
   end
 
   defp compiled_with?(event, count) do
-    module = ModuleStateCompiler.module_event_name(event)
-
-    Code.ensure_loaded?(module) and function_exported?(module, :initialize, 0) and
-      length(module.initialize().plugins) == count
+    case ModuleStateCompiler.event_module(event) do
+      nil -> false
+      module -> length(module.initialize().plugins) == count
+    end
   end
 
   defp started?(mod) do

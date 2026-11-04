@@ -1,3 +1,60 @@
+# Changelog for MishkaInstaller 0.1.16
+
+### Added:
+
+- `Hook.call/3` and `call!/3` take `raised:`, the answer when a plugin of the event raises or
+  replies with something other than `{:reply, _}` or `{:reply, :halt, _}`. The plugins after it do
+  not run. Without it the call answers the state it was given, as before. The log line names the
+  event and carries the stacktrace, so it shows the plugin that raised
+- `MishkaInstaller.Event.PluginSupervisor` runs a list of plugins as one `:one_for_one` group in
+  your own tree, with its own `:max_restarts`/`:max_seconds`: a burst of plugin deaths stops only
+  the group, and its parent starts it again. Its docs and `Hook`'s new "Supervision" section say
+  what happens when a plugin process dies
+
+### Changed:
+
+- `Hook.call/3` runs a compiled event with one `:persistent_term` read and no export check:
+  `ModuleStateCompiler.event_module/1` finds a module only while it is loaded, and `purge/1` takes
+  the event out of it before deleting the code. `compile_initialize?/1`, `safe_initialize?/1`,
+  `Hook.profile/2`, `Hook.event_health/2` and the event handler's rebuild check read the same lookup
+- An event's compiled `call/2` reads `meta` only when one of its plugins takes it with `call/2`, and
+  a call with no args answers what the chain answered without scanning them. On an Apple M4, a chain
+  of 5 plugins went from 58 ns to 38 ns a call (`bench/hook_call.exs`)
+- A plugin's `config/0` is one literal built when the plugin compiles, so `config/1`, which every
+  lifecycle function and status poll reads, no longer merges a keyword list on each call (115 ns
+  to 13 ns)
+- The registry reads `Event.get/0`, `get/1`, `get/2`, `group_events/1` and `Installer.get/0`,
+  `get/1`, `get/2` are dirty reads through `Transaction.dirty/1`: an ETS lookup on the node's copy
+  of the table instead of a transaction. They take no lock, so they never queue behind Mnesia's
+  transaction and lock managers or wait for a status write that holds the record, and they still
+  answer `[]`, `nil` or the error tuple while Mnesia is stopped. A record becomes its struct in one
+  map build. `Event.get(:name, plugin)` went from 7.5 µs to 0.9 µs, and 16 readers at once from
+  5.5 µs to 0.7 µs a read. `Event.dirty_get/2` is now the same read as `get(:name, _)`
+
+### Fixed:
+
+- An event's compiled chain holds only `:started` and `:restarted` plugins, as the `Hook` status
+  table says. A `:registered` plugin, stored but never started, ran in the chain before; it now
+  joins it when it starts. A plugin process starts itself after it registers, and boot starts every
+  plugin that is not stopped, so this changes only code that registers a plugin and rebuilds its
+  event without starting it: call `start/0` (or `Event.start/3`) after `register/0` there.
+  `Event.plugin_status/1` is gone
+
+- Building an event prints no `the following clause will never match` warning for a plugin that
+  always replies `{:reply, state}`: the chain calls each plugin through `apply/3` with literal
+  arguments, the same direct call in the BEAM, which the type checker does not read
+
+- Rebuilding an event no longer kills a caller that is still running an earlier version, for
+  example a request waiting inside a slow plugin while the event is rebuilt twice. Loading a module
+  over an old version that a process still runs kills that process, and `purge_create/3` also
+  purged hard before each build. `create/3` now loads a new version into the event's own module
+  name only when no process runs its old version (`:code.soft_purge/1`), and otherwise into the
+  next free slot (`ModuleStateCompiler.State1.YourEvent`, ...); `event_module/1` points at it.
+  `purge/1` drops only versions nothing runs. Nothing is purged hard any more
+- A plugin process no longer crashes once a second while Mnesia is stopped. Its status poll copies
+  the status the plugin has in its event's compiled chain instead of reading Mnesia, so it costs no
+  Mnesia read per plugin per tick
+
 # Changelog for MishkaInstaller 0.1.15
 
 ### Security:

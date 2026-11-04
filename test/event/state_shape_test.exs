@@ -39,7 +39,7 @@ defmodule MishkaInstallerTest.Event.StateShapeTest do
   # Runs `fun` and returns its answer, failing the test when the chain logged a raise.
   defp quietly(fun) do
     {answer, log} = with_log(fun)
-    refute log =~ "plugin pipeline raised"
+    refute log =~ "raised"
     answer
   end
 

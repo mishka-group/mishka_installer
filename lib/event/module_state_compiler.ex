@@ -31,6 +31,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   require Logger
   alias MishkaInstaller.Helper.Extra
   @state_dir "MishkaInstaller.Event.ModuleStateCompiler.State."
+  @slot_dir "Elixir.MishkaInstaller.Event.ModuleStateCompiler.State"
 
   @type error_return :: {:error, [%{action: atom(), field: atom(), message: String.t()}]}
   ####################################################################################
@@ -47,9 +48,27 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   empty, the module's `call/2` runs none of the plugins: it answers the `:cannot_run` option, or the
   state it was given when there is none, and `mode/0` is `:error`.
 
+  When a plugin of the module's `call/2` raises, or replies with something other than
+  `{:reply, state}` or `{:reply, :halt, state}`, the plugins after it do not run, the exception is
+  logged with its stacktrace, and `call/2` answers the `:raised` option, or the state it was given
+  when there is none.
+
   Returns `:ok`, or `{:error, [%{action: :compile, field: :event, message: _}]}` when the module
   cannot be built (a plugin entry that is not a plugin, for example). The module is built in its own
   process, so a failure never raises in the caller.
+
+  Once the module is loaded, `event_module/1` finds it, so `MishkaInstaller.Event.Hook.call/3`
+  starts running it. A failed build leaves the lookup as it was: the module built before keeps
+  answering, and an event that never built one has none.
+
+  A build never stops a process that is still running an earlier version, for example a caller
+  waiting inside a slow plugin. Loading a module over an old version that a process still runs
+  would kill that process, so the new version goes into the event's own module name
+  (`module_event_name/1`) when no process runs its old version (`:code.soft_purge/1`), and
+  otherwise into the next free slot (`...ModuleStateCompiler.State1.YourEvent`, and so on). The
+  caller finishes on the version it entered, and later calls run the new one. Once nothing runs
+  the old version, the next build goes back to the event's own name, so an event uses more than one
+  slot only while a caller outlives two builds.
 
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
@@ -91,7 +110,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   defp compile_event(plugins, event, inaccessible) do
-    module = module_event_name(event)
+    module = free_slot(event, module_event_name(event), 0)
     escaped_plugins = Macro.escape(plugins)
     mode = if inaccessible == [], do: :ok, else: :error
 
@@ -124,7 +143,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     Code.put_compiler_option(:ignore_module_conflict, true)
     [{^module, _}] = Code.compile_quoted(ast, "#{Extra.randstring(8)}")
     {:module, ^module} = Code.ensure_loaded(module)
-    :ok
+    # An atom value: putting the same one again is a no-op, and erasing it needs no global GC.
+    :persistent_term.put(compiled_key(event), module)
   end
 
   # Started-but-not-loaded plugins compile to a stub that runs none of them: it hands back the state,
@@ -135,37 +155,46 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     end
   end
 
+  # One shared `state` var for the param and the unrolled chain. `meta` is read from the args only
+  # when a plugin of the chain takes it with `call/2`, so a chain of `call/1` plugins never scans them.
   defp call_ast(:ok, event, plugins) do
-    # One shared `state` var for the param and the unrolled chain.
     state = Macro.var(:state, __MODULE__)
+    meta = Macro.var(:meta, __MODULE__)
+    chain = build_chain(plugins, state, meta)
 
-    # `meta` is read-only side context handed to plugins that opt in with `call/2`. When no plugin uses
-    # it the var is named `_meta`, so the binding never trips an "unused variable" warning.
-    meta = Macro.var(if(any_call2?(plugins), do: :meta, else: :_meta), __MODULE__)
+    performed =
+      if any_call2?(plugins) do
+        quote do
+          unquote(meta) = Keyword.get(args, :meta)
+          unquote(chain)
+        end
+      else
+        chain
+      end
 
     quote do
       def call(unquote(state), args \\ []) do
-        unquote(meta) = Keyword.get(args, :meta)
-
-        performed = unquote(build_chain(plugins, state, meta))
-
-        unquote(__MODULE__).finish_call(performed, unquote(state), args)
+        unquote(__MODULE__).finish_call(unquote(performed), unquote(state), args)
       rescue
         e ->
-          unquote(__MODULE__).log_call_error(unquote(event), e)
-          unquote(state)
+          unquote(__MODULE__).log_call_error(unquote(event), e, __STACKTRACE__)
+          Keyword.get(args, :raised, unquote(state))
       end
     end
   end
 
   @doc false
   @spec finish_call(any(), any(), keyword()) :: any()
+  def finish_call(performed, _state, []), do: performed
+
   def finish_call(performed, state, args) do
     case Keyword.get(args, :return) do
       nil -> merge_private(performed, Keyword.get(args, :private))
       _return -> state
     end
   end
+
+  defp merge_private(data, nil), do: data
 
   defp merge_private({:ok, data}, private) when is_list(data),
     do: {:ok, merge_list(data, private)}
@@ -179,18 +208,17 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   # plugins left it; `:private` merges only into a list or a map.
   defp merge_private(other, _private), do: other
 
-  defp merge_list(data, nil), do: data
-
   defp merge_list(data, private),
     do: if(Keyword.keyword?(data), do: Keyword.merge(data, private), else: data)
 
-  defp merge_map(data, nil), do: data
   defp merge_map(data, private), do: Map.merge(data, private)
 
   # Unroll the plugin chain into nested calls: `{:reply, state}` continues, `{:reply, :halt, state}` halts.
   # A plugin that defines `call/2` is handed `meta` as a second, read-only argument; `call/1` plugins are
-  # invoked exactly as before. The arity is resolved here, at dispatch-compile time, so the hot path stays
-  # a direct call with no per-invocation arity check.
+  # invoked exactly as before. The arity is resolved here, at dispatch-compile time. `apply/3` with a
+  # literal module, function and argument list compiles to the same direct remote call, and keeps the
+  # type checker from warning on every build that a plugin which never halts makes the halt clause
+  # unreachable.
   defp build_chain([], state_var, _meta_var), do: state_var
 
   defp build_chain([plugin | rest], state_var, meta_var) do
@@ -211,15 +239,17 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     do: Code.ensure_loaded?(plugin.name) and function_exported?(plugin.name, :call, 2)
 
   @doc false
-  @spec log_call_error(String.t(), Exception.t()) :: :ok
-  def log_call_error(event, error) do
+  @spec log_call_error(String.t(), Exception.t(), Exception.stacktrace()) :: :ok
+  def log_call_error(event, error, stacktrace) do
     Logger.error(
-      "[mishka_installer.event] plugin pipeline raised in event #{inspect(event)}: #{inspect(error)}"
+      "[mishka_installer.event] a plugin of event #{inspect(event)} raised: " <>
+        Exception.format(:error, error, stacktrace)
     )
   end
 
   @doc """
-  Purges (`purge/1`) an existing module and creates a new one (`create/2`) with the provided plugins and event name.
+  Rebuilds the module of an event with the provided plugins: the same as `create/3`, which already
+  replaces an earlier version without stopping a process that still runs it.
 
   > #### Security considerations {: .warning}
   >
@@ -234,16 +264,15 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec purge_create(list(struct()), String.t(), list(module())) :: :ok | error_return
-  def purge_create(plugins, event, inaccessible \\ []) do
-    module = module_event_name(event)
-
-    # Drop only the old copy then recompile; the current version stays callable until the new one loads.
-    :code.purge(module)
-    create(plugins, event, inaccessible)
-  end
+  def purge_create(plugins, event, inaccessible \\ []), do: create(plugins, event, inaccessible)
 
   @doc """
   Purges the specified event modules or a module.
+
+  The event leaves the `event_module/1` lookup before its code is deleted, so
+  `MishkaInstaller.Event.Hook.call/3` answers the state it is given from then on, as for an event
+  that was never compiled. A process still running a version of the event finishes on it: that
+  version is dropped once nothing runs it, at the latest by the event's next build.
 
   > #### Security considerations {: .warning}
   >
@@ -267,21 +296,57 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
       nil ->
         :ok
 
-      module ->
-        :code.purge(module)
-        :code.delete(module)
+      _module ->
+        :persistent_term.erase(compiled_key(event))
+        base = module_event_name(event)
+        for index <- 0..last_slot(event), do: retire(slot(base, index))
         :ok
     end
+  end
+
+  # The module a new version of the event is loaded into: the first slot whose old version no
+  # process runs. A slot whose old version is still running is skipped, never purged.
+  defp free_slot(event, base, index) do
+    module = slot(base, index)
+
+    if :code.soft_purge(module) do
+      remember_slot(event, index)
+      module
+    else
+      free_slot(event, base, index + 1)
+    end
+  end
+
+  defp slot(base, 0), do: base
+
+  defp slot(base, index) do
+    "Elixir." <> @state_dir <> name = Atom.to_string(base)
+    String.to_atom(@slot_dir <> Integer.to_string(index) <> "." <> name)
+  end
+
+  # The highest slot an event used, kept as a small integer so updating it needs no global GC.
+  defp last_slot(event), do: :persistent_term.get({__MODULE__, :last_slot, event}, 0)
+
+  defp remember_slot(event, index) do
+    if index > last_slot(event), do: :persistent_term.put({__MODULE__, :last_slot, event}, index)
+  end
+
+  # Drops a slot's code unless a process still runs its old version; the next build of the event
+  # drops that version once it is free.
+  defp retire(module) do
+    if :code.soft_purge(module) and :code.delete(module), do: :code.soft_purge(module)
   end
 
   ####################################################################################
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   @doc """
-  Returns the module compiled for `event` on this node, or `nil` when `create/3` never built one.
+  Returns the module compiled for `event` on this node, or `nil` when `create/3` never built one
+  or `purge/1` removed it.
 
-  It only reads the cache that `module_event_name/1` fills, so it never creates an atom or a cache
-  key: this is the function to call with an event name that is not known to exist.
+  A module is in this lookup only while it is loaded, so the answer can be called without checking
+  its exports first. It is one `:persistent_term` read, never creates an atom or a key, and is the
+  function to call with an event name that is not known to exist.
 
   ## Examples
   ```elixir
@@ -289,7 +354,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec event_module(String.t()) :: module() | nil
-  def event_module(event), do: :persistent_term.get({__MODULE__, :name_cache, event}, nil)
+  def event_module(event), do: :persistent_term.get(compiled_key(event), nil)
+
+  defp compiled_key(event), do: {__MODULE__, :compiled, event}
 
   @doc """
   Generates a module name based on the event name.
@@ -297,6 +364,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   It **creates** the module atom and a `:persistent_term` cache key for a name it has not seen, so
   pass it only the name of an event that is being compiled. `create/3` and `purge_create/3` call it;
   to find the module of an event that may not exist use `event_module/1`.
+
+  It is the event's own module name, which runs the event unless a caller outlived two builds (see
+  `create/3`); `event_module/1` always answers the module that runs it now.
 
   > #### Security considerations {: .warning}
   >
@@ -311,7 +381,6 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
-    # Memoize the immutable event->module mapping in `:persistent_term` (hot path, lock-free reads).
     case :persistent_term.get({__MODULE__, :name_cache, event}, nil) do
       nil ->
         module = build_module_name(event)
@@ -342,7 +411,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec initialize?(String.t()) :: boolean()
-  def initialize?(event), do: module_event_name(event).initialize?()
+  def initialize?(event), do: event_module(event).initialize?()
 
   @doc """
   Checks if the event module is initialized, answering `false` for an event that is not compiled
@@ -359,9 +428,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
-  Checks if the event module is compiled and loaded.
-
-  > Just should be used when you need one time or in compile time
+  Checks if the event module is compiled and loaded: `event_module/1` finds it.
 
   ## Examples
   ```elixir
@@ -369,15 +436,11 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec compile_initialize?(String.t()) :: boolean()
-  def compile_initialize?(event) do
-    case event_module(event) do
-      nil -> false
-      module -> Code.ensure_loaded?(module)
-    end
-  end
+  def compile_initialize?(event), do: not is_nil(event_module(event))
 
   @doc """
-  Checks if the event module has an `initialize?` function exported.
+  Checks if the event module is loaded, so its `initialize?/0` can be called: `event_module/1`
+  finds it.
 
   ## Examples
   ```elixir
@@ -385,10 +448,5 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec safe_initialize?(String.t()) :: boolean()
-  def safe_initialize?(event) do
-    case event_module(event) do
-      nil -> false
-      module -> Code.ensure_loaded?(module) and function_exported?(module, :initialize?, 0)
-    end
-  end
+  def safe_initialize?(event), do: not is_nil(event_module(event))
 end
