@@ -254,9 +254,7 @@ defmodule MishkaInstaller.Event.EventHandler do
       )
     end
 
-    module = ModuleStateCompiler.module_event_name(event)
-
-    case recompile(compiled?(module), module, sorted_plugins, inaccessible, event) do
+    case recompile(ModuleStateCompiler.event_module(event), sorted_plugins, inaccessible, event) do
       :ok ->
         telemetry(:compile, %{event: event, result: :ok})
         true
@@ -272,28 +270,22 @@ defmodule MishkaInstaller.Event.EventHandler do
   end
 
   # Not compiled yet: build it.
-  defp recompile(false, _module, sorted_plugins, inaccessible, event),
+  defp recompile(nil, sorted_plugins, inaccessible, event),
     do: purge_create(sorted_plugins, inaccessible, event)
 
   # Already compiled: rebuild only when the plugin set or the accessibility mode changed.
-  defp recompile(true, module, sorted_plugins, inaccessible, event) do
+  defp recompile(module, sorted_plugins, inaccessible, event) do
     desired_mode = if inaccessible == [], do: :ok, else: :error
 
-    if module.is_changed?(sorted_plugins) or safe_mode(module) != desired_mode,
+    if module.is_changed?(sorted_plugins) or module.mode() != desired_mode,
       do: purge_create(sorted_plugins, inaccessible, event),
       else: :ok
   end
-
-  defp compiled?(module),
-    do: Code.ensure_loaded?(module) and function_exported?(module, :is_changed?, 1)
 
   defp plugin_callable?(name),
     do:
       Code.ensure_loaded?(name) and
         (function_exported?(name, :call, 1) or function_exported?(name, :call, 2))
-
-  defp safe_mode(module),
-    do: if(function_exported?(module, :mode, 0), do: module.mode(), else: :ok)
 
   defp purge_create(sorted_plugins, inaccessible, event) do
     with :ok <- ModuleStateCompiler.purge_create(sorted_plugins, event, inaccessible) do

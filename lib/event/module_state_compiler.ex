@@ -51,6 +51,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   cannot be built (a plugin entry that is not a plugin, for example). The module is built in its own
   process, so a failure never raises in the caller.
 
+  Once the module is loaded, `event_module/1` finds it, so `MishkaInstaller.Event.Hook.call/3`
+  starts running it. A failed build leaves the lookup as it was: the module built before keeps
+  answering, and an event that never built one has none.
+
   The generated `is_changed?/1` compares the incoming chain with the compiled one by **equality**,
   so a plugin leaving the chain — a stopped plugin, or one held by a dependency — is detected just
   like a plugin joining it, and `MishkaInstaller.Event.EventHandler` rebuilds the module.
@@ -124,7 +128,8 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
     Code.put_compiler_option(:ignore_module_conflict, true)
     [{^module, _}] = Code.compile_quoted(ast, "#{Extra.randstring(8)}")
     {:module, ^module} = Code.ensure_loaded(module)
-    :ok
+    # An atom value: putting the same one again is a no-op, and erasing it needs no global GC.
+    :persistent_term.put(compiled_key(event), module)
   end
 
   # Started-but-not-loaded plugins compile to a stub that runs none of them: it hands back the state,
@@ -245,6 +250,10 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   @doc """
   Purges the specified event modules or a module.
 
+  The event leaves the `event_module/1` lookup before its code is deleted, so
+  `MishkaInstaller.Event.Hook.call/3` answers the state it is given from then on, as for an event
+  that was never compiled.
+
   > #### Security considerations {: .warning}
   >
   > It is important to remember that all of the functionalities contained within this
@@ -268,6 +277,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
         :ok
 
       module ->
+        :persistent_term.erase(compiled_key(event))
         :code.purge(module)
         :code.delete(module)
         :ok
@@ -278,10 +288,12 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ########################## (▰˘◡˘▰) Helper (▰˘◡˘▰) ############################
   ####################################################################################
   @doc """
-  Returns the module compiled for `event` on this node, or `nil` when `create/3` never built one.
+  Returns the module compiled for `event` on this node, or `nil` when `create/3` never built one
+  or `purge/1` removed it.
 
-  It only reads the cache that `module_event_name/1` fills, so it never creates an atom or a cache
-  key: this is the function to call with an event name that is not known to exist.
+  A module is in this lookup only while it is loaded, so the answer can be called without checking
+  its exports first. It is one `:persistent_term` read, never creates an atom or a key, and is the
+  function to call with an event name that is not known to exist.
 
   ## Examples
   ```elixir
@@ -289,7 +301,9 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec event_module(String.t()) :: module() | nil
-  def event_module(event), do: :persistent_term.get({__MODULE__, :name_cache, event}, nil)
+  def event_module(event), do: :persistent_term.get(compiled_key(event), nil)
+
+  defp compiled_key(event), do: {__MODULE__, :compiled, event}
 
   @doc """
   Generates a module name based on the event name.
@@ -311,7 +325,6 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   """
   @spec module_event_name(String.t()) :: module()
   def module_event_name(event) do
-    # Memoize the immutable event->module mapping in `:persistent_term` (hot path, lock-free reads).
     case :persistent_term.get({__MODULE__, :name_cache, event}, nil) do
       nil ->
         module = build_module_name(event)
@@ -359,9 +372,7 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   end
 
   @doc """
-  Checks if the event module is compiled and loaded.
-
-  > Just should be used when you need one time or in compile time
+  Checks if the event module is compiled and loaded: `event_module/1` finds it.
 
   ## Examples
   ```elixir
@@ -369,15 +380,11 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec compile_initialize?(String.t()) :: boolean()
-  def compile_initialize?(event) do
-    case event_module(event) do
-      nil -> false
-      module -> Code.ensure_loaded?(module)
-    end
-  end
+  def compile_initialize?(event), do: not is_nil(event_module(event))
 
   @doc """
-  Checks if the event module has an `initialize?` function exported.
+  Checks if the event module is loaded, so its `initialize?/0` can be called: `event_module/1`
+  finds it.
 
   ## Examples
   ```elixir
@@ -385,10 +392,5 @@ defmodule MishkaInstaller.Event.ModuleStateCompiler do
   ```
   """
   @spec safe_initialize?(String.t()) :: boolean()
-  def safe_initialize?(event) do
-    case event_module(event) do
-      nil -> false
-      module -> Code.ensure_loaded?(module) and function_exported?(module, :initialize?, 0)
-    end
-  end
+  def safe_initialize?(event), do: not is_nil(event_module(event))
 end

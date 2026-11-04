@@ -1,3 +1,12 @@
+# Changelog for MishkaInstaller 0.1.16
+
+### Changed:
+
+- `Hook.call/3` runs a compiled event with one `:persistent_term` read and no export check:
+  `ModuleStateCompiler.event_module/1` finds a module only while it is loaded, and `purge/1` takes
+  the event out of it before deleting the code. `compile_initialize?/1`, `safe_initialize?/1`,
+  `Hook.profile/2`, `Hook.event_health/2` and the event handler's rebuild check read the same lookup
+
 # Changelog for MishkaInstaller 0.1.15
 
 ### Security:

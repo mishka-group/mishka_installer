@@ -464,7 +464,7 @@ defmodule MishkaInstaller.Event.Hook do
   def call(event, data, args \\ []) do
     case ModuleStateCompiler.event_module(event) do
       nil -> data
-      module -> if function_exported?(module, :call, 2), do: module.call(data, args), else: data
+      module -> module.call(data, args)
     end
   end
 
@@ -497,11 +497,10 @@ defmodule MishkaInstaller.Event.Hook do
   """
   @spec profile(String.t(), any()) :: {:ok, [map()]} | {:error, :not_compiled}
   def profile(event, state) do
-    module = ModuleStateCompiler.event_module(event)
-
-    if !is_nil(module) and function_exported?(module, :initialize, 0),
-      do: {:ok, profile_plugins(module.initialize().plugins, state)},
-      else: {:error, :not_compiled}
+    case ModuleStateCompiler.event_module(event) do
+      nil -> {:error, :not_compiled}
+      module -> {:ok, profile_plugins(module.initialize().plugins, state)}
+    end
   end
 
   defp profile_plugins(plugins, state) do
@@ -575,11 +574,8 @@ defmodule MishkaInstaller.Event.Hook do
   @spec event_health(String.t(), timeout()) :: map()
   def event_health(event, timeout \\ @health_timeout) do
     module = ModuleStateCompiler.event_module(event)
-    compiled? = !is_nil(module) and function_exported?(module, :initialize, 0)
-
-    mode =
-      if compiled? and function_exported?(module, :mode, 0), do: module.mode(), else: :unknown
-
+    compiled? = not is_nil(module)
+    mode = if compiled?, do: module.mode(), else: :unknown
     plugins = if compiled?, do: module.initialize().plugins, else: []
 
     reports =

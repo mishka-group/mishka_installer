@@ -254,10 +254,10 @@ defmodule MishkaInstaller.Event.HealthTest do
   end
 
   defp compiled_with?(event, count) do
-    module = ModuleStateCompiler.module_event_name(event)
-
-    Code.ensure_loaded?(module) and function_exported?(module, :initialize, 0) and
-      length(module.initialize().plugins) == count
+    case ModuleStateCompiler.event_module(event) do
+      nil -> false
+      module -> length(module.initialize().plugins) == count
+    end
   end
 
   defp started?(mod) do

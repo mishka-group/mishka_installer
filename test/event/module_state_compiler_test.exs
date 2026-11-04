@@ -165,6 +165,7 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
 
       assert {:error, [%{action: :compile}]} = ModuleStateCompiler.purge_create([plugin], event)
       refute ModuleStateCompiler.compile_initialize?(event)
+      assert ModuleStateCompiler.event_module(event) == nil
       assert Hook.call(event, %{a: 1}) == %{a: 1}
     end
 
@@ -242,8 +243,13 @@ defmodule MishkaInstallerTest.Event.ModuleStateCompilerTest do
 
       :ok = ModuleStateCompiler.purge(event)
       refute ModuleStateCompiler.compile_initialize?(event)
+      assert ModuleStateCompiler.event_module(event) == nil
       assert Hook.call(event, %{a: 1}) == %{a: 1}
       assert_raise UndefinedFunctionError, fn -> Hook.call!(event, %{a: 1}) end
+
+      :ok = ModuleStateCompiler.create([plugin], event)
+      assert ModuleStateCompiler.event_module(event) == module
+      assert Hook.call(event, %{a: 1}) == %{a: 1}
     end
   end
 end
