@@ -1,89 +1,38 @@
-name: MishkaInstaller CI
+name: CI
 
 on:
   push:
-    branches:
-      - master
+    branches: [master]
   pull_request:
-    branches:
-      - master
+    branches: [master]
+  workflow_dispatch:
 
-# No job writes to the repository, so the token can only read it.
+# A newer push to the same branch or pull request makes the run in progress pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
 jobs:
   ci:
-    env:
-      GITHUB_ACTION: true
-
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - pair:
-              elixir: "1.17.1"
-              otp: "27.0"
-          - pair:
-              elixir: "1.20.5-otp-29"
-              otp: "29.1.2"
-
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: erlef/setup-beam@v1
-        id: beam
-        with:
-          otp-version: ${{matrix.pair.otp}}
-          elixir-version: ${{matrix.pair.elixir}}
-
-      - name: Cache deps and build
-        uses: actions/cache@v6
-        with:
-          path: |
-            deps
-            _build
-          key: ${{ runner.os }}-mix-${{ matrix.pair.otp }}-${{ matrix.pair.elixir }}-${{ hashFiles('**/mix.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-mix-${{ matrix.pair.otp }}-${{ matrix.pair.elixir }}-
-
-      - name: Elixir and Erlang Dependencies
-        run: |
-          mix local.hex --force
-          mix local.rebar --force
-
-      - name: Source Compiling
-        run: |
-          mix deps.get
-          mix deps.compile
-
-      - name: Check formatting and compile warnings
-        if: matrix.pair.elixir == '1.20.5-otp-29'
-        run: |
-          mix format --check-formatted
-          mix compile --warnings-as-errors
-
-      # mix_audit; Hex's own audit is hex-audit.yml.
-      - name: Audit dependencies
-        if: matrix.pair.elixir == '1.20.5-otp-29'
-        run: mix deps.audit
-
-      - name: Set up environment
-        run: |
-          echo "PROJECT_PATH=$(pwd)" >> $GITHUB_ENV
-          mkdir -p $(pwd)/deployment/test/extensions
-
-      - name: Run test with temporary information
-        run: |
-          mix test --trace
-        env:
-          PROJECT_PATH: ${{ env.PROJECT_PATH }}
-
-      - name: Run distributed tests
-        run: |
-          epmd -daemon
-          mix test --only distributed --trace
-        env:
-          PROJECT_PATH: ${{ env.PROJECT_PATH }}
+    # Switch to @ci-v1 once mishka-group/mishka_cms#77 is merged and tagged.
+    uses: mishka-group/mishka_cms/.github/workflows/mishka-ci.yml@ci-v1
+    with:
+      # Today CI runs format, compile warnings, `mix deps.audit` and the tests; Credo, Sobelow, Dialyzer and ExDNA are not run.
+      elixir: 1.20.5-otp-29
+      otp: 29.1.2
+      versions: '[{"elixir":"1.17.1","otp":"27.0"}]'
+      credo: false
+      dialyzer: false
+      ex_dna: false
+      test-args: --trace
+      # The tests read PROJECT_PATH and write under deployment/test/extensions.
+      pre-test: |
+        echo "PROJECT_PATH=$(pwd)" >> "$GITHUB_ENV"
+        mkdir -p "$(pwd)/deployment/test/extensions"
+      # The :distributed tests start peer nodes through EPMD and are excluded from `mix test`.
+      extra-checks: |
+        epmd -daemon
+        PROJECT_PATH="$(pwd)" mix test --only distributed --trace
