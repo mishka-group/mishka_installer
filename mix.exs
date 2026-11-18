@@ -51,7 +51,7 @@ defmodule MishkaInstaller.MixProject do
       {:plug, "~> 1.20"},
 
       # Schema validation + sanitizing
-      {:guarded_struct, "~> 0.1.8"},
+      {:guarded_struct, "~> 0.1.9"},
       # Telemetry instrumentation
       {:telemetry, "~> 1.4"},
       # Plugin dependency graph: cycle detection + start ordering
