@@ -1,3 +1,9 @@
+# Changelog for MishkaInstaller 0.1.17
+
+### Changed:
+
+- `guarded_struct` is `~> 0.1.10`, and the lock is on the newest Hex releases, `plug` 1.20.4 (which closes EEF-CVE-2026-120287) and `ex_doc` 0.40.5
+
 # Changelog for MishkaInstaller 0.1.16
 
 ### Added:
