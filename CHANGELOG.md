@@ -1,3 +1,9 @@
+# Changelog for MishkaInstaller 0.1.18
+
+### Changed:
+
+- `guarded_struct` is `~> 0.1.11`, so the plugin and event structs are built on its newest release. The rest of the lock (`plug` 1.20.4, `ex_doc` 0.40.5, `spark` 2.7.10 and the other dependencies) is already on the newest Hex releases
+
 # Changelog for MishkaInstaller 0.1.17
 
 ### Changed:
