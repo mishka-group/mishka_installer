@@ -1,3 +1,13 @@
+# Changelog for MishkaInstaller 0.1.18
+
+### Security:
+
+- An extension archive that would unpack past `max_bytes` bytes (default 500 MB) or `max_entries` files (default 10 000), or that holds a link, a device or a fifo, is refused before anything is written. A gzip archive is inflated only up to the limit, so a decompression bomb never fills memory or disk. Set the limits with `config :mishka_installer, :archive_limits, max_bytes: ..., max_entries: ...`
+
+### Changed:
+
+- `guarded_struct` is `~> 0.1.11`, so the plugin and event structs are built on its newest release. The rest of the lock (`plug` 1.20.4, `ex_doc` 0.40.5, `spark` 2.7.10 and the other dependencies) is already on the newest Hex releases
+
 # Changelog for MishkaInstaller 0.1.17
 
 ### Changed:
