@@ -46,6 +46,12 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
 
   @type app :: Installer.t() | map()
 
+  @default_archive_limits [max_bytes: 500 * 1024 * 1024, max_entries: 10_000]
+
+  @tar_entry_overhead 4 * 512
+
+  @tar_end_overhead 20 * 512
+
   ####################################################################################
   ######################### (▰˘◡˘▰) Functions (▰˘◡˘▰) ##########################
   ####################################################################################
@@ -143,6 +149,25 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   The archive may contain `ebin/...` at its top level or nested one directory deep
   (for example `<app>-<version>/ebin/...`). Nothing is compiled here.
 
+  ## Archive limits
+
+  Before anything is written, the archive's table is read and the whole archive is refused with
+  `{:error, [%{action: :extract, field: :path, ...}]}` when:
+
+  - its members would unpack past `:max_bytes` bytes in all (a gzip archive is also inflated only
+    up to that size, so a decompression bomb stops there and never fills memory or disk);
+  - it holds more than `:max_entries` members (files and directories);
+  - a member is not a regular file or a directory: a symlink, a hard link, a device or a fifo;
+  - a member path is absolute or climbs out with `..`.
+
+  Both limits are options; the defaults are 500 MB and 10 000 members:
+
+  ```elixir
+  config :mishka_installer, :archive_limits,
+    max_bytes: 500 * 1024 * 1024,
+    max_entries: 10_000
+  ```
+
   > #### Security considerations {: .warning}
   >
   > It is important to remember that all of the functionalities contained within this
@@ -176,43 +201,132 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
   defp extract_archive(archived, name) do
     base = extensions_path()
     temp_path = "#{base}/temp-#{name}"
-    File.rm_rf!(temp_path)
-    File.mkdir_p!(temp_path)
+    limits = archive_limits()
 
-    with :ok <- safe_tar_paths(archived),
-         :ok <-
-           :erl_tar.extract({:binary, archived}, [
-             :compressed,
-             {:cwd, String.to_charlist(temp_path)}
-           ]) do
-      finalize_extract(temp_path, "#{base}/#{name}")
-    else
-      {:error, [%{} | _] = errors} ->
-        File.rm_rf!(temp_path)
-        {:error, errors}
+    with {:ok, tar} <- inflate_archive(archived, limits),
+         :ok <- safe_tar_members(tar, limits) do
+      File.rm_rf!(temp_path)
+      File.mkdir_p!(temp_path)
+      unpack(tar, temp_path, "#{base}/#{name}")
+    end
+  end
+
+  defp unpack(tar, temp_path, dest) do
+    case :erl_tar.extract({:binary, tar}, [{:cwd, String.to_charlist(temp_path)}]) do
+      :ok ->
+        finalize_extract(temp_path, dest)
 
       error ->
         File.rm_rf!(temp_path)
         message = "There is a problem in extracting the compressed file of the pre-built library."
-        {:error, [%{message: message, field: :path, action: :extract, source: error}]}
+        {:error, [extract_error(message, error)]}
     end
   end
 
-  # Tar-slip guard: a malicious archive can carry members with absolute or `../` paths that escape
-  # the extraction dir. Read the table first and refuse the whole archive if any member is unsafe.
-  defp safe_tar_paths(archived) do
-    case :erl_tar.table({:binary, archived}, [:compressed]) do
+  defp archive_limits() do
+    Keyword.merge(
+      @default_archive_limits,
+      Application.get_env(:mishka_installer, :archive_limits, [])
+    )
+  end
+
+  # A gzip archive is inflated here, a block at a time, so a small download that would inflate
+  # without end is stopped at the limit instead of filling memory (`:erl_tar.table/2` with
+  # `:compressed` inflates the whole binary with no limit). A plain tar is taken as it is.
+  defp inflate_archive(<<0x1F, 0x8B, _::binary>> = archived, limits) do
+    z = :zlib.open()
+
+    try do
+      :ok = :zlib.inflateInit(z, 31, :cut)
+      inflate_chunks(z, :zlib.safeInflate(z, archived), limits, 0, [])
+    catch
+      :error, reason ->
+        {:error, [extract_error("The archive is not a readable gzip file.", reason)]}
+    after
+      :zlib.close(z)
+    end
+  end
+
+  defp inflate_archive(archived, limits) do
+    case byte_size(archived) > tar_size_limit(limits) do
+      true -> {:error, [too_big_error(limits[:max_bytes])]}
+      false -> {:ok, archived}
+    end
+  end
+
+  defp inflate_chunks(z, {status, chunks}, limits, total, acc) do
+    new_total = total + IO.iodata_length(chunks)
+
+    case {new_total > tar_size_limit(limits), status} do
+      {true, _status} ->
+        {:error, [too_big_error(limits[:max_bytes])]}
+
+      {false, :finished} ->
+        {:ok, IO.iodata_to_binary([acc | chunks])}
+
+      {false, :continue} ->
+        inflate_chunks(z, :zlib.safeInflate(z, []), limits, new_total, [acc | chunks])
+    end
+  end
+
+  # The tar stream holds each member's bytes plus its header blocks, so it may be `max_bytes` plus
+  # a few blocks for each entry and the end-of-archive record.
+  defp tar_size_limit(limits),
+    do: limits[:max_bytes] + limits[:max_entries] * @tar_entry_overhead + @tar_end_overhead
+
+  # Read the table first and refuse the whole archive, before anything is written, when a member
+  # would escape the extraction dir (tar-slip), is not a plain file or directory, or when the
+  # archive holds too many members or would unpack past the byte limit. The sizes are the ones
+  # `:erl_tar.extract/2` writes (a sparse member reports its full size).
+  defp safe_tar_members(tar, limits) do
+    case :erl_tar.table({:binary, tar}, [:verbose]) do
       {:ok, members} ->
-        if Enum.all?(members, &safe_member?/1) do
-          :ok
-        else
-          message = "The archive contains unsafe member paths (absolute or `..` traversal)."
-          {:error, [%{message: message, field: :path, action: :extract}]}
-        end
+        check_members(members, limits)
 
       error ->
-        message = "Could not read the archive table."
-        {:error, [%{message: message, field: :path, action: :extract, source: error}]}
+        {:error, [extract_error("Could not read the archive table.", error)]}
+    end
+  end
+
+  defp check_members(members, limits) do
+    with :ok <- within_entries(length(members), limits[:max_entries]),
+         :ok <- only_files_and_dirs(members),
+         :ok <- inside_extract_dir(members) do
+      members
+      |> Enum.reduce(0, fn {_name, _type, size, _mtime, _mode, _uid, _gid}, acc -> acc + size end)
+      |> within_bytes(limits[:max_bytes])
+    end
+  end
+
+  defp within_entries(count, max) when count > max do
+    message = "The archive holds more than #{max} files, the most an extension may unpack."
+    {:error, [extract_error(message, {:too_many_entries, count, max})]}
+  end
+
+  defp within_entries(_count, _max), do: :ok
+
+  defp within_bytes(total, max) when total > max, do: {:error, [too_big_error(max)]}
+  defp within_bytes(_total, _max), do: :ok
+
+  defp only_files_and_dirs(members) do
+    case Enum.find(members, &(elem(&1, 1) not in [:regular, :directory])) do
+      nil ->
+        :ok
+
+      {name, type, _size, _mtime, _mode, _uid, _gid} ->
+        message =
+          "The archive holds a link or a special file; an extension may hold only regular files and directories."
+
+        {:error, [extract_error(message, {:unsupported_member, type, to_string(name)})]}
+    end
+  end
+
+  defp inside_extract_dir(members) do
+    if Enum.all?(members, &safe_member?(elem(&1, 0))) do
+      :ok
+    else
+      message = "The archive contains unsafe member paths (absolute or `..` traversal)."
+      {:error, [%{message: message, field: :path, action: :extract}]}
     end
   end
 
@@ -220,6 +334,14 @@ defmodule MishkaInstaller.Installer.LibraryHandler do
     parts = name |> to_string() |> Path.split()
     not (String.starts_with?(to_string(name), "/") or ".." in parts)
   end
+
+  defp too_big_error(max) do
+    message = "The archive would unpack past #{max} bytes, the most an extension may take."
+    extract_error(message, {:too_big, max})
+  end
+
+  defp extract_error(message, source),
+    do: %{message: message, field: :path, action: :extract, source: source}
 
   @doc """
   Helper function to load an application and all its dependencies.
