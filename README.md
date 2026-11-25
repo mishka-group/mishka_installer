@@ -120,6 +120,9 @@ Installer.uninstall(%{app: "demo", version: "0.1.0"})
 > [!NOTE]
 > Remote installs (`:url`/`:github_*`) are **fail-closed**: they require the source host/repo in `config :mishka_installer, :allowlist, url_hosts:/github_repos:`, a `:url` must be `https`, and a redirect is followed only to `https` hosts the install may use. `checksum:` (sha256) pins the artifact; without one a remote install logs a warning, and `require_checksum: true` in the same config refuses it; `:protected_apps` guards apps from being overwritten/removed. See `MishkaInstaller.Installer.Installer`.
 
+> [!NOTE]
+> A downloaded archive is checked before anything is written: it is refused when it would unpack past `max_bytes` (default 500 MB), holds more than `max_entries` members (default 10 000), or holds a link, device or fifo. Set your own limits with `config :mishka_installer, :archive_limits, max_bytes: ..., max_entries: ...`. See `MishkaInstaller.Installer.LibraryHandler.extract/3`.
+
 ---
 
 ## 🏭 Production deployment

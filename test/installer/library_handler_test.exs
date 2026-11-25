@@ -218,4 +218,103 @@ defmodule MishkaInstallerTest.Installer.LibraryHandlerTest do
     # rejected before extracting — nothing written outside the temp dir
     refute File.exists?(escaped)
   end
+
+  describe "Extract archive limits" do
+    setup do
+      Application.put_env(:mishka_installer, :archive_limits,
+        max_bytes: 64 * 1024,
+        max_entries: 5
+      )
+
+      on_exit(fn -> Application.delete_env(:mishka_installer, :archive_limits) end)
+      :ok
+    end
+
+    test "a normal archive still extracts under the limits" do
+      {tarball, name, dest} = limits_archive(fn _ebin -> :ok end)
+
+      :ok = assert LibraryHandler.extract(:tar, tarball, name)
+      assert File.dir?("#{dest}/ebin")
+    end
+
+    test "an archive whose members add up past max_bytes is refused and nothing is written" do
+      {tarball, name, dest} =
+        limits_archive(fn ebin ->
+          File.write!(Path.join(ebin, "big.bin"), :crypto.strong_rand_bytes(70 * 1024))
+        end)
+
+      {:error, [%{action: :extract, field: :path, source: {:too_big, 65_536}}]} =
+        assert LibraryHandler.extract(:tar, tarball, name)
+
+      assert_nothing_written(name, dest)
+    end
+
+    test "a gzip bomb is stopped while inflating and nothing is written" do
+      {tarball, name, dest} =
+        limits_archive(fn ebin ->
+          File.write!(Path.join(ebin, "zeros.bin"), :binary.copy(<<0>>, 8 * 1024 * 1024))
+        end)
+
+      assert byte_size(tarball) < 64 * 1024
+
+      {:error, [%{action: :extract, field: :path, source: {:too_big, 65_536}}]} =
+        assert LibraryHandler.extract(:tar, tarball, name)
+
+      assert_nothing_written(name, dest)
+    end
+
+    test "an archive with more members than max_entries is refused" do
+      {tarball, name, dest} =
+        limits_archive(fn ebin ->
+          for i <- 1..5, do: File.write!(Path.join(ebin, "extra-#{i}.txt"), "x")
+        end)
+
+      {:error, [%{action: :extract, field: :path, source: {:too_many_entries, count, 5}}]} =
+        assert LibraryHandler.extract(:tar, tarball, name)
+
+      assert count > 5
+
+      assert_nothing_written(name, dest)
+    end
+
+    test "an archive holding a symlink to outside is refused" do
+      outside = Path.join(System.tmp_dir!(), "outside-#{System.unique_integer([:positive])}")
+
+      {tarball, name, dest} =
+        limits_archive(fn ebin -> File.ln_s!(outside, Path.join(ebin, "evil")) end)
+
+      {:error, [%{action: :extract, field: :path, source: {:unsupported_member, :symlink, _}}]} =
+        assert LibraryHandler.extract(:tar, tarball, name)
+
+      assert_nothing_written(name, dest)
+      refute File.exists?(outside)
+    end
+  end
+
+  defp limits_archive(add_files) do
+    app = :"lib_handler_limits_#{System.unique_integer([:positive])}"
+    src = Path.join(System.tmp_dir!(), "limits-#{app}")
+    {^app, _module, ebin} = EbinFixture.build_fake_app(src, app, "0.1.0")
+    add_files.(ebin)
+    tar = Path.join(System.tmp_dir!(), "limits-#{app}.tar.gz")
+
+    :ok =
+      :erl_tar.create(String.to_charlist(tar), [{~c"ebin", String.to_charlist(ebin)}], [
+        :compressed
+      ])
+
+    tarball = File.read!(tar)
+    File.rm_rf!(src)
+    File.rm!(tar)
+
+    name = "#{app}-0.1.0"
+    dest = "#{LibraryHandler.extensions_path()}/#{name}"
+    on_exit(fn -> File.rm_rf!(dest) end)
+    {tarball, name, dest}
+  end
+
+  defp assert_nothing_written(name, dest) do
+    refute File.exists?(dest)
+    refute File.exists?("#{LibraryHandler.extensions_path()}/temp-#{name}")
+  end
 end
